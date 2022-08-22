@@ -1,10 +1,12 @@
+from typing import Sequence
+
 import numpy as np
 
 
 class Lowpass:
-    def __init__(self, dt: float, cutoff: np.ndarray):
+    def __init__(self, dt: float, cutoff: Sequence[float]):
         self.dt = dt
-        self.cutoff = cutoff
+        self.cutoff = np.array(cutoff)
         self.state = None
         self.reset()
 
