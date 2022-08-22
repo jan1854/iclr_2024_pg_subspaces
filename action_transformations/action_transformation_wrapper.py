@@ -35,7 +35,7 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
         return
 
     def transform_state(self, state: np.ndarray) -> np.ndarray:
-        return np.concatenate((state, self.transformation_state()))
+        return np.concatenate((state, self.transformation_observation()))
 
     @abc.abstractmethod
     def transform_action(self, action: np.ndarray) -> np.ndarray:
