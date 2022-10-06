@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(
-    name='action-transformations',
+    name='action-space-toolbox',
     version='',
-    packages=['action_transformations', 'action_transformations.filter', 'action_transformations.stateless'],
+    packages=['action_space_toolbox', 'action_space_toolbox.filter', 'action_space_toolbox.stateless'],
     url='',
     license='',
     author='Jan Schneider',
