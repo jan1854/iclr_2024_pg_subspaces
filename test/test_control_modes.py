@@ -1,12 +1,10 @@
-from time import sleep
-
 import gym
 import numpy as np
 
-from action_transformations.control_modes.get_control_state import get_control_state
-from action_transformations.control_modes.position_control_wrapper import PositionControlWrapper
-from action_transformations.control_modes.velocity_control_wrapper import VelocityControlWrapper
-from action_transformations.util.angles import normalize_angle
+from action_space_toolbox.control_modes.get_control_state import get_control_state
+from action_space_toolbox.control_modes.position_control_wrapper import PositionControlWrapper
+from action_space_toolbox.control_modes.velocity_control_wrapper import VelocityControlWrapper
+from action_space_toolbox.util.angles import normalize_angle
 
 
 def test_position_control_pendulum():
