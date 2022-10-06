@@ -1,8 +1,8 @@
 import gym
 import numpy as np
 
-from action_transformations.action_transformation_wrapper import ActionTransformationWrapper
-from action_transformations.transformations.filter.lowpass import Lowpass
+from action_space_toolbox.action_transformation_wrapper import ActionTransformationWrapper
+from action_space_toolbox.transformations.filter.lowpass import Lowpass
 
 
 class FilterWrapper(ActionTransformationWrapper):

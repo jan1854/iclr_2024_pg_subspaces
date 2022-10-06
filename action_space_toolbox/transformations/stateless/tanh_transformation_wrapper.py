@@ -3,7 +3,7 @@ from typing import Sequence, Union
 import gym
 import numpy as np
 
-from action_transformations.action_transformation_wrapper import ActionTransformationWrapper
+from action_space_toolbox.action_transformation_wrapper import ActionTransformationWrapper
 
 
 class TanhTransformationWrapper(ActionTransformationWrapper):

@@ -1,9 +1,9 @@
 import gym
 import numpy as np
 
-from action_transformations.action_transformation_wrapper import ActionTransformationWrapper
-from action_transformations.control_modes.get_control_state import get_control_state
-from action_transformations.util.angles import normalize_angle
+from action_space_toolbox.action_transformation_wrapper import ActionTransformationWrapper
+from action_space_toolbox.control_modes.get_control_state import get_control_state
+from action_space_toolbox.util.angles import normalize_angle
 
 
 class PositionControlWrapper(ActionTransformationWrapper):
