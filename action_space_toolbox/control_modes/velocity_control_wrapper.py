@@ -14,4 +14,3 @@ class VelocityControlWrapper(ActionTransformationWrapper):
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         _, vel = get_control_state(self.env)
         return -self.gains * (vel - action)
-        # return np.zeros(1)
