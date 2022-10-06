@@ -2,7 +2,7 @@ import gym
 import numpy as np
 
 from action_transformations.action_transformation_wrapper import ActionTransformationWrapper
-from action_transformations.filter.lowpass import Lowpass
+from action_transformations.transformations.filter.lowpass import Lowpass
 
 
 class FilterWrapper(ActionTransformationWrapper):
