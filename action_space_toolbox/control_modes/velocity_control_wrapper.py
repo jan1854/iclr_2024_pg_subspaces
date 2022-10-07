@@ -1,16 +1,19 @@
-import gym
+from typing import Union
+
 import numpy as np
 
 from action_space_toolbox.action_transformation_wrapper import ActionTransformationWrapper
-from action_space_toolbox.control_modes.get_control_state import get_control_state
+from action_space_toolbox.base_environments.controller_base_env import ControllerBaseEnv
 
 
 class VelocityControlWrapper(ActionTransformationWrapper):
-    def __init__(self, env: gym.Env, gains: np.ndarray):
+    def __init__(self, env: ControllerBaseEnv, gains: Union[float, np.ndarray] = 1.0):
         super().__init__(env)
-        assert gains.shape == gains.shape == env.action_space.shape
+        if np.isscalar(gains):
+            gains = gains * np.ones(env.action_space.shape)
+        assert gains.shape == env.action_space.shape
         self.gains = gains
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
-        _, vel = get_control_state(self.env)
+        vel = self.dof_velocities
         return -self.gains * (vel - action)
