@@ -19,7 +19,8 @@ class PositionControlWrapper(ActionTransformationWrapper):
         assert p_gains.shape == d_gains.shape == env.action_space.shape
         self.p_gains = p_gains
         self.d_gains = d_gains
-        self.action_space = gym.spaces.Box(env.dof_pos_bounds[:, 0], env.dof_pos_bounds[:, 1])
+        self.action_space = gym.spaces.Box(env.dof_pos_bounds[:, 0].astype(np.float32),
+                                           env.dof_pos_bounds[:, 1].astype(np.float32))
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         pos = self.dof_positions

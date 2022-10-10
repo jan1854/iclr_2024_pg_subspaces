@@ -14,7 +14,8 @@ class VelocityControlWrapper(ActionTransformationWrapper):
             gains = gains * np.ones(env.action_space.shape)
         assert gains.shape == env.action_space.shape
         self.gains = gains
-        self.action_space = gym.spaces.Box(env.dof_vel_bounds[:, 0], env.dof_vel_bounds[:, 1])
+        self.action_space = gym.spaces.Box(env.dof_vel_bounds[:, 0].astype(np.float32),
+                                           env.dof_vel_bounds[:, 1].astype(np.float32))
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         vel = self.dof_velocities
