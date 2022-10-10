@@ -1,5 +1,6 @@
 from typing import Union
 
+import gym
 import numpy as np
 
 from action_space_toolbox.action_transformation_wrapper import ActionTransformationWrapper
@@ -18,6 +19,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         assert p_gains.shape == d_gains.shape == env.action_space.shape
         self.p_gains = p_gains
         self.d_gains = d_gains
+        self.action_space = gym.spaces.Box(env.dof_pos_bounds[:, 0], env.dof_pos_bounds[:, 1])
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         pos = self.dof_positions

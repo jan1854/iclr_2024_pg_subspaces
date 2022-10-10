@@ -19,7 +19,9 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
         return self.transform_state(self.env.reset())
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict]:
-        obs, reward, done, info = self.env.step(self.transform_action(action))
+        action_transformed = self.transform_action(action)
+        action_transformed = np.clip(action_transformed, self.env.action_space.low, self.env.action_space.high)
+        obs, reward, done, info = self.env.step(action_transformed)
         return self.transform_state(obs), reward, done, info
 
     def reset_transformation(self) -> None:
@@ -27,12 +29,6 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
 
     def transformation_observation(self) -> np.ndarray:
         return np.array([])
-
-    def get_transformation_parameters(self) -> np.ndarray:
-        return np.array([])
-
-    def set_transformation_parameters(self, transformation_parameters: np.ndarray) -> None:
-        return
 
     def transform_state(self, state: np.ndarray) -> np.ndarray:
         return np.concatenate((state, self.transformation_observation()))

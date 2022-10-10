@@ -23,9 +23,3 @@ class FilterWrapper(ActionTransformationWrapper):
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         return self.filter.filter(action)
-
-    def get_transformation_parameters(self) -> np.ndarray:
-        return self.filter.state
-
-    def set_transformation_parameters(self, parameters: np.ndarray) -> None:
-        self.filter.state = parameters

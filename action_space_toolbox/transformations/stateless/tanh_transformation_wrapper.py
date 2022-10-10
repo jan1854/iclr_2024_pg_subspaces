@@ -16,11 +16,5 @@ class TanhTransformationWrapper(ActionTransformationWrapper):
                             - np.tanh(env.action_space.low * self.scaling_pre)
         self.scaling_post = (self.action_space.high - self.action_space.low) / tanh_output_range
 
-    def get_transformation_parameters(self) -> np.ndarray:
-        return self.scaling_pre
-
-    def set_transformation_parameters(self, transformation_parameters: np.ndarray) -> None:
-        self.scaling_pre = transformation_parameters
-
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         return np.tanh((action - self.offset) * self.scaling_pre) * self.scaling_post + self.offset
