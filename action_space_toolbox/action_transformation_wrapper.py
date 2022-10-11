@@ -20,8 +20,9 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict]:
         action_transformed = self.transform_action(action)
-        action_transformed = np.core.umath.clip(    # For some reason np.core.umath.clip is a lot faster than np.clip
-            action_transformed, self.env.action_space.low, self.env.action_space.high)
+        action_transformed = np.core.umath.clip(  # For some reason np.core.umath.clip is a lot faster than np.clip
+            action_transformed, self.env.action_space.low, self.env.action_space.high
+        )
         obs, reward, done, info = self.env.step(action_transformed)
         return self.transform_state(obs), reward, done, info
 

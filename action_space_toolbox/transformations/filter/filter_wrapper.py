@@ -1,7 +1,9 @@
 import gym
 import numpy as np
 
-from action_space_toolbox.action_transformation_wrapper import ActionTransformationWrapper
+from action_space_toolbox.action_transformation_wrapper import (
+    ActionTransformationWrapper,
+)
 from action_space_toolbox.transformations.filter.lowpass import Lowpass
 
 
