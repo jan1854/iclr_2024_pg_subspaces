@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "action-space-toolbox"
+description = ""
+version = "0.0.1"
+dependencies = [
+    "gym",
+    "numpy"
+]
+authors = [
+    {name="Jan Schneider", email="Jan.Schneider@tuebingen.mpg.de"}
+]
