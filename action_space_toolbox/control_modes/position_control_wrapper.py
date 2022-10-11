@@ -34,6 +34,8 @@ class PositionControlWrapper(ActionTransformationWrapper):
         pos = self.dof_positions
         vel = self.dof_velocities
         # Normalize the angle distances of all revolute dofs (so that diff(pi - 0.1, -pi + 0.1) = 0.2 not 2pi - 0.2)
+        # TODO: This only works if there are no angle bounds in place and the joint can do an arbitrary number of
+        #       rotations
         pos_error = ~self.dofs_revolute * (
             pos - action
         ) + self.dofs_revolute * normalize_angle(pos - action)
