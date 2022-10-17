@@ -3,7 +3,7 @@ from typing import Type, TypeVar, Union, Sequence, Optional
 import gym.envs.classic_control
 import numpy as np
 from gym.envs.classic_control import PendulumEnv
-from gym.envs.mujoco import MujocoEnv, ReacherEnv
+from gym.envs.mujoco import MujocoEnv
 from gym.envs.mujoco.ant_v3 import AntEnv
 from gym.envs.mujoco.half_cheetah_v3 import HalfCheetahEnv
 from gym.envs.mujoco.hopper_v3 import HopperEnv
