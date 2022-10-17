@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 
 import gym
 import numpy as np
@@ -19,6 +19,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         p_gains: Union[float, np.ndarray] = 1.0,
         d_gains: Union[float, np.ndarray] = 1.0,
         positions_relative: bool = False,
+        target_position_limits: Optional[np.ndarray] = None,
     ):
         assert check_wrapped_dof_information(env)
         super().__init__(env)
@@ -30,17 +31,29 @@ class PositionControlWrapper(ActionTransformationWrapper):
         self.p_gains = p_gains
         self.d_gains = d_gains
         self.positions_relative = positions_relative
-        if not positions_relative:
-            # TODO: This assumes revolute joints with no joint limits
-            self.action_space = gym.spaces.Box(
-                -np.pi * np.ones(env.action_space.shape, dtype=np.float32),
-                np.pi * np.ones(env.action_space.shape, dtype=np.float32),
-            )
+
+        if target_position_limits is not None:
+            target_position_limits = np.asarray(target_position_limits)
+            # Assume that the limits are the same for each action dimension if a single (low, high) pair is passed
+            if target_position_limits.ndim == 1:
+                target_position_limits[None].repeat(env.action_space.shape, axis=0)
         else:
-            self.action_space = gym.spaces.Box(
-                env.dof_pos_bounds[:, 0].astype(np.float32),  # type: ignore
-                env.dof_pos_bounds[:, 1].astype(np.float32),  # type: ignore
-            )
+            if positions_relative:
+                # TODO: This assumes revolute joints with no joint limits
+                target_position_limits = np.stack(
+                    (
+                        -np.pi * np.ones(env.action_space.shape, dtype=np.float32),
+                        np.pi * np.ones(env.action_space.shape, dtype=np.float32),
+                    ),
+                    axis=1,
+                )
+            else:
+                target_position_limits = env.dof_pos_bounds  # type: ignore
+
+        self.action_space = gym.spaces.Box(
+            target_position_limits[:, 0].astype(np.float32),
+            target_position_limits[:, 1].astype(np.float32),
+        )
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         pos = self.dof_positions
