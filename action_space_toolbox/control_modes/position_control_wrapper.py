@@ -6,18 +6,21 @@ import numpy as np
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
 )
-from action_space_toolbox.base_environments.controller_base_env import ControllerBaseEnv
+from action_space_toolbox.control_modes.check_wrapped_dof_information import (
+    check_wrapped_dof_information,
+)
 from action_space_toolbox.util.angles import normalize_angle
 
 
 class PositionControlWrapper(ActionTransformationWrapper):
     def __init__(
         self,
-        env: ControllerBaseEnv,
+        env: gym.Env,
         p_gains: Union[float, np.ndarray] = 1.0,
         d_gains: Union[float, np.ndarray] = 1.0,
         positions_relative: bool = False,
     ):
+        assert check_wrapped_dof_information(env)
         super().__init__(env)
         if np.isscalar(p_gains):
             p_gains = p_gains * np.ones(env.action_space.shape)
@@ -35,8 +38,8 @@ class PositionControlWrapper(ActionTransformationWrapper):
             )
         else:
             self.action_space = gym.spaces.Box(
-                env.dof_pos_bounds[:, 0].astype(np.float32),
-                env.dof_pos_bounds[:, 1].astype(np.float32),
+                env.dof_pos_bounds[:, 0].astype(np.float32),  # type: ignore
+                env.dof_pos_bounds[:, 1].astype(np.float32),  # type: ignore
             )
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
