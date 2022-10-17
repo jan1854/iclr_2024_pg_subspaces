@@ -2,7 +2,8 @@ import re
 
 import gym
 
-SUPPORTED_ENVS = ["Pendulum-v1", "HalfCheetah-v3"]
+from action_space_toolbox import ORIGINAL_ENV_ARGS
+
 SUPPORTED_CONTROL_MODES = ["PC", "VC"]
 
 
@@ -15,6 +16,6 @@ def test_instantiation():
     """
     Instantiates all implemented environments to test whether any exceptions occur during the instantiation.
     """
-    for env_id in SUPPORTED_ENVS:
+    for env_id in ORIGINAL_ENV_ARGS.keys():
         for control_mode_id in SUPPORTED_CONTROL_MODES:
             gym.make(construct_env_id(env_id, control_mode_id))
