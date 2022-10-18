@@ -14,7 +14,7 @@ from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 from action_space_toolbox.util.angles import normalize_angle
 
 
-def determine_target_dof_positions(env_id: str, num_positions: int) -> List[np.ndarray]:
+def sample_targets(env_id: str, num_targets: int) -> List[np.ndarray]:
     # Unwrap the env to get back the original action space
     env = gym.make(env_id)
     env.seed(42)
@@ -32,11 +32,11 @@ def determine_target_dof_positions(env_id: str, num_positions: int) -> List[np.n
             _, _, done, _ = env.step(action)
             dof_positions_curr_episode.append(env.dof_positions)
         dof_positions.extend(dof_positions_curr_episode)
-    return random.choices(dof_positions, k=num_positions)
+    return random.choices(dof_positions, k=num_targets)
 
 
-def visualize_target_positions(env, target_dof_positions: Sequence[np.ndarray]) -> None:
-    for pos in target_dof_positions:
+def visualize_targets(env, targets: Sequence[np.ndarray]) -> None:
+    for pos in targets:
         env.reset()
         if isinstance(env.unwrapped, gym.envs.mujoco.MujocoEnv):
             full_pos = env.sim.data.qpos
@@ -115,12 +115,12 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("env_id", type=str)
     parser.add_argument("num_iterations", type=int)
-    parser.add_argument("num_joint_positions", type=int)
     parser.add_argument("p_gains_exp_low", type=float)
     parser.add_argument("p_gains_exp_high", type=float)
     parser.add_argument("d_gains_exp_low", type=float)
     parser.add_argument("d_gains_exp_high", type=float)
     parser.add_argument("--visualize-targets", action="store_true")
+    parser.add_argument("--targets-to-sample", type=int, default=25)
     parser.add_argument("--repetitions-per-target", type=int, default=1)
     args = parser.parse_args()
 
@@ -133,13 +133,11 @@ if __name__ == "__main__":
     if args.env_id in fixed_targets:
         target_dof_positions = np.array(fixed_targets[args.env_id])
     else:
-        target_dof_positions = determine_target_dof_positions(
-            args.env_id, args.num_joint_positions
-        )
+        target_dof_positions = sample_targets(args.env_id, args.targets_to_sample)
 
     if args.visualize_targets:
         env = gym.make(args.env_id)
-        visualize_target_positions(env, target_dof_positions)
+        visualize_targets(env, target_dof_positions)
 
     tuned_gains = tune_pd_gains(
         args.env_id,
