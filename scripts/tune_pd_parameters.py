@@ -10,7 +10,7 @@ from action_space_toolbox import PositionControlWrapper
 from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 
 
-def determine_target_dof_positions(env_id) -> List[np.ndarray]:
+def determine_target_dof_positions(env_id, num_positions: int) -> List[np.ndarray]:
     # Unwrap the env to get back the original action space
     env = gym.make(env_id)
     env.seed(42)
@@ -30,7 +30,7 @@ def determine_target_dof_positions(env_id) -> List[np.ndarray]:
         # Leave out the first states since these can be hard to reach for certain initializations (e.g. the pendulum
         # might be initialized upright)
         dof_positions.extend(dof_positions_curr_episode[10:])
-    return random.choices(dof_positions, k=10)
+    return random.choices(dof_positions, k=num_positions)
 
 
 def visualize_target_positions(env, target_dof_positions: Sequence[np.ndarray]) -> None:
@@ -81,7 +81,7 @@ def tune_pd_gains(
 def evaluate_pd_gains(
     env,
     target_dof_positions: Sequence[np.ndarray],
-    num_episodes: int = 10,
+    num_episodes: int = 1,
     render=False,
 ) -> float:
     assert check_wrapped(env, PositionControlWrapper)
@@ -106,6 +106,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("env_id", type=str)
     parser.add_argument("num_iterations", type=int)
+    parser.add_argument("num_joint_positions", type=int)
     parser.add_argument("p_gains_exp_low", type=float)
     parser.add_argument("p_gains_exp_high", type=float)
     parser.add_argument("d_gains_exp_low", type=float)
@@ -113,7 +114,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     random.seed(42)
-    target_dof_positions = determine_target_dof_positions(args.env_id)
+    target_dof_positions = determine_target_dof_positions(
+        args.env_id, args.num_joint_positions
+    )
 
     tuned_gains = tune_pd_gains(
         args.env_id,
