@@ -149,6 +149,7 @@ if __name__ == "__main__":
         args.p_gains_exp_high,
         args.d_gains_exp_low,
         args.d_gains_exp_high,
+        args.repetitions_per_target,
     )
 
     env = gym.make(args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1])
