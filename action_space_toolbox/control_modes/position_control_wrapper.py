@@ -3,11 +3,12 @@ from typing import Union, Optional
 import gym
 import numpy as np
 
+from action_space_toolbox import DofInformationWrapper
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
 )
-from action_space_toolbox.control_modes.check_wrapped_dof_information import (
-    check_wrapped_dof_information,
+from action_space_toolbox.control_modes.check_wrapped import (
+    check_wrapped,
 )
 from action_space_toolbox.util.angles import normalize_angle
 
@@ -21,7 +22,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         positions_relative: bool = False,
         target_position_limits: Optional[np.ndarray] = None,
     ):
-        assert check_wrapped_dof_information(env)
+        assert check_wrapped(env, DofInformationWrapper)
         super().__init__(env)
         if np.isscalar(p_gains):
             p_gains = p_gains * np.ones(env.action_space.shape)

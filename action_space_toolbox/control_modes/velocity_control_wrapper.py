@@ -3,11 +3,12 @@ from typing import Union, Optional, Sequence
 import gym
 import numpy as np
 
+from action_space_toolbox import DofInformationWrapper
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
 )
-from action_space_toolbox.control_modes.check_wrapped_dof_information import (
-    check_wrapped_dof_information,
+from action_space_toolbox.control_modes.check_wrapped import (
+    check_wrapped,
 )
 
 
@@ -20,7 +21,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
             Union[Sequence[float], Sequence[Sequence[float]]]
         ] = None,
     ):
-        assert check_wrapped_dof_information(env)
+        assert check_wrapped(env, DofInformationWrapper)
         super().__init__(env)
         if np.isscalar(gains):
             gains = gains * np.ones(env.action_space.shape)
