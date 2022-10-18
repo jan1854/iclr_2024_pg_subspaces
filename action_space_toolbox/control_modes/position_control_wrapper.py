@@ -41,6 +41,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         else:
             if positions_relative:
                 # TODO: This assumes revolute joints with no joint limits
+                assert np.all(self.dofs_revolute)
                 target_position_limits = np.stack(
                     (
                         -np.pi * np.ones(env.action_space.shape, dtype=np.float32),
