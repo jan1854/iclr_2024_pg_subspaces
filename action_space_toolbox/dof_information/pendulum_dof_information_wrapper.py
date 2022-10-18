@@ -4,6 +4,7 @@ import numpy as np
 from action_space_toolbox.dof_information.dof_information_wrapper import (
     DofInformationWrapper,
 )
+from action_space_toolbox.util.angles import normalize_angle
 
 
 class PendulumDofInformationWrapper(DofInformationWrapper):
@@ -18,7 +19,7 @@ class PendulumDofInformationWrapper(DofInformationWrapper):
 
     @property
     def dof_positions(self) -> np.ndarray:
-        return np.array([self.state[0]])
+        return np.array([normalize_angle(self.state[0])])
 
     @property
     def dof_velocities(self) -> np.ndarray:
