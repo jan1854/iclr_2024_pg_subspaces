@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union, Optional, Sequence
 
 import gym
 import numpy as np
@@ -17,8 +17,8 @@ class PositionControlWrapper(ActionTransformationWrapper):
     def __init__(
         self,
         env: gym.Env,
-        p_gains: Union[float, np.ndarray] = 1.0,
-        d_gains: Union[float, np.ndarray] = 1.0,
+        p_gains: Union[float, Sequence[float]] = 1.0,
+        d_gains: Union[float, Sequence[float]] = 1.0,
         positions_relative: bool = False,
         target_position_limits: Optional[np.ndarray] = None,
     ):
@@ -28,6 +28,8 @@ class PositionControlWrapper(ActionTransformationWrapper):
             p_gains = p_gains * np.ones(env.action_space.shape)
         if np.isscalar(d_gains):
             d_gains = d_gains * np.ones(env.action_space.shape)
+        p_gains = np.asarray(p_gains)
+        d_gains = np.asarray(d_gains)
         assert p_gains.shape == d_gains.shape == env.action_space.shape
         self.p_gains = p_gains
         self.d_gains = d_gains
