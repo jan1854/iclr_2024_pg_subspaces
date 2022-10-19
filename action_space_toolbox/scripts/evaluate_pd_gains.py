@@ -78,10 +78,12 @@ if __name__ == "__main__":
     parser.add_argument("--p_gains", type=float, nargs="+")
     parser.add_argument("--d_gains", type=float, nargs="+")
     parser.add_argument("--num-targets", type=int, default=10)
+    parser.add_argument("--visualize-targets", action="store_true")
     args = parser.parse_args()
 
     targets = sample_targets(args.env_id, args.num_targets)
     env = gym.make(args.env_id, p_gains=args.p_gains, d_gains=args.d_gains)
-    visualize_targets(env, targets)
+    if args.visualize_targets:
+        visualize_targets(env, targets)
     loss = evaluate_pd_gains(env, targets, render=True)
     print(f"Average joint error: {loss}")
