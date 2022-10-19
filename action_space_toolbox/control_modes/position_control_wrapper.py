@@ -62,12 +62,11 @@ class PositionControlWrapper(ActionTransformationWrapper):
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         pos = self.dof_positions
         vel = self.dof_velocities
-        # Normalize the angle distances of all revolute dofs (so that diff(pi - 0.1, -pi + 0.1) = 0.2 not 2pi - 0.2)
-        # TODO: This only works if there are no angle bounds in place and the joint can do an arbitrary number of
-        #       rotations
         if self.positions_relative:
             pos_error = action
         else:
+            # Normalize the angle distances of multi-turn revolute dofs (so that diff(pi - 0.1, -pi + 0.1) = 0.2
+            # not 2pi - 0.2)
             multi_turn = np.logical_and(
                 np.logical_and(self.dofs_revolute, self.dof_pos_bounds[:, 0] == -np.pi),
                 self.dof_pos_bounds[:, 1] == np.pi,
