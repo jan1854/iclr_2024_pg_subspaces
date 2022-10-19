@@ -3,7 +3,7 @@ from typing import Type, TypeVar, Union, Sequence, Optional
 import gym.envs.classic_control
 import numpy as np
 from gym.envs.classic_control import PendulumEnv
-from gym.envs.mujoco import MujocoEnv
+from gym.envs.mujoco import MujocoEnv, ReacherEnv
 from gym.envs.mujoco.ant_v3 import AntEnv
 from gym.envs.mujoco.half_cheetah_v3 import HalfCheetahEnv
 from gym.envs.mujoco.hopper_v3 import HopperEnv
@@ -34,6 +34,7 @@ ORIGINAL_ENV_ARGS = {
     "Ant-v3": {"max_episode_steps": 1000, "reward_threshold": 6000.0},
     "HalfCheetah-v3": {"max_episode_steps": 1000, "reward_threshold": 4800.0},
     "Hopper-v3": {"max_episode_steps": 1000, "reward_threshold": 3800.0},
+    "Reacher-v2": {"max_episode_steps": 50, "reward_threshold": 3.75},
     "Walker2d-v3": {"max_episode_steps": 1000},
 }
 
@@ -160,6 +161,28 @@ gym.register(
         "positions_relative": False,
     },
     **ORIGINAL_ENV_ARGS["Hopper-v3"],
+)
+
+gym.register(
+    id="Reacher_VC-v2",
+    entry_point="action_space_toolbox:create_vc_env",
+    kwargs={
+        "base_env_type": ReacherEnv,
+        "gains": 10.0,
+        "target_velocity_limits": [-10.0, 10.0],
+    },
+    **ORIGINAL_ENV_ARGS["Reacher-v2"],
+)
+gym.register(
+    id="Reacher_PC-v2",
+    entry_point="action_space_toolbox:create_pc_env",
+    kwargs={
+        "base_env_type": ReacherEnv,
+        "p_gains": 15.0,
+        "d_gains": 2.0,
+        "positions_relative": False,
+    },
+    **ORIGINAL_ENV_ARGS["Reacher-v2"],
 )
 
 gym.register(
