@@ -7,7 +7,7 @@ name = "action-space-toolbox"
 description = ""
 version = "0.0.1"
 dependencies = [
-    "gym",
+    "gym==0.21",
     "numpy"
 ]
 authors = [
