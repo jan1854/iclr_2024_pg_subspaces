@@ -66,9 +66,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     random.seed(42)
-    fixed_targets_path = (
-        Path(__file__).parent.parent.parent / "res" / "pd_tuning_fixed_targets.json"
-    )
+    fixed_targets_path = Path(__file__).parent / "res" / "pd_tuning_fixed_targets.json"
     with fixed_targets_path.open("r") as fixed_targets_file:
         fixed_targets = json.load(fixed_targets_file)
     if args.env_id in fixed_targets:
