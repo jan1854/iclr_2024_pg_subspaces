@@ -81,7 +81,7 @@ def create_pc_env(
 gym.register(
     id="Pendulum_VC-v1",
     entry_point="action_space_toolbox:create_vc_env",
-    kwargs={"base_env_type": PendulumEnv, "gains": 10.0},
+    kwargs={"base_env_type": PendulumEnv, "gains": 10.0},  # TODO: Not tuned
     max_episode_steps=200,
 )
 gym.register(
@@ -89,20 +89,19 @@ gym.register(
     entry_point="action_space_toolbox:create_pc_env",
     kwargs={
         "base_env_type": PendulumEnv,
-        "p_gains": 15.0,
+        "p_gains": 15.0,  # Tuned (manually; controller accuracy)
         "d_gains": 2.0,
         "positions_relative": False,
     },
     max_episode_steps=200,
 )
 
-# TODO: Need to tune the controller gains and the velocity limits of all environments below
 gym.register(
     id="Ant_VC-v3",
     entry_point="action_space_toolbox:create_vc_env",
     kwargs={
         "base_env_type": AntEnv,
-        "gains": 10.0,
+        "gains": 10.0,  # TODO: Not tuned
         "target_velocity_limits": [-10.0, 10.0],
     },
     **ORIGINAL_ENV_ARGS["Ant-v3"],
@@ -112,7 +111,7 @@ gym.register(
     entry_point="action_space_toolbox:create_pc_env",
     kwargs={
         "base_env_type": AntEnv,
-        "p_gains": 15.0,
+        "p_gains": 15.0,  # TODO: Not tuned
         "d_gains": 2.0,
         "positions_relative": False,
     },
@@ -124,7 +123,7 @@ gym.register(
     entry_point="action_space_toolbox:create_vc_env",
     kwargs={
         "base_env_type": HalfCheetahEnv,
-        "gains": 10.0,
+        "gains": 10.0,  # TODO: Not tuned
         "target_velocity_limits": [-10.0, 10.0],
     },
     **ORIGINAL_ENV_ARGS["HalfCheetah-v3"],
@@ -134,7 +133,7 @@ gym.register(
     entry_point="action_space_toolbox:create_pc_env",
     kwargs={
         "base_env_type": HalfCheetahEnv,
-        "p_gains": 15.0,
+        "p_gains": 15.0,  # TODO: Not tuned
         "d_gains": 2.0,
         "positions_relative": False,
     },
@@ -146,7 +145,7 @@ gym.register(
     entry_point="action_space_toolbox:create_vc_env",
     kwargs={
         "base_env_type": HopperEnv,
-        "gains": 10.0,
+        "gains": 10.0,  # TODO: Not tuned
         "target_velocity_limits": [-10.0, 10.0],
     },
     **ORIGINAL_ENV_ARGS["Hopper-v3"],
@@ -156,7 +155,7 @@ gym.register(
     entry_point="action_space_toolbox:create_pc_env",
     kwargs={
         "base_env_type": HopperEnv,
-        "p_gains": 15.0,
+        "p_gains": 15.0,  # TODO: Not tuned
         "d_gains": 2.0,
         "positions_relative": False,
     },
@@ -168,7 +167,7 @@ gym.register(
     entry_point="action_space_toolbox:create_vc_env",
     kwargs={
         "base_env_type": ReacherEnv,
-        "gains": 10.0,
+        "gains": 10.0,  # TODO: Not tuned
         "target_velocity_limits": [-10.0, 10.0],
     },
     **ORIGINAL_ENV_ARGS["Reacher-v2"],
@@ -178,8 +177,8 @@ gym.register(
     entry_point="action_space_toolbox:create_pc_env",
     kwargs={
         "base_env_type": ReacherEnv,
-        "p_gains": 15.0,
-        "d_gains": 2.0,
+        "p_gains": 20.0,  # Tuned (grid search; controller accuracy)
+        "d_gains": 1.0,
         "positions_relative": False,
     },
     **ORIGINAL_ENV_ARGS["Reacher-v2"],
@@ -190,7 +189,7 @@ gym.register(
     entry_point="action_space_toolbox:create_vc_env",
     kwargs={
         "base_env_type": Walker2dEnv,
-        "gains": 10.0,
+        "gains": 10.0,  # TODO: Not tuned
         "target_velocity_limits": [-10.0, 10.0],
     },
     **ORIGINAL_ENV_ARGS["Walker2d-v3"],
@@ -200,7 +199,7 @@ gym.register(
     entry_point="action_space_toolbox:create_pc_env",
     kwargs={
         "base_env_type": Walker2dEnv,
-        "p_gains": 15.0,
+        "p_gains": 15.0,  # TODO: Not tuned
         "d_gains": 2.0,
         "positions_relative": False,
     },
