@@ -26,8 +26,8 @@ class MujocoDofInformationWrapper(DofInformationWrapper):
 
     @property
     def dof_positions(self) -> np.ndarray:
-        return np.array([self.env.sim.data.qpos[self.actuated_joints]])
+        return self.env.sim.data.qpos[self.actuated_joints]
 
     @property
     def dof_velocities(self) -> np.ndarray:
-        return np.array([self.env.sim.data.qvel[self.actuated_joints]])
+        return self.env.sim.data.qvel[self.actuated_joints]
