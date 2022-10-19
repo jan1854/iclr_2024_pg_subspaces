@@ -68,7 +68,11 @@ class PositionControlWrapper(ActionTransformationWrapper):
         if self.positions_relative:
             pos_error = action
         else:
-            pos_error = ~self.dofs_revolute * (
-                pos - action
-            ) + self.dofs_revolute * normalize_angle(pos - action)
+            multi_turn = np.logical_and(
+                np.logical_and(self.dofs_revolute, self.dof_pos_bounds[:, 0] == -np.pi),
+                self.dof_pos_bounds[:, 1] == np.pi,
+            )
+            pos_error = np.where(
+                multi_turn, normalize_angle(pos - action), pos - action
+            )
         return -self.p_gains * pos_error - self.d_gains * vel
