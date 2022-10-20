@@ -1,6 +1,8 @@
+import json
 import random
 import time
 from argparse import ArgumentParser
+from pathlib import Path
 from typing import List, Sequence
 
 import gym
@@ -81,7 +83,13 @@ if __name__ == "__main__":
     parser.add_argument("--visualize-targets", action="store_true")
     args = parser.parse_args()
 
-    targets = sample_targets(args.env_id, args.num_targets)
+    fixed_targets_path = Path(__file__).parent / "res" / "pd_tuning_fixed_targets.json"
+    with fixed_targets_path.open("r") as fixed_targets_file:
+        fixed_targets = json.load(fixed_targets_file)
+    if args.env_id in fixed_targets:
+        targets = np.array(fixed_targets[args.env_id])
+    else:
+        targets = sample_targets(args.env_id, args.num_targets)
     env = gym.make(args.env_id, p_gains=args.p_gains, d_gains=args.d_gains)
     if args.visualize_targets:
         visualize_targets(env, targets)
