@@ -16,7 +16,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
     def __init__(
         self,
         env: gym.Env,
-        gains: Union[float, np.ndarray] = 1.0,
+        gains: Union[float, Sequence[float]] = 1.0,
         target_velocity_limits: Optional[
             Union[Sequence[float], Sequence[Sequence[float]]]
         ] = None,
@@ -25,6 +25,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         super().__init__(env)
         if np.isscalar(gains):
             gains = gains * np.ones(env.action_space.shape)
+        gains = np.asarray(gains)
         assert gains.shape == env.action_space.shape
         self.gains = gains
         if target_velocity_limits is not None:
