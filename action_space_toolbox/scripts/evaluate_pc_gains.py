@@ -48,7 +48,7 @@ def visualize_targets(env, targets: Sequence[np.ndarray]) -> None:
         time.sleep(1)
 
 
-def evaluate_pd_gains(
+def evaluate_pc_gains(
     env,
     target_dof_positions: Sequence[np.ndarray],
     repetitions_per_target: int = 1,
@@ -93,5 +93,5 @@ if __name__ == "__main__":
     env = gym.make(args.env_id, p_gains=args.p_gains, d_gains=args.d_gains)
     if args.visualize_targets:
         visualize_targets(env, targets)
-    loss = evaluate_pd_gains(env, targets, render=True)
+    loss = evaluate_pc_gains(env, targets, render=True)
     print(f"Average joint error: {loss}")

@@ -8,14 +8,14 @@ import gym
 import gym.envs.mujoco
 import numpy as np
 
-from action_space_toolbox.scripts.evaluate_pd_gains import (
-    evaluate_pd_gains,
+from action_space_toolbox.scripts.evaluate_pc_gains import (
+    evaluate_pc_gains,
     sample_targets,
     visualize_targets,
 )
 
 
-def tune_pd_gains(
+def tune_pc_gains(
     env_id: str,
     dof_positions: Sequence[np.ndarray],
     num_iterations: int,
@@ -38,7 +38,7 @@ def tune_pd_gains(
         )
         env = gym.make(env_id, p_gains=p_gains, d_gains=d_gains)
         env.seed(42)
-        loss = evaluate_pd_gains(env, dof_positions, repetitions_per_target)
+        loss = evaluate_pc_gains(env, dof_positions, repetitions_per_target)
         print(
             f"Iteration: {i + 1}/{num_iterations}, p_gains: {p_gains}, d_gains: {d_gains}, loss: {loss}"
         )
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     random.seed(42)
-    fixed_targets_path = Path(__file__).parent / "res" / "pd_tuning_fixed_targets.json"
+    fixed_targets_path = Path(__file__).parent / "res" / "pc_tuning_fixed_targets.json"
     with fixed_targets_path.open("r") as fixed_targets_file:
         fixed_targets = json.load(fixed_targets_file)
     if args.env_id in fixed_targets:
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         env = gym.make(args.env_id)
         visualize_targets(env, target_dof_positions)
 
-    tuned_gains = tune_pd_gains(
+    tuned_gains = tune_pc_gains(
         args.env_id,
         target_dof_positions,
         args.num_iterations,
@@ -91,4 +91,4 @@ if __name__ == "__main__":
 
     env = gym.make(args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1])
     input("Press any key to visualize the optimized controllers.")
-    evaluate_pd_gains(env, target_dof_positions, repetitions_per_target=1, render=True)
+    evaluate_pc_gains(env, target_dof_positions, repetitions_per_target=1, render=True)
