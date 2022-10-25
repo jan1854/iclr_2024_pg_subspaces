@@ -83,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument("--visualize-targets", action="store_true")
     args = parser.parse_args()
 
-    fixed_targets_path = Path(__file__).parent / "res" / "pd_tuning_fixed_targets.json"
+    fixed_targets_path = Path(__file__).parent / "res" / "pc_tuning_fixed_targets.json"
     with fixed_targets_path.open("r") as fixed_targets_file:
         fixed_targets = json.load(fixed_targets_file)
     if args.env_id in fixed_targets:
