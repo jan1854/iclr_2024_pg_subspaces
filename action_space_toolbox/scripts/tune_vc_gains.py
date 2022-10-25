@@ -38,9 +38,7 @@ def tune_vc_gains(
             best_gains = gains
             best_loss = loss
 
-    print(
-        f"best: p_gains: {best_gains[0]}, d_gains: {best_gains[1]}, loss: {best_loss}"
-    )
+    print(f"best: gains: {best_gains}, loss: {best_loss}")
     return best_gains
 
 
