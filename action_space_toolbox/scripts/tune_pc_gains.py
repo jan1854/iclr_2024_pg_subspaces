@@ -38,7 +38,7 @@ def tune_pc_gains(
         )
         env = gym.make(env_id, p_gains=p_gains, d_gains=d_gains)
         env.seed(42)
-        loss = evaluate_pc_gains(env, dof_positions, repetitions_per_target)
+        loss = evaluate_pc_gains(env, dof_positions, repetitions_per_target, max_steps_per_episode=200)
         print(
             f"Iteration: {i + 1}/{num_iterations}, p_gains: {p_gains}, d_gains: {d_gains}, loss: {loss}"
         )

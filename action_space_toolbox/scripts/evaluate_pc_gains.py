@@ -3,7 +3,7 @@ import random
 import time
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Sequence, Optional
 
 import gym
 import gym.envs.mujoco
@@ -53,6 +53,7 @@ def evaluate_pc_gains(
     target_dof_positions: Sequence[np.ndarray],
     repetitions_per_target: int = 1,
     render: bool = False,
+    max_steps_per_episode: Optional[int] = None
 ) -> float:
     assert check_wrapped(env, PositionControlWrapper)
     joint_errors = []
@@ -61,6 +62,7 @@ def evaluate_pc_gains(
             done = False
             env.reset()
             joint_errors.append(0.0)
+            i = 0
             while not done:
                 _, _, done, _ = env.step(target_dof_position)
                 if render:
@@ -70,6 +72,9 @@ def evaluate_pc_gains(
                     diff
                 ) * np.array(env.dofs_revolute)
                 joint_errors[-1] += np.mean(np.abs(joint_diff))
+                i += 1
+                if max_steps_per_episode is not None and i >= max_steps_per_episode:
+                    break
 
     return np.mean(joint_errors)  # type: ignore
 
