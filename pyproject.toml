@@ -6,10 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "action-space-toolbox"
 description = ""
 version = "0.0.1"
-dependencies = [
-    "gym==0.21",
-    "numpy"
-]
 authors = [
     {name="Jan Schneider", email="Jan.Schneider@tuebingen.mpg.de"}
 ]
+dependencies = [
+    "gym==0.21",    # To ensure compatibility to stable-baselines3
+    "numpy",
+    "dm_control",
+    "dmc2gym @ git+https://github.com/denisyarats/dmc2gym.git"
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
