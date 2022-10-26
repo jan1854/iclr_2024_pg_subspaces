@@ -3,6 +3,7 @@ import time
 from argparse import ArgumentParser
 from typing import List, Sequence, Tuple
 
+import dmc2gym.wrappers
 import gym
 import gym.envs.mujoco
 import numpy as np
@@ -17,6 +18,8 @@ State = Tuple[np.ndarray, np.ndarray]
 def _set_state(env, state) -> None:
     if isinstance(env.unwrapped, gym.envs.mujoco.MujocoEnv):
         env.set_state(*state)
+    elif isinstance(env.unwrapped, dmc2gym.wrappers.DMCWrapper):
+        env.physics.set_state(state)
     else:
         env.state = state
 
@@ -39,9 +42,11 @@ def sample_targets(
         while not done:
             if isinstance(env.unwrapped, gym.envs.mujoco.MujocoEnv):
                 sim_state = env.sim.get_state()
-                state = (sim_state.qpos, sim_state.qvel)
+                state = (sim_state.qpos.copy(), sim_state.qvel.copy())
+            elif isinstance(env.unwrapped, dmc2gym.wrappers.DMCWrapper):
+                state = env.physics.get_state().copy()
             else:
-                state = env.state
+                state = env.state.copy()
             action = env.action_space.sample()
             _, _, done, _ = env.step(action)
             dof_velocities_curr_episode.append((state, env.dof_velocities))
