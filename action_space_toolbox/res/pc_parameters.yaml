@@ -1,0 +1,7 @@
+Pendulum-v1:
+  p_gains: 15
+  d_gains: 2
+
+Reacher-v2:
+  p_gains: 20
+  d_gains: 1

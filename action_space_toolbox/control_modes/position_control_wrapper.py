@@ -74,4 +74,6 @@ class PositionControlWrapper(ActionTransformationWrapper):
             pos_error = np.where(
                 multi_turn, normalize_angle(pos - action), pos - action
             )
-        return -self.p_gains * pos_error - self.d_gains * vel
+        return (-self.p_gains * pos_error - self.d_gains * vel).astype(
+            self.env.action_space.dtype
+        )

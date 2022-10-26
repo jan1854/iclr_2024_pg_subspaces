@@ -1,7 +1,13 @@
-from typing import Type, TypeVar, Union, Sequence, Optional
+import re
+from pathlib import Path
+from typing import Type, TypeVar, Union, Sequence, Optional, Tuple
 
+import dm_control.suite
+import dmc2gym
+import dmc2gym.wrappers
 import gym.envs.classic_control
 import numpy as np
+import yaml
 from gym.envs.classic_control import PendulumEnv
 from gym.envs.mujoco import MujocoEnv, ReacherEnv
 from gym.envs.mujoco.ant_v3 import AntEnv
@@ -12,8 +18,11 @@ from gym.envs.mujoco.walker2d_v3 import Walker2dEnv
 from action_space_toolbox.dof_information.dof_information_wrapper import (
     DofInformationWrapper,
 )
-from action_space_toolbox.dof_information.mujoco_dof_information_wrapper import (
-    MujocoDofInformationWrapper,
+from action_space_toolbox.dof_information.dmc_dof_information_wrapper import (
+    DMCDofInformationWrapper,
+)
+from action_space_toolbox.dof_information.gym_mujoco_dof_information_wrapper import (
+    GymMujocoDofInformationWrapper,
 )
 from action_space_toolbox.dof_information.pendulum_dof_information_wrapper import (
     PendulumDofInformationWrapper,
@@ -27,23 +36,21 @@ from action_space_toolbox.control_modes.velocity_control_wrapper import (
 
 TEnv = TypeVar("TEnv", bound=gym.Env)
 
-ORIGINAL_ENV_ARGS = {
-    # Classic control
-    "Pendulum-v1": {"max_episode_steps": 200},
-    # MuJoCo
-    "Ant-v3": {"max_episode_steps": 1000, "reward_threshold": 6000.0},
-    "HalfCheetah-v3": {"max_episode_steps": 1000, "reward_threshold": 4800.0},
-    "Hopper-v3": {"max_episode_steps": 1000, "reward_threshold": 3800.0},
-    "Reacher-v2": {"max_episode_steps": 50, "reward_threshold": 3.75},
-    "Walker2d-v3": {"max_episode_steps": 1000},
-}
+
+def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **kwargs):
+    if isinstance(base_env_type_or_id, tuple):
+        return dmc2gym.make(base_env_type_or_id[0], base_env_type_or_id[1], **kwargs)
+    else:
+        return base_env_type_or_id(**kwargs)
 
 
 def wrap_env_dof_information(env: gym.Env) -> DofInformationWrapper:
     if isinstance(env.unwrapped, PendulumEnv):
         return PendulumDofInformationWrapper(env)
     elif isinstance(env.unwrapped, MujocoEnv):
-        return MujocoDofInformationWrapper(env)
+        return GymMujocoDofInformationWrapper(env)
+    elif isinstance(env.unwrapped, dmc2gym.wrappers.DMCWrapper):
+        return DMCDofInformationWrapper(env)
     else:
         raise NotImplementedError(
             f"Environment {type(env.unwrapped)} is not supported."
@@ -51,157 +58,82 @@ def wrap_env_dof_information(env: gym.Env) -> DofInformationWrapper:
 
 
 def create_vc_env(
-    base_env_type: Type[TEnv],
+    base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     gains: np.ndarray,
     target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
     **kwargs,
 ) -> VelocityControlWrapper:
+    base_env = create_base_env(base_env_type_or_id, **kwargs)
     return VelocityControlWrapper(
-        wrap_env_dof_information(base_env_type(**kwargs)), gains, target_velocity_limits
+        wrap_env_dof_information(base_env), gains, target_velocity_limits
     )
 
 
 def create_pc_env(
-    base_env_type: Type[TEnv],
+    base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     p_gains: np.ndarray,
     d_gains: np.ndarray,
-    positions_relative: bool,
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
     **kwargs,
 ) -> PositionControlWrapper:
+    base_env = create_base_env(base_env_type_or_id, **kwargs)
     return PositionControlWrapper(
-        wrap_env_dof_information(base_env_type(**kwargs)),
+        wrap_env_dof_information(base_env),
         p_gains,
         d_gains,
-        positions_relative,
-        target_position_limits,
+        target_position_limits=target_position_limits,
     )
 
 
-gym.register(
-    id="Pendulum_VC-v1",
-    entry_point="action_space_toolbox:create_vc_env",
-    kwargs={"base_env_type": PendulumEnv, "gains": 10.0},  # TODO: Not tuned
-    max_episode_steps=200,
-)
-gym.register(
-    id="Pendulum_PC-v1",
-    entry_point="action_space_toolbox:create_pc_env",
-    kwargs={
-        "base_env_type": PendulumEnv,
-        "p_gains": 15.0,  # Tuned (manually; controller accuracy)
-        "d_gains": 2.0,
-        "positions_relative": False,
-    },
-    max_episode_steps=200,
-)
+def construct_env_name(base_env_name: str, control_mode: str) -> str:
+    version_str = re.findall("-v[0-9]+", base_env_name)[-1]
+    return f"{base_env_name[:-len(version_str)]}_{control_mode}{version_str}"
 
-gym.register(
-    id="Ant_VC-v3",
-    entry_point="action_space_toolbox:create_vc_env",
-    kwargs={
-        "base_env_type": AntEnv,
-        "gains": 10.0,  # TODO: Not tuned
-        "target_velocity_limits": [-10.0, 10.0],
-    },
-    **ORIGINAL_ENV_ARGS["Ant-v3"],
-)
-gym.register(
-    id="Ant_PC-v3",
-    entry_point="action_space_toolbox:create_pc_env",
-    kwargs={
-        "base_env_type": AntEnv,
-        "p_gains": 15.0,  # TODO: Not tuned
-        "d_gains": 2.0,
-        "positions_relative": False,
-    },
-    **ORIGINAL_ENV_ARGS["Ant-v3"],
-)
 
-gym.register(
-    id="HalfCheetah_VC-v3",
-    entry_point="action_space_toolbox:create_vc_env",
-    kwargs={
-        "base_env_type": HalfCheetahEnv,
-        "gains": 10.0,  # TODO: Not tuned
-        "target_velocity_limits": [-10.0, 10.0],
-    },
-    **ORIGINAL_ENV_ARGS["HalfCheetah-v3"],
-)
-gym.register(
-    id="HalfCheetah_PC-v3",
-    entry_point="action_space_toolbox:create_pc_env",
-    kwargs={
-        "base_env_type": HalfCheetahEnv,
-        "p_gains": 15.0,  # TODO: Not tuned
-        "d_gains": 2.0,
-        "positions_relative": False,
-    },
-    **ORIGINAL_ENV_ARGS["HalfCheetah-v3"],
-)
+BASE_ENV_TYPE_OR_ID = {
+    # Classic control
+    "Pendulum-v1": PendulumEnv,
+    # MuJoCo
+    "Ant-v3": AntEnv,
+    "HalfCheetah-v3": HalfCheetahEnv,
+    "Hopper-v3": HopperEnv,
+    "Reacher-v2": ReacherEnv,
+    "Walker2d-v3": Walker2dEnv,
+} | {
+    f"dmc_{domain.capitalize()}-{task}-v1": (domain, task)
+    for domain in dm_control.suite._DOMAINS.keys()
+    for task in dm_control.suite._DOMAINS[domain].SUITE
+}
 
-gym.register(
-    id="Hopper_VC-v3",
-    entry_point="action_space_toolbox:create_vc_env",
-    kwargs={
-        "base_env_type": HopperEnv,
-        "gains": 10.0,  # TODO: Not tuned
-        "target_velocity_limits": [-10.0, 10.0],
-    },
-    **ORIGINAL_ENV_ARGS["Hopper-v3"],
-)
-gym.register(
-    id="Hopper_PC-v3",
-    entry_point="action_space_toolbox:create_pc_env",
-    kwargs={
-        "base_env_type": HopperEnv,
-        "p_gains": 15.0,  # TODO: Not tuned
-        "d_gains": 2.0,
-        "positions_relative": False,
-    },
-    **ORIGINAL_ENV_ARGS["Hopper-v3"],
-)
+DEFAULT_PARAMETERS = {"VC": {"gains": 10.0}, "PC": {"p_gains": 15.0, "d_gains": 2.0}}
 
-gym.register(
-    id="Reacher_VC-v2",
-    entry_point="action_space_toolbox:create_vc_env",
-    kwargs={
-        "base_env_type": ReacherEnv,
-        "gains": 10.0,  # TODO: Not tuned
-        "target_velocity_limits": [-10.0, 10.0],
-    },
-    **ORIGINAL_ENV_ARGS["Reacher-v2"],
-)
-gym.register(
-    id="Reacher_PC-v2",
-    entry_point="action_space_toolbox:create_pc_env",
-    kwargs={
-        "base_env_type": ReacherEnv,
-        "p_gains": 20.0,  # Tuned (grid search; controller accuracy)
-        "d_gains": 1.0,
-        "positions_relative": False,
-    },
-    **ORIGINAL_ENV_ARGS["Reacher-v2"],
-)
+pc_parameters_path = Path(__file__).parent / "res" / "pc_parameters.yaml"
+with pc_parameters_path.open("r") as pc_parameters_file:
+    pc_parameters = yaml.safe_load(pc_parameters_file)
+vc_parameters_path = Path(__file__).parent / "res" / "vc_parameters.yaml"
+with vc_parameters_path.open("r") as vc_parameters_file:
+    vc_parameters = yaml.safe_load(vc_parameters_file)
+original_env_args_path = Path(__file__).parent / "res" / "original_env_args.yaml"
+with original_env_args_path.open("r") as original_env_args_file:
+    original_env_args = yaml.safe_load(original_env_args_file)
 
-gym.register(
-    id="Walker2d_VC-v3",
-    entry_point="action_space_toolbox:create_vc_env",
-    kwargs={
-        "base_env_type": Walker2dEnv,
-        "gains": 10.0,  # TODO: Not tuned
-        "target_velocity_limits": [-10.0, 10.0],
-    },
-    **ORIGINAL_ENV_ARGS["Walker2d-v3"],
-)
-gym.register(
-    id="Walker2d_PC-v3",
-    entry_point="action_space_toolbox:create_pc_env",
-    kwargs={
-        "base_env_type": Walker2dEnv,
-        "p_gains": 15.0,  # TODO: Not tuned
-        "d_gains": 2.0,
-        "positions_relative": False,
-    },
-    **ORIGINAL_ENV_ARGS["Walker2d-v3"],
-)
+control_mode_parameters = {"VC": vc_parameters, "PC": pc_parameters}
+entry_points = {
+    "VC": "action_space_toolbox:create_vc_env",
+    "PC": "action_space_toolbox:create_pc_env",
+}
+
+
+for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
+    for control_mode in control_mode_parameters:
+        parameters = DEFAULT_PARAMETERS[control_mode] | control_mode_parameters.get(
+            base_env_name, {}
+        )
+        env_args = original_env_args.get(base_env_name, {})
+
+        gym.register(
+            id=construct_env_name(base_env_name, control_mode),
+            entry_point=entry_points[control_mode],
+            kwargs={"base_env_type_or_id": base_env_type_or_id, **parameters},
+            **env_args,
+        )

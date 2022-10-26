@@ -2,7 +2,7 @@ import re
 
 import gym
 
-from action_space_toolbox import ORIGINAL_ENV_ARGS
+from action_space_toolbox import BASE_ENV_TYPE_OR_ID
 
 SUPPORTED_CONTROL_MODES = ["PC", "VC"]
 
@@ -16,6 +16,10 @@ def test_instantiation():
     """
     Instantiates all implemented environments to test whether any exceptions occur during the instantiation.
     """
-    for env_id in ORIGINAL_ENV_ARGS.keys():
+    for env_id in BASE_ENV_TYPE_OR_ID.keys():
         for control_mode_id in SUPPORTED_CONTROL_MODES:
-            gym.make(construct_env_id(env_id, control_mode_id))
+            env = gym.make(construct_env_id(env_id, control_mode_id))
+
+            env.reset()
+            action = env.action_space.sample()
+            env.step(action)

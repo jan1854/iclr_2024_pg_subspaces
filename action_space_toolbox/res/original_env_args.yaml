@@ -1,0 +1,23 @@
+# Gym: Classic control
+Pendulum-v1:
+  max_episode_steps: 200
+
+# Gym: MuJoCo
+Ant-v3:
+  max_episode_steps: 1000
+  reward_threshold: 6000.0
+
+HalfCheetah-v3:
+  max_episode_steps: 1000
+  reward_threshold: 4800.0
+
+Hopper-v3:
+  max_episode_steps: 1000
+  reward_threshold: 3800.0
+
+Reacher-v2:
+  max_episode_steps: 50
+  reward_threshold: 3.75
+
+Walker2d-v3:
+  max_episode_steps: 1000

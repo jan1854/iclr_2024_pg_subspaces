@@ -7,11 +7,11 @@ from action_space_toolbox.dof_information.dof_information_wrapper import (
 )
 
 
-class MujocoDofInformationWrapper(DofInformationWrapper):
+class GymMujocoDofInformationWrapper(DofInformationWrapper):
     def __init__(self, env: gym.Env):
         assert isinstance(env.unwrapped, MujocoEnv)
         self.actuated_joints = env.model.actuator_trnid[:, 0]
-        dofs_revolute = env.model.jnt_type[self.actuated_joints] == 3
+        dofs_revolute = env.model.jnt_type == 3
         dof_pos_bounds = []
         for j in self.actuated_joints:
             if env.model.jnt_limited[j]:
@@ -22,7 +22,9 @@ class MujocoDofInformationWrapper(DofInformationWrapper):
                 dof_pos_bounds.append(np.array([-np.inf, np.inf]))
         dof_pos_bounds = np.array(dof_pos_bounds)
         dof_vel_bounds = None  # TODO: There does not appear to be a maximum joint velocity property of the Mujoco environments
-        super().__init__(env, dof_pos_bounds, dof_vel_bounds, dofs_revolute)
+        super().__init__(
+            env, dof_pos_bounds, dof_vel_bounds, dofs_revolute[self.actuated_joints]
+        )
 
     @property
     def dof_positions(self) -> np.ndarray:

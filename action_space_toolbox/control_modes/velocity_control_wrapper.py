@@ -1,3 +1,4 @@
+import logging
 from typing import Union, Optional, Sequence
 
 import gym
@@ -10,6 +11,8 @@ from action_space_toolbox.action_transformation_wrapper import (
 from action_space_toolbox.control_modes.check_wrapped import (
     check_wrapped,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VelocityControlWrapper(ActionTransformationWrapper):
@@ -31,12 +34,18 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         if target_velocity_limits is not None:
             target_velocity_limits = np.asarray(target_velocity_limits)
             # Assume that the limits are the same for each action dimension if a single (low, high) pair is passed
-            if target_velocity_limits.ndim == 1:
-                target_velocity_limits = target_velocity_limits[None].repeat(
-                    env.action_space.shape, axis=0
-                )
-        else:
+        elif env.dof_vel_bounds is not None:  # type: ignore
             target_velocity_limits = env.dof_vel_bounds  # type: ignore
+        else:
+            target_velocity_limits = np.array([[-10.0, 10.0]])
+            logger.info(
+                f"Did not find target velocity limits for environment {env}. Using the default [-10, 10]."
+            )
+
+        if target_velocity_limits.ndim == 1:
+            target_velocity_limits = target_velocity_limits[None].repeat(
+                env.action_space.shape, axis=0
+            )
         self.action_space = gym.spaces.Box(
             target_velocity_limits[:, 0].astype(np.float32),
             target_velocity_limits[:, 1].astype(np.float32),
@@ -44,4 +53,4 @@ class VelocityControlWrapper(ActionTransformationWrapper):
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         vel = self.dof_velocities
-        return -self.gains * (vel - action)
+        return (-self.gains * (vel - action)).astype(np.float32)
