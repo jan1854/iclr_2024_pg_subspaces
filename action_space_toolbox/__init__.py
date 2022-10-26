@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import Type, TypeVar, Union, Sequence, Optional, Tuple
 
@@ -33,6 +32,7 @@ from action_space_toolbox.control_modes.position_control_wrapper import (
 from action_space_toolbox.control_modes.velocity_control_wrapper import (
     VelocityControlWrapper,
 )
+from action_space_toolbox.util.construct_env_id import construct_env_id
 
 TEnv = TypeVar("TEnv", bound=gym.Env)
 
@@ -85,11 +85,6 @@ def create_pc_env(
     )
 
 
-def construct_env_name(base_env_name: str, control_mode: str) -> str:
-    version_str = re.findall("-v[0-9]+", base_env_name)[-1]
-    return f"{base_env_name[:-len(version_str)]}_{control_mode}{version_str}"
-
-
 BASE_ENV_TYPE_OR_ID = {
     # Classic control
     "Pendulum-v1": PendulumEnv,
@@ -105,7 +100,7 @@ BASE_ENV_TYPE_OR_ID = {
     for task in dm_control.suite._DOMAINS[domain].SUITE
 }
 
-DEFAULT_PARAMETERS = {"VC": {"gains": 10.0}, "PC": {"p_gains": 15.0, "d_gains": 2.0}}
+DEFAULT_PARAMETERS = {"TC": {}, "VC": {"gains": 10.0}, "PC": {"p_gains": 15.0, "d_gains": 2.0}}
 
 pc_parameters_path = Path(__file__).parent / "res" / "pc_parameters.yaml"
 with pc_parameters_path.open("r") as pc_parameters_file:
@@ -117,12 +112,12 @@ original_env_args_path = Path(__file__).parent / "res" / "original_env_args.yaml
 with original_env_args_path.open("r") as original_env_args_file:
     original_env_args = yaml.safe_load(original_env_args_file)
 
-control_mode_parameters = {"VC": vc_parameters, "PC": pc_parameters}
-entry_points = {
+control_mode_parameters = {"TC": {}, "VC": vc_parameters, "PC": pc_parameters}
+ENTRY_POINTS = {
+    "TC": "action_space_toolbox:create_base_env",
     "VC": "action_space_toolbox:create_vc_env",
     "PC": "action_space_toolbox:create_pc_env",
 }
-
 
 for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
     for control_mode in control_mode_parameters:
@@ -132,8 +127,8 @@ for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
         env_args = original_env_args.get(base_env_name, {})
 
         gym.register(
-            id=construct_env_name(base_env_name, control_mode),
-            entry_point=entry_points[control_mode],
+            id=construct_env_id(base_env_name, control_mode),
+            entry_point=ENTRY_POINTS[control_mode],
             kwargs={"base_env_type_or_id": base_env_type_or_id, **parameters},
             **env_args,
         )
