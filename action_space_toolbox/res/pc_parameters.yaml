@@ -5,3 +5,11 @@ Pendulum-v1:
 Reacher-v2:
   p_gains: 20
   d_gains: 1
+
+dmc_Pendulum-swingup-v1:
+  p_gains: 60
+  d_gains: 30
+
+dmc_Reacher-easy-v1:
+  p_gains: [87, 32]
+  d_gains: [1.6, 1.4]
