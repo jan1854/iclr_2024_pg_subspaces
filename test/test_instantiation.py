@@ -1,5 +1,6 @@
 import gym
 
+import action_space_toolbox
 from action_space_toolbox import BASE_ENV_TYPE_OR_ID, construct_env_id, ENTRY_POINTS
 
 
@@ -14,3 +15,12 @@ def test_instantiation():
             env.reset()
             action = env.action_space.sample()
             env.step(action)
+
+
+def test_unused_parameters():
+    """
+    Check that all parameters defined in pc_parameters.yaml / vc_parameters.yaml belong to a supported environment.
+    """
+    for parameters in action_space_toolbox.control_mode_parameters.values():
+        for env_name in parameters.keys():
+            assert env_name in BASE_ENV_TYPE_OR_ID
