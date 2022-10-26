@@ -10,10 +10,10 @@ authors = [
     {name="Jan Schneider", email="Jan.Schneider@tuebingen.mpg.de"}
 ]
 dependencies = [
-    "gym==0.21",    # To ensure compatibility to stable-baselines3
-    "numpy",
     "dm_control",
-    "dmc2gym @ git+https://github.com/denisyarats/dmc2gym.git"
+    "dmc2gym @ git+https://github.com/denisyarats/dmc2gym.git",
+    "gym[mujoco]==0.21",    # To ensure compatibility to stable-baselines3
+    "numpy"
 ]
 
 [project.optional-dependencies]
