@@ -121,7 +121,7 @@ ENTRY_POINTS = {
 
 for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
     for control_mode in control_mode_parameters:
-        parameters = DEFAULT_PARAMETERS[control_mode] | control_mode_parameters.get(
+        parameters = DEFAULT_PARAMETERS[control_mode] | control_mode_parameters[control_mode].get(
             base_env_name, {}
         )
         env_args = original_env_args.get(base_env_name, {})
