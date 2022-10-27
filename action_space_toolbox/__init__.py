@@ -57,8 +57,8 @@ def wrap_env_dof_information(env: gym.Env) -> DofInformationWrapper:
         )
 
 
-def maybe_wrap_action_normalization(env: gym.Env) -> gym.Env:
-    if np.all(env.action_space.low == -1) and np.all(env.action_space.high == 1):
+def maybe_wrap_action_normalization(env: gym.Env, normalize: bool) -> gym.Env:
+    if not normalize or np.all(env.action_space.low == -1) and np.all(env.action_space.high == 1):
         return env
     else:
         return gym.wrappers.RescaleAction(env, -1, 1)
@@ -68,13 +68,14 @@ def create_vc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     gains: np.ndarray,
     target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
+    normalize: bool = True,
     **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
     env = VelocityControlWrapper(
         wrap_env_dof_information(base_env), gains, target_velocity_limits
     )
-    return maybe_wrap_action_normalization(env)
+    return maybe_wrap_action_normalization(env, normalize)
 
 
 def create_pc_env(
@@ -82,6 +83,7 @@ def create_pc_env(
     p_gains: np.ndarray,
     d_gains: np.ndarray,
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
+    normalize: bool = True,
     **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
@@ -91,15 +93,16 @@ def create_pc_env(
         d_gains,
         target_position_limits=target_position_limits,
     )
-    return maybe_wrap_action_normalization(env)
+    return maybe_wrap_action_normalization(env, normalize)
 
 
 def create_tc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
+    normalize: bool = True,
     **kwargs
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
-    return maybe_wrap_action_normalization(base_env)
+    return maybe_wrap_action_normalization(base_env, normalize)
 
 
 # TODO: Support also fish and ball_in_cup tasks (find sensible limits for the positions)

@@ -8,7 +8,7 @@ from action_space_toolbox.util.angles import normalize_angle
 
 
 def test_position_control_pendulum():
-    env = gym.make("Pendulum_PC-v1")
+    env = gym.make("Pendulum_PC-v1", normalize=False)
     target_positions = [np.pi - d for d in np.arange(0.0, 0.2, 0.02)] + [
         -np.pi + d for d in np.arange(0.02, 0.2, 0.02)
     ]
@@ -25,6 +25,7 @@ def test_velocity_control_pendulum():
     env = gym.make(
         "Pendulum_VC-v1",
         g=0.0,  # Disable gravity, so that we can achieve the velocity at all times
+        normalize = False
     )
     target_velocities = np.arange(-0.2, 0.2, 0.05)
     for target_velocity in target_velocities:
@@ -67,7 +68,7 @@ def test_position_control_multiturn():
 
 
 def test_position_control_dmc_pendulum():
-    env = gym.make("dmc_Pendulum-swingup_PC-v1")
+    env = gym.make("dmc_Pendulum-swingup_PC-v1", normalize=False)
     target_positions = [np.pi - d for d in np.arange(0.0, 0.2, 0.02)] + [
         -np.pi + d for d in np.arange(0.02, 0.2, 0.02)
     ]
@@ -82,7 +83,7 @@ def test_position_control_dmc_pendulum():
 
 
 def test_velocity_control_dmc_pendulum():
-    env = gym.make("dmc_Pendulum-swingup_VC-v1")
+    env = gym.make("dmc_Pendulum-swingup_VC-v1", normalize=False)
     # Disable gravity, so that we can achieve the velocity at all times
     env.unwrapped._env.physics.model.opt.gravity = np.zeros(3)
     target_velocities = np.arange(-0.2, 0.2, 0.05)
