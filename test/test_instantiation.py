@@ -17,6 +17,7 @@ def test_instantiation():
             action = env.action_space.sample()
             env.step(action)
 
+            assert np.all(env.action_space.low == -1) and np.all(env.action_space.high == 1)
             assert env.action_space.shape == env.unwrapped.action_space.shape
 
 

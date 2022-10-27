@@ -57,16 +57,24 @@ def wrap_env_dof_information(env: gym.Env) -> DofInformationWrapper:
         )
 
 
+def maybe_wrap_action_normalization(env: gym.Env) -> gym.Env:
+    if np.all(env.action_space.low == -1) and np.all(env.action_space.high == 1):
+        return env
+    else:
+        return gym.wrappers.RescaleAction(env, -1, 1)
+
+
 def create_vc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     gains: np.ndarray,
     target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
     **kwargs,
-) -> VelocityControlWrapper:
+) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
-    return VelocityControlWrapper(
+    env = VelocityControlWrapper(
         wrap_env_dof_information(base_env), gains, target_velocity_limits
     )
+    return maybe_wrap_action_normalization(env)
 
 
 def create_pc_env(
@@ -75,16 +83,26 @@ def create_pc_env(
     d_gains: np.ndarray,
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
     **kwargs,
-) -> PositionControlWrapper:
+) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
-    return PositionControlWrapper(
+    env = PositionControlWrapper(
         wrap_env_dof_information(base_env),
         p_gains,
         d_gains,
         target_position_limits=target_position_limits,
     )
+    return maybe_wrap_action_normalization(env)
 
 
+def create_tc_env(
+    base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
+    **kwargs
+) -> gym.Env:
+    base_env = create_base_env(base_env_type_or_id, **kwargs)
+    return maybe_wrap_action_normalization(base_env)
+
+
+# TODO: Support also fish and ball_in_cup tasks (find sensible limits for the positions)
 BASE_ENV_TYPE_OR_ID = {
     # Classic control
     "Pendulum-v1": PendulumEnv,
@@ -96,8 +114,7 @@ BASE_ENV_TYPE_OR_ID = {
     "Walker2d-v3": Walker2dEnv,
 } | {
     f"dmc_{domain.capitalize()}-{task}-v1": (domain, task)
-    for domain in dm_control.suite._DOMAINS.keys()
-    for task in dm_control.suite._DOMAINS[domain].SUITE
+    for domain, task in dm_control.suite.BENCHMARKING if domain != "fish" and domain != "ball_in_cup"
 }
 
 DEFAULT_PARAMETERS = {"TC": {}, "VC": {"gains": 10.0}, "PC": {"p_gains": 15.0, "d_gains": 2.0}}
@@ -114,7 +131,7 @@ with original_env_args_path.open("r") as original_env_args_file:
 
 control_mode_parameters = {"TC": {}, "VC": vc_parameters, "PC": pc_parameters}
 ENTRY_POINTS = {
-    "TC": "action_space_toolbox:create_base_env",
+    "TC": "action_space_toolbox:create_tc_env",
     "VC": "action_space_toolbox:create_vc_env",
     "PC": "action_space_toolbox:create_pc_env",
 }

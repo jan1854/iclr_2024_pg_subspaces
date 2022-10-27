@@ -28,4 +28,4 @@ env = gym.make("dmc_Pendulum-swingup_VC-v1")
 ## Supported environments
 OpenAI Gym: Pendulum-v1, Ant-v3, HalfCheetah-v3, Hopper-v3, Reacher-v2, Walker2d-v3
 
-DeepMind Control Suite: All environments
+DeepMind Control Suite: All benchmarking environments except for fish and ball-in-cup environments
