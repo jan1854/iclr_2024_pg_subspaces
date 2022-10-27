@@ -1,4 +1,5 @@
 import gym
+import numpy as np
 
 import action_space_toolbox
 from action_space_toolbox import BASE_ENV_TYPE_OR_ID, construct_env_id, ENTRY_POINTS
@@ -15,6 +16,8 @@ def test_instantiation():
             env.reset()
             action = env.action_space.sample()
             env.step(action)
+
+            assert env.action_space.shape == env.unwrapped.action_space.shape
 
 
 def test_unused_parameters():

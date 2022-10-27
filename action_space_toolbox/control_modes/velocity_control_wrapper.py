@@ -37,7 +37,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         elif env.dof_vel_bounds is not None:  # type: ignore
             target_velocity_limits = env.dof_vel_bounds  # type: ignore
         else:
-            target_velocity_limits = np.array([[-10.0, 10.0]])
+            target_velocity_limits = np.array([-10.0, 10.0])
             logger.info(
                 f"Did not find target velocity limits for environment {env}. Using the default [-10, 10]."
             )
