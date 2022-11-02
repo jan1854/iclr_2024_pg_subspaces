@@ -11,20 +11,41 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
     for state-full transformations (requires changing the observations).
     """
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gym.Env, repeat: int = 1, keep_base_timestep: bool = False):
+        """
+        :param env:                 The gym environment to wrap
+        :param repeat:              Number of steps for which the wrapped environment should be executed for each step
+                                    of the wrapper (rewards are averaged and the last observation of the wrapped
+                                    environment is used as observation of the wrapper)
+        :param keep_base_timestep:  Whether the simulation timestep of the base environment should be kept. If false,
+                                    the timestep of the base environment will be changed to original timestep / repeat
+                                    (so that the resulting time of one step of the wrapper is the same as the original
+                                    timestep)
+        """
         super().__init__(env)
+        assert repeat >= 1
+        self.repeat = repeat
+        if not keep_base_timestep:
+            self.env.set_timestep(self.env.timestep / repeat)
 
     def reset(self, **kwargs) -> np.ndarray:
         self.reset_transformation()
         return self.transform_state(self.env.reset())
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict]:
-        action_transformed = self.transform_action(action)
-        action_transformed = np.core.umath.clip(  # For some reason np.core.umath.clip is a lot faster than np.clip
-            action_transformed, self.env.action_space.low, self.env.action_space.high
-        )
-        obs, reward, done, info = self.env.step(action_transformed)
-        return self.transform_state(obs), reward, done, info
+        rewards = []
+        for _ in range(self.repeat):
+            action_transformed = self.transform_action(action)
+            action_transformed = np.core.umath.clip(  # For some reason np.core.umath.clip is a lot faster than np.clip
+                action_transformed,
+                self.env.action_space.low,
+                self.env.action_space.high,
+            )
+            obs, reward, done, info = self.env.step(action_transformed)
+            rewards.append(reward)
+            if done:
+                break
+        return self.transform_state(obs), np.mean(rewards), done, info
 
     def reset_transformation(self) -> None:
         return

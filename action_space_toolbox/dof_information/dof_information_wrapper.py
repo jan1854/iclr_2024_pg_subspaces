@@ -30,7 +30,6 @@ class DofInformationWrapper(gym.Wrapper):
         """
         The position of each controllable dof.
         """
-        pass
 
     @property
     @abc.abstractmethod
@@ -38,4 +37,16 @@ class DofInformationWrapper(gym.Wrapper):
         """
         The velocity of each controllable dof.
         """
-        pass
+
+    @property
+    @abc.abstractmethod
+    def timestep(self) -> float:
+        """
+        The time step of the simulation.
+        """
+
+    @abc.abstractmethod
+    def set_timestep(self, timestep: float) -> None:
+        """
+        Set the time step of the simulation.
+        """

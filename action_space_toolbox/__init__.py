@@ -38,8 +38,17 @@ TEnv = TypeVar("TEnv", bound=gym.Env)
 
 
 def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **kwargs):
+    # The step limit of the environment is problematic when using a different controller frequency, therefore we disable
+    # it / set a very large value and handle termination with a TimeLimitWrapper later
     if isinstance(base_env_type_or_id, tuple):
-        return dmc2gym.make(base_env_type_or_id[0], base_env_type_or_id[1], **kwargs)
+        time_limit_wrapped_env = dmc2gym.make(
+            base_env_type_or_id[0],
+            base_env_type_or_id[1],
+            time_limit=int(1e9),
+            **kwargs,
+        )
+        # Remove the TimeLimitWrapper added by dmc2gym (see above)
+        return time_limit_wrapped_env.env
     else:
         return base_env_type_or_id(**kwargs)
 
@@ -58,7 +67,11 @@ def wrap_env_dof_information(env: gym.Env) -> DofInformationWrapper:
 
 
 def maybe_wrap_action_normalization(env: gym.Env, normalize: bool) -> gym.Env:
-    if not normalize or np.all(env.action_space.low == -1) and np.all(env.action_space.high == 1):
+    if (
+        not normalize
+        or np.all(env.action_space.low == -1)
+        and np.all(env.action_space.high == 1)
+    ):
         return env
     else:
         return gym.wrappers.RescaleAction(env, -1, 1)
@@ -68,12 +81,16 @@ def create_vc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     gains: np.ndarray,
     target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
+    controller_steps: int = 1,
     normalize: bool = True,
     **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
     env = VelocityControlWrapper(
-        wrap_env_dof_information(base_env), gains, target_velocity_limits
+        wrap_env_dof_information(base_env),
+        gains,
+        target_velocity_limits,
+        controller_steps,
     )
     return maybe_wrap_action_normalization(env, normalize)
 
@@ -83,6 +100,7 @@ def create_pc_env(
     p_gains: np.ndarray,
     d_gains: np.ndarray,
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
+    controller_steps: int = 1,
     normalize: bool = True,
     **kwargs,
 ) -> gym.Env:
@@ -92,6 +110,7 @@ def create_pc_env(
         p_gains,
         d_gains,
         target_position_limits=target_position_limits,
+        controller_steps=controller_steps,
     )
     return maybe_wrap_action_normalization(env, normalize)
 
@@ -99,7 +118,7 @@ def create_pc_env(
 def create_tc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     normalize: bool = True,
-    **kwargs
+    **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
     return maybe_wrap_action_normalization(base_env, normalize)
@@ -117,10 +136,15 @@ BASE_ENV_TYPE_OR_ID = {
     "Walker2d-v3": Walker2dEnv,
 } | {
     f"dmc_{domain.capitalize()}-{task}-v1": (domain, task)
-    for domain, task in dm_control.suite.BENCHMARKING if domain != "fish" and domain != "ball_in_cup"
+    for domain, task in dm_control.suite.BENCHMARKING
+    if domain != "fish" and domain != "ball_in_cup"
 }
 
-DEFAULT_PARAMETERS = {"TC": {}, "VC": {"gains": 10.0}, "PC": {"p_gains": 15.0, "d_gains": 2.0}}
+DEFAULT_PARAMETERS = {
+    "TC": {},
+    "VC": {"gains": 10.0},
+    "PC": {"p_gains": 15.0, "d_gains": 2.0},
+}
 
 pc_parameters_path = Path(__file__).parent / "res" / "pc_parameters.yaml"
 with pc_parameters_path.open("r") as pc_parameters_file:
@@ -141,10 +165,10 @@ ENTRY_POINTS = {
 
 for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
     for control_mode in control_mode_parameters:
-        parameters = DEFAULT_PARAMETERS[control_mode] | control_mode_parameters[control_mode].get(
-            base_env_name, {}
-        )
-        env_args = original_env_args.get(base_env_name, {})
+        parameters = DEFAULT_PARAMETERS[control_mode] | control_mode_parameters[
+            control_mode
+        ].get(base_env_name, {})
+        env_args = original_env_args.get(base_env_name, {"max_episode_steps": 1000})
 
         gym.register(
             id=construct_env_id(base_env_name, control_mode),

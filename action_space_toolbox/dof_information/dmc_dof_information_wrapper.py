@@ -32,3 +32,10 @@ class DMCDofInformationWrapper(DofInformationWrapper):
     @property
     def dof_velocities(self) -> np.ndarray:
         return self.env.physics.data.qvel[self.actuated_joints]
+
+    @property
+    def timestep(self) -> float:
+        return self.env.physics.model.opt.timestep
+
+    def set_timestep(self, timestep: float) -> None:
+        self.env.physics.model.opt.timestep = timestep

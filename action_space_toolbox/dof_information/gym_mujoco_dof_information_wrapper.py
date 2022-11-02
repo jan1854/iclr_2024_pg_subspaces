@@ -33,3 +33,10 @@ class GymMujocoDofInformationWrapper(DofInformationWrapper):
     @property
     def dof_velocities(self) -> np.ndarray:
         return self.env.sim.data.qvel[self.actuated_joints]
+
+    @property
+    def timestep(self) -> float:
+        return self.env.sim.model.opt.timestep
+
+    def set_timestep(self, timestep: float) -> None:
+        self.env.sim.model.opt.timestep = timestep

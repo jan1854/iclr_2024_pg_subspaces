@@ -21,9 +21,11 @@ class PositionControlWrapper(ActionTransformationWrapper):
         d_gains: Union[float, Sequence[float]] = 1.0,
         positions_relative: bool = False,
         target_position_limits: Optional[np.ndarray] = None,
+        controller_steps: int = 1,
+        keep_base_timestep: bool = False,
     ):
         assert check_wrapped(env, DofInformationWrapper)
-        super().__init__(env)
+        super().__init__(env, controller_steps, keep_base_timestep)
         if np.isscalar(p_gains):
             p_gains = p_gains * np.ones(env.action_space.shape)
         if np.isscalar(d_gains):

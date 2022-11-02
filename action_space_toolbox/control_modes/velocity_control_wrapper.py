@@ -23,9 +23,11 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         target_velocity_limits: Optional[
             Union[Sequence[float], Sequence[Sequence[float]]]
         ] = None,
+        controller_steps: int = 1,
+        keep_base_timestep: bool = False,
     ):
         assert check_wrapped(env, DofInformationWrapper)
-        super().__init__(env)
+        super().__init__(env, controller_steps, keep_base_timestep)
         if np.isscalar(gains):
             gains = gains * np.ones(env.action_space.shape)
         gains = np.asarray(gains)
