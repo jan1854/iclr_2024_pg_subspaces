@@ -33,11 +33,13 @@ from action_space_toolbox.control_modes.velocity_control_wrapper import (
     VelocityControlWrapper,
 )
 from action_space_toolbox.util.construct_env_id import construct_env_id
+from action_space_toolbox.util.action_repeat_wrapper import ActionRepeatWrapper
 
 TEnv = TypeVar("TEnv", bound=gym.Env)
 
 
 def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **kwargs):
+    assert "frame_skip" not in kwargs or kwargs["frame_skip"] == 1
     # The step limit of the environment is problematic when using a different controller frequency, therefore we disable
     # it / set a very large value and handle termination with a TimeLimitWrapper later
     if isinstance(base_env_type_or_id, tuple):
@@ -79,12 +81,20 @@ def maybe_wrap_action_normalization(env: gym.Env, normalize: bool) -> gym.Env:
         return gym.wrappers.RescaleAction(env, -1, 1)
 
 
+def maybe_wrap_action_repeat(env: gym.Env, action_repeat: int) -> gym.Env:
+    if action_repeat > 1:
+        return ActionRepeatWrapper(env, action_repeat)
+    else:
+        return env
+
+
 def create_vc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     gains: np.ndarray,
     target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
     controller_steps: int = 1,
     normalize: bool = True,
+    action_repeat: int = 1,
     **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
@@ -94,7 +104,8 @@ def create_vc_env(
         target_velocity_limits,
         controller_steps,
     )
-    return maybe_wrap_action_normalization(env, normalize)
+    env = maybe_wrap_action_normalization(env, normalize)
+    return maybe_wrap_action_repeat(env, action_repeat)
 
 
 def create_pc_env(
@@ -104,6 +115,7 @@ def create_pc_env(
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
     controller_steps: int = 1,
     normalize: bool = True,
+    action_repeat: int = 1,
     **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
@@ -114,16 +126,19 @@ def create_pc_env(
         target_position_limits=target_position_limits,
         controller_steps=controller_steps,
     )
-    return maybe_wrap_action_normalization(env, normalize)
+    env = maybe_wrap_action_normalization(env, normalize)
+    return maybe_wrap_action_repeat(env, action_repeat)
 
 
 def create_tc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     normalize: bool = True,
+    action_repeat: int = 1,
     **kwargs,
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
-    return maybe_wrap_action_normalization(base_env, normalize)
+    env = maybe_wrap_action_normalization(base_env, normalize)
+    return maybe_wrap_action_repeat(env, action_repeat)
 
 
 # TODO: Support also fish and ball_in_cup tasks (find sensible limits for the positions)
