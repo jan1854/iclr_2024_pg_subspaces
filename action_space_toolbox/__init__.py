@@ -45,6 +45,8 @@ def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **k
             base_env_type_or_id[0],
             base_env_type_or_id[1],
             time_limit=int(1e9),
+            height=480,
+            width=640,
             **kwargs,
         )
         # Remove the TimeLimitWrapper added by dmc2gym (see above)
