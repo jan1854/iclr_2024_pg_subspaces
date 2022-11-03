@@ -39,6 +39,7 @@ TEnv = TypeVar("TEnv", bound=gym.Env)
 
 
 def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **kwargs):
+    # Action repeat is handled by the ActionRepeatWrapper (accessible with the action_repeat argument to gym.make())
     assert "frame_skip" not in kwargs or kwargs["frame_skip"] == 1
     # The step limit of the environment is problematic when using a different controller frequency, therefore we disable
     # it / set a very large value and handle termination with a TimeLimitWrapper later
