@@ -129,16 +129,39 @@ def test_controller_frequency():
     controller_steps = 4
     episode_length = 1000
     for env_id in ["HalfCheetah_PC-v3", "dmc_Acrobot-swingup_PC-v1"]:
-        env_original_timestep = gym.make(env_id, controller_steps=1)
-        env = gym.make(env_id, controller_steps=controller_steps)
-        env.reset()
-        steps = execute_episode(env)
-        if isinstance(env.unwrapped, DMCWrapper):
-            sim_time = env.physics.data.time
-            frame_skip = 1
-        else:
-            sim_time = env.sim.data.time
-            frame_skip = env.frame_skip
-        assert env.timestep == approx(env_original_timestep.timestep / controller_steps)
-        assert steps == episode_length
-        assert sim_time == approx(env.timestep * steps * frame_skip * controller_steps)
+        for keep_base_timestep in [True, False]:
+            env_original_timestep = gym.make(env_id, controller_steps=1)
+            env = gym.make(
+                env_id,
+                controller_steps=controller_steps,
+                keep_base_timestep=keep_base_timestep,
+            )
+            env.reset()
+            steps = execute_episode(env)
+            if isinstance(env.unwrapped, DMCWrapper):
+                sim_time = env.physics.data.time
+                base_action_repeat = 1
+            else:
+                sim_time = env.sim.data.time
+                base_action_repeat = env.frame_skip
+            if keep_base_timestep:
+                assert env.timestep == approx(env_original_timestep.timestep)
+                assert steps == episode_length // controller_steps
+                assert sim_time == approx(
+                    env.timestep
+                    * steps
+                    * env.base_env_timestep_factor
+                    * base_action_repeat
+                )
+            else:
+                assert env.timestep == approx(
+                    env_original_timestep.timestep / controller_steps
+                )
+                assert steps == episode_length
+                assert sim_time == approx(
+                    env.timestep
+                    * steps
+                    * env.base_env_timestep_factor
+                    * base_action_repeat
+                    * controller_steps
+                )

@@ -26,7 +26,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
             Union[Sequence[float], Sequence[Sequence[float]]]
         ] = None,
         controller_steps: int = 1,
-        keep_base_timestep: bool = False,
+        keep_base_timestep: bool = True,
     ):
         assert check_wrapped(env, ControllerBaseWrapper)
         super().__init__(env, controller_steps, keep_base_timestep)

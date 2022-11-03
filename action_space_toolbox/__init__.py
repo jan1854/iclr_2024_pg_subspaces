@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Type, TypeVar, Union, Sequence, Optional, Tuple
 
@@ -36,6 +37,8 @@ from action_space_toolbox.util.construct_env_id import construct_env_id
 from action_space_toolbox.util.action_repeat_wrapper import ActionRepeatWrapper
 
 TEnv = TypeVar("TEnv", bound=gym.Env)
+
+logger = logging.getLogger(__name__)
 
 
 def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **kwargs):
@@ -89,24 +92,37 @@ def maybe_wrap_action_repeat(env: gym.Env, action_repeat: int) -> gym.Env:
         return env
 
 
+def add_common_wrappers(
+    env: gym.Env, normalize: bool, action_repeat: int, max_episode_steps: int
+) -> gym.Env:
+    env = maybe_wrap_action_normalization(env, normalize)
+    env = maybe_wrap_action_repeat(env, action_repeat)
+    if max_episode_steps % env.base_env_timestep_factor != 0:
+        logger.warning(
+            f"The episode length of the original environment {max_episode_steps} is not divisible by the "
+            f"action repeat {env.base_env_timestep_factor}. Episodes will be shorter than specified."
+        )
+    env = gym.wrappers.TimeLimit(env, max_episode_steps // env.base_env_timestep_factor)
+    return env
+
+
 def create_vc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     gains: np.ndarray,
     target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
     controller_steps: int = 1,
+    keep_base_timestep: bool = True,
     normalize: bool = True,
     action_repeat: int = 1,
+    max_episode_steps: int = 1000,
     **kwargs,
 ) -> gym.Env:
-    base_env = create_base_env(base_env_type_or_id, **kwargs)
+    env = create_base_env(base_env_type_or_id, **kwargs)
+    env = wrap_env_controller_base(env)
     env = VelocityControlWrapper(
-        wrap_env_controller_base(base_env),
-        gains,
-        target_velocity_limits,
-        controller_steps,
+        env, gains, target_velocity_limits, controller_steps, keep_base_timestep
     )
-    env = maybe_wrap_action_normalization(env, normalize)
-    return maybe_wrap_action_repeat(env, action_repeat)
+    return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 
 
 def create_pc_env(
@@ -115,31 +131,35 @@ def create_pc_env(
     d_gains: np.ndarray,
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
     controller_steps: int = 1,
+    keep_base_timestep: bool = True,
     normalize: bool = True,
     action_repeat: int = 1,
+    max_episode_steps: int = 1000,
     **kwargs,
 ) -> gym.Env:
-    base_env = create_base_env(base_env_type_or_id, **kwargs)
+    env = create_base_env(base_env_type_or_id, **kwargs)
+    env = wrap_env_controller_base(env)
     env = PositionControlWrapper(
-        wrap_env_controller_base(base_env),
+        env,
         p_gains,
         d_gains,
         target_position_limits=target_position_limits,
         controller_steps=controller_steps,
+        keep_base_timestep=keep_base_timestep,
     )
-    env = maybe_wrap_action_normalization(env, normalize)
-    return maybe_wrap_action_repeat(env, action_repeat)
+    return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 
 
 def create_tc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     normalize: bool = True,
     action_repeat: int = 1,
+    max_episode_steps: int = 1000,
     **kwargs,
 ) -> gym.Env:
-    base_env = create_base_env(base_env_type_or_id, **kwargs)
-    env = maybe_wrap_action_normalization(base_env, normalize)
-    return maybe_wrap_action_repeat(env, action_repeat)
+    env = create_base_env(base_env_type_or_id, **kwargs)
+    env = wrap_env_controller_base(env)
+    return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 
 
 # TODO: Support also fish and ball_in_cup tasks (find sensible limits for the positions)

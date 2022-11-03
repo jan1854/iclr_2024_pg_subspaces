@@ -11,7 +11,7 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
     for state-full transformations (requires changing the observations).
     """
 
-    def __init__(self, env: gym.Env, repeat: int = 1, keep_base_timestep: bool = False):
+    def __init__(self, env: gym.Env, repeat: int = 1, keep_base_timestep: bool = True):
         """
         :param env:                 The gym environment to wrap
         :param repeat:              Number of steps for which the wrapped environment should be executed for each step
@@ -25,6 +25,7 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
         super().__init__(env)
         assert repeat >= 1
         self.repeat = repeat
+        self.keep_base_timestep = keep_base_timestep
         if not keep_base_timestep:
             self.env.set_timestep(self.env.timestep / repeat)
 
@@ -59,3 +60,10 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
     @abc.abstractmethod
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         pass
+
+    @property
+    def base_env_timestep_factor(self):
+        if self.keep_base_timestep:
+            return self.env.base_env_timestep_factor * self.repeat
+        else:
+            return self.env.base_env_timestep_factor

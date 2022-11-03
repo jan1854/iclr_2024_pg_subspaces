@@ -50,3 +50,7 @@ class ControllerBaseWrapper(gym.Wrapper):
         """
         Set the time step of the simulation.
         """
+
+    @property
+    def base_env_timestep_factor(self) -> int:
+        return 1

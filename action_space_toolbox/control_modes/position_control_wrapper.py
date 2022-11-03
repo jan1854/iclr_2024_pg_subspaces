@@ -24,7 +24,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         positions_relative: bool = False,
         target_position_limits: Optional[np.ndarray] = None,
         controller_steps: int = 1,
-        keep_base_timestep: bool = False,
+        keep_base_timestep: bool = True,
     ):
         assert check_wrapped(env, ControllerBaseWrapper)
         super().__init__(env, controller_steps, keep_base_timestep)
