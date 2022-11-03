@@ -14,17 +14,17 @@ from gym.envs.mujoco.half_cheetah_v3 import HalfCheetahEnv
 from gym.envs.mujoco.hopper_v3 import HopperEnv
 from gym.envs.mujoco.walker2d_v3 import Walker2dEnv
 
-from action_space_toolbox.dof_information.dof_information_wrapper import (
-    DofInformationWrapper,
+from action_space_toolbox.controller_base.controller_base_wrapper import (
+    ControllerBaseWrapper,
 )
-from action_space_toolbox.dof_information.dmc_dof_information_wrapper import (
-    DMCDofInformationWrapper,
+from action_space_toolbox.controller_base.dmc_controller_base_wrapper import (
+    DMCControllerBaseWrapper,
 )
-from action_space_toolbox.dof_information.gym_mujoco_dof_information_wrapper import (
-    GymMujocoDofInformationWrapper,
+from action_space_toolbox.controller_base.gym_mujoco_controller_base_wrapper import (
+    GymMujocoControllerBaseWrapper,
 )
-from action_space_toolbox.dof_information.pendulum_dof_information_wrapper import (
-    PendulumDofInformationWrapper,
+from action_space_toolbox.controller_base.pendulum_controller_base_wrapper import (
+    PendulumControllerBaseWrapper,
 )
 from action_space_toolbox.control_modes.position_control_wrapper import (
     PositionControlWrapper,
@@ -58,13 +58,13 @@ def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **k
         return base_env_type_or_id(**kwargs)
 
 
-def wrap_env_dof_information(env: gym.Env) -> DofInformationWrapper:
+def wrap_env_controller_base(env: gym.Env) -> ControllerBaseWrapper:
     if isinstance(env.unwrapped, PendulumEnv):
-        return PendulumDofInformationWrapper(env)
+        return PendulumControllerBaseWrapper(env)
     elif isinstance(env.unwrapped, MujocoEnv):
-        return GymMujocoDofInformationWrapper(env)
+        return GymMujocoControllerBaseWrapper(env)
     elif isinstance(env.unwrapped, dmc2gym.wrappers.DMCWrapper):
-        return DMCDofInformationWrapper(env)
+        return DMCControllerBaseWrapper(env)
     else:
         raise NotImplementedError(
             f"Environment {type(env.unwrapped)} is not supported."
@@ -100,7 +100,7 @@ def create_vc_env(
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
     env = VelocityControlWrapper(
-        wrap_env_dof_information(base_env),
+        wrap_env_controller_base(base_env),
         gains,
         target_velocity_limits,
         controller_steps,
@@ -121,7 +121,7 @@ def create_pc_env(
 ) -> gym.Env:
     base_env = create_base_env(base_env_type_or_id, **kwargs)
     env = PositionControlWrapper(
-        wrap_env_dof_information(base_env),
+        wrap_env_controller_base(base_env),
         p_gains,
         d_gains,
         target_position_limits=target_position_limits,

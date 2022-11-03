@@ -22,17 +22,17 @@ def sample_targets(env_id: str, num_targets: int) -> List[np.ndarray]:
     while not isinstance(tmp_env.env, PositionControlWrapper):
         tmp_env = tmp_env.env
     tmp_env.env = tmp_env.env.env
-    dof_positions = []
+    actuator_positions = []
     for _ in range(5):
         env.reset()
         done = False
-        dof_positions_curr_episode = []
+        actuator_positions_curr_episode = []
         while not done:
             action = env.action_space.sample()
             _, _, done, _ = env.step(action)
-            dof_positions_curr_episode.append(env.dof_positions)
-        dof_positions.extend(dof_positions_curr_episode)
-    return random.choices(dof_positions, k=num_targets)
+            actuator_positions_curr_episode.append(env.actuator_positions)
+        actuator_positions.extend(actuator_positions_curr_episode)
+    return random.choices(actuator_positions, k=num_targets)
 
 
 def visualize_targets(env, targets: Sequence[np.ndarray]) -> None:
@@ -50,27 +50,27 @@ def visualize_targets(env, targets: Sequence[np.ndarray]) -> None:
 
 def evaluate_pc_gains(
     env,
-    target_dof_positions: Sequence[np.ndarray],
+    target_actuator_positions: Sequence[np.ndarray],
     repetitions_per_target: int = 1,
     render: bool = False,
-    max_steps_per_episode: Optional[int] = None
+    max_steps_per_episode: Optional[int] = None,
 ) -> float:
     assert check_wrapped(env, PositionControlWrapper)
     joint_errors = []
-    for target_dof_position in target_dof_positions:
+    for target_actuator_position in target_actuator_positions:
         for _ in range(repetitions_per_target):
             done = False
             env.reset()
             joint_errors.append(0.0)
             i = 0
             while not done:
-                _, _, done, _ = env.step(target_dof_position)
+                _, _, done, _ = env.step(target_actuator_position)
                 if render:
                     env.render()
-                diff = env.dof_positions - target_dof_position
-                joint_diff = diff * ~np.array(env.dofs_revolute) + normalize_angle(
+                diff = env.actuator_positions - target_actuator_position
+                joint_diff = diff * ~np.array(env.actuators_revolute) + normalize_angle(
                     diff
-                ) * np.array(env.dofs_revolute)
+                ) * np.array(env.actuators_revolute)
                 joint_errors[-1] += np.mean(np.abs(joint_diff))
                 i += 1
                 if max_steps_per_episode is not None and i >= max_steps_per_episode:

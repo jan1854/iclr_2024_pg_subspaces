@@ -5,37 +5,37 @@ import gym
 import numpy as np
 
 
-class DofInformationWrapper(gym.Wrapper):
+class ControllerBaseWrapper(gym.Wrapper):
     """
     This wrapper is an interface that provides a unified way to extract information on the state of the controllable
-    dofs (e.g. position and velocity). This is needed to implement different control modes as generic wrappers that
+    actuator (e.g. position and velocity). This is needed to implement different control modes as generic wrappers that
     work for different environments. Each supported environment needs an implementation of this interface.
     """
 
     def __init__(
         self,
         env: gym.Env,
-        dof_pos_bounds: Optional[np.ndarray],
-        dof_vel_bounds: Optional[np.ndarray],
-        dofs_revolute: np.ndarray,
+        actuator_pos_bounds: Optional[np.ndarray],
+        actuator_vel_bounds: Optional[np.ndarray],
+        actuators_revolute: np.ndarray,
     ):
         super().__init__(env)
-        self.dof_pos_bounds = dof_pos_bounds
-        self.dof_vel_bounds = dof_vel_bounds
-        self.dofs_revolute = dofs_revolute
+        self.actuator_pos_bounds = actuator_pos_bounds
+        self.actuator_vel_bounds = actuator_vel_bounds
+        self.actuators_revolute = actuators_revolute
 
     @property
     @abc.abstractmethod
-    def dof_positions(self) -> np.ndarray:
+    def actuator_positions(self) -> np.ndarray:
         """
-        The position of each controllable dof.
+        The position of each controllable actuator.
         """
 
     @property
     @abc.abstractmethod
-    def dof_velocities(self) -> np.ndarray:
+    def actuator_velocities(self) -> np.ndarray:
         """
-        The velocity of each controllable dof.
+        The velocity of each controllable actuator.
         """
 
     @property

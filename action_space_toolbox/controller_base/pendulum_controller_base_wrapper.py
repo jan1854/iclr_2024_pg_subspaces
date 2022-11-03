@@ -1,13 +1,13 @@
 import gym.envs.classic_control
 import numpy as np
 
-from action_space_toolbox.dof_information.dof_information_wrapper import (
-    DofInformationWrapper,
+from action_space_toolbox.controller_base.controller_base_wrapper import (
+    ControllerBaseWrapper,
 )
 from action_space_toolbox.util.angles import normalize_angle
 
 
-class PendulumDofInformationWrapper(DofInformationWrapper):
+class PendulumControllerBaseWrapper(ControllerBaseWrapper):
     def __init__(self, env: gym.Env):
         assert isinstance(env.unwrapped, gym.envs.classic_control.PendulumEnv)
         super().__init__(
@@ -18,11 +18,11 @@ class PendulumDofInformationWrapper(DofInformationWrapper):
         )
 
     @property
-    def dof_positions(self) -> np.ndarray:
+    def actuator_positions(self) -> np.ndarray:
         return np.array([normalize_angle(self.state[0])])
 
     @property
-    def dof_velocities(self) -> np.ndarray:
+    def actuator_velocities(self) -> np.ndarray:
         return np.array([self.env.state[1]])
 
     @property

@@ -3,7 +3,9 @@ from typing import Union, Optional, Sequence
 import gym
 import numpy as np
 
-from action_space_toolbox import DofInformationWrapper
+from action_space_toolbox.controller_base.controller_base_wrapper import (
+    ControllerBaseWrapper,
+)
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
 )
@@ -24,7 +26,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         controller_steps: int = 1,
         keep_base_timestep: bool = False,
     ):
-        assert check_wrapped(env, DofInformationWrapper)
+        assert check_wrapped(env, ControllerBaseWrapper)
         super().__init__(env, controller_steps, keep_base_timestep)
         if np.isscalar(p_gains):
             p_gains = p_gains * np.ones(env.action_space.shape)
@@ -45,7 +47,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         else:
             if positions_relative:
                 # TODO: This assumes revolute joints with no joint limits
-                assert np.all(self.dofs_revolute)
+                assert np.all(self.actuators_revolute)
                 target_position_limits = np.stack(
                     (
                         -np.pi * np.ones(env.action_space.shape, dtype=np.float32),
@@ -54,7 +56,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
                     axis=1,
                 )
             else:
-                target_position_limits = env.dof_pos_bounds  # type: ignore
+                target_position_limits = env.actuator_pos_bounds  # type: ignore
 
         self.action_space = gym.spaces.Box(
             target_position_limits[:, 0].astype(np.float32),
@@ -62,16 +64,18 @@ class PositionControlWrapper(ActionTransformationWrapper):
         )
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
-        pos = self.dof_positions
-        vel = self.dof_velocities
+        pos = self.actuator_positions
+        vel = self.actuator_velocities
         if self.positions_relative:
             pos_error = action
         else:
-            # Normalize the angle distances of multi-turn revolute dofs (so that diff(pi - 0.1, -pi + 0.1) = 0.2
+            # Normalize the angle distances of multi-turn revolute actuators (so that diff(pi - 0.1, -pi + 0.1) = 0.2
             # not 2pi - 0.2)
             multi_turn = np.logical_and(
-                np.logical_and(self.dofs_revolute, self.dof_pos_bounds[:, 0] == -np.pi),
-                self.dof_pos_bounds[:, 1] == np.pi,
+                np.logical_and(
+                    self.actuators_revolute, self.actuator_pos_bounds[:, 0] == -np.pi
+                ),
+                self.actuator_pos_bounds[:, 1] == np.pi,
             )
             pos_error = np.where(
                 multi_turn, normalize_angle(pos - action), pos - action

@@ -4,7 +4,9 @@ from typing import Union, Optional, Sequence
 import gym
 import numpy as np
 
-from action_space_toolbox import DofInformationWrapper
+from action_space_toolbox.controller_base.controller_base_wrapper import (
+    ControllerBaseWrapper,
+)
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
 )
@@ -26,7 +28,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         controller_steps: int = 1,
         keep_base_timestep: bool = False,
     ):
-        assert check_wrapped(env, DofInformationWrapper)
+        assert check_wrapped(env, ControllerBaseWrapper)
         super().__init__(env, controller_steps, keep_base_timestep)
         if np.isscalar(gains):
             gains = gains * np.ones(env.action_space.shape)
@@ -36,8 +38,8 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         if target_velocity_limits is not None:
             target_velocity_limits = np.asarray(target_velocity_limits)
             # Assume that the limits are the same for each action dimension if a single (low, high) pair is passed
-        elif env.dof_vel_bounds is not None:  # type: ignore
-            target_velocity_limits = env.dof_vel_bounds  # type: ignore
+        elif env.actuator_vel_bounds is not None:  # type: ignore
+            target_velocity_limits = env.actuator_vel_bounds  # type: ignore
         else:
             target_velocity_limits = np.array([-10.0, 10.0])
             logger.info(
@@ -54,5 +56,5 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         )
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
-        vel = self.dof_velocities
+        vel = self.actuator_velocities
         return (-self.gains * (vel - action)).astype(np.float32)

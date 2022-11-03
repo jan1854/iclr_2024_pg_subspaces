@@ -4,7 +4,12 @@ from _pytest.python_api import approx
 from dmc2gym.wrappers import DMCWrapper
 
 import action_space_toolbox
-from action_space_toolbox import PositionControlWrapper, DofInformationWrapper
+from action_space_toolbox.control_modes.position_control_wrapper import (
+    PositionControlWrapper,
+)
+from action_space_toolbox.controller_base.controller_base_wrapper import (
+    ControllerBaseWrapper,
+)
 from action_space_toolbox.util.angles import normalize_angle
 
 
@@ -30,7 +35,7 @@ def test_position_control_pendulum():
         for _ in range(10):
             env.step(target_position)
             assert np.all(
-                normalize_angle(env.dof_positions[0] - target_position) < 0.05
+                normalize_angle(env.actuator_positions[0] - target_position) < 0.05
             )
 
 
@@ -47,7 +52,9 @@ def test_velocity_control_pendulum():
             env.step(target_velocity)
         for _ in range(10):
             env.step(target_velocity)
-            assert np.all(np.abs(env.dof_velocities[0] - target_velocity).item() < 0.05)
+            assert np.all(
+                np.abs(env.actuator_velocities[0] - target_velocity).item() < 0.05
+            )
 
 
 def test_position_control_multiturn():
@@ -57,26 +64,26 @@ def test_position_control_multiturn():
             np.array([10, 10], dtype=np.float32),
         )
 
-    class DummyDofInformationWrapper(DofInformationWrapper):
+    class DummyControllerBaseWrapper(ControllerBaseWrapper):
         def __init__(self, env: gym.Env):
-            dofs_revolute = np.array([True, True])
+            actuators_revolute = np.array([True, True])
             super().__init__(
                 env,
                 np.array([[-np.pi, np.pi], [-3, 3]]),
                 np.array([[-1, -1], [1, 1]]),
-                dofs_revolute,
+                actuators_revolute,
             )
 
         @property
-        def dof_positions(self) -> np.ndarray:
+        def actuator_positions(self) -> np.ndarray:
             return np.array([np.pi - 0.1, 2.9])
 
         @property
-        def dof_velocities(self) -> np.ndarray:
+        def actuator_velocities(self) -> np.ndarray:
             return np.zeros(2)
 
     env = PositionControlWrapper(
-        DummyDofInformationWrapper(DummyEnv()),  # type: ignore
+        DummyControllerBaseWrapper(DummyEnv()),  # type: ignore
         p_gains=1.0,
         d_gains=0.0,
         keep_base_timestep=True,
@@ -97,7 +104,7 @@ def test_position_control_dmc_pendulum():
         for _ in range(20):
             env.step(target_position)
             assert np.all(
-                normalize_angle(env.dof_positions[0] - target_position) < 0.05
+                normalize_angle(env.actuator_positions[0] - target_position) < 0.05
             ), f"Did not reach target position {target_position}"
 
 
@@ -112,7 +119,9 @@ def test_velocity_control_dmc_pendulum():
             env.step(target_velocity)
         for _ in range(20):
             env.step(target_velocity)
-            assert np.all(np.abs(env.dof_velocities[0] - target_velocity).item() < 0.05)
+            assert np.all(
+                np.abs(env.actuator_velocities[0] - target_velocity).item() < 0.05
+            )
 
 
 # TODO: Make sure that the dm_control environments do not terminate too early

@@ -34,11 +34,11 @@ def sample_targets(
     while not isinstance(tmp_env.env, VelocityControlWrapper):
         tmp_env = tmp_env.env
     tmp_env.env = tmp_env.env.env
-    dof_velocities = []
+    acturator_velocities = []
     for _ in range(num_episodes):
         env.reset()
         done = False
-        dof_velocities_curr_episode = []
+        actuator_velocities_curr_episode = []
         while not done:
             if isinstance(env.unwrapped, gym.envs.mujoco.MujocoEnv):
                 sim_state = env.sim.get_state()
@@ -49,9 +49,9 @@ def sample_targets(
                 state = env.state.copy()
             action = env.action_space.sample()
             _, _, done, _ = env.step(action)
-            dof_velocities_curr_episode.append((state, env.dof_velocities))
-        dof_velocities.extend(dof_velocities_curr_episode)
-    return random.choices(dof_velocities, k=num_targets)
+            actuator_velocities_curr_episode.append((state, env.actuator_velocities))
+        acturator_velocities.extend(actuator_velocities_curr_episode)
+    return random.choices(acturator_velocities, k=num_targets)
 
 
 def visualize_targets(env, targets: Sequence[Tuple[State, np.ndarray]]) -> None:
@@ -77,7 +77,7 @@ def evaluate_vc_gains(
             _, _, _, _ = env.step(target[1])
             if render:
                 env.render()
-            diff = env.dof_velocities - target[1]
+            diff = env.actuator_velocities - target[1]
             joint_vel_errors.append(np.mean(np.abs(diff)))
 
     return np.mean(joint_vel_errors)  # type: ignore

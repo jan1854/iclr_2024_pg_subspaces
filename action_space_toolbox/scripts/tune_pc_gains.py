@@ -17,7 +17,7 @@ from action_space_toolbox.scripts.evaluate_pc_gains import (
 
 def tune_pc_gains(
     env_id: str,
-    dof_positions: Sequence[np.ndarray],
+    actuator_positions: Sequence[np.ndarray],
     num_iterations: int,
     p_gains_exp_low: float,
     p_gains_exp_high: float,
@@ -38,7 +38,9 @@ def tune_pc_gains(
         )
         env = gym.make(env_id, p_gains=p_gains, d_gains=d_gains)
         env.seed(42)
-        loss = evaluate_pc_gains(env, dof_positions, repetitions_per_target, max_steps_per_episode=200)
+        loss = evaluate_pc_gains(
+            env, actuator_positions, repetitions_per_target, max_steps_per_episode=200
+        )
         print(
             f"Iteration: {i + 1}/{num_iterations}, p_gains: {p_gains}, d_gains: {d_gains}, loss: {loss}"
         )
@@ -70,17 +72,17 @@ if __name__ == "__main__":
     with fixed_targets_path.open("r") as fixed_targets_file:
         fixed_targets = json.load(fixed_targets_file)
     if args.env_id in fixed_targets:
-        target_dof_positions = np.array(fixed_targets[args.env_id])
+        target_actuator_positions = np.array(fixed_targets[args.env_id])
     else:
-        target_dof_positions = sample_targets(args.env_id, args.targets_to_sample)
+        target_actuator_positions = sample_targets(args.env_id, args.targets_to_sample)
 
     if args.visualize_targets:
         env = gym.make(args.env_id)
-        visualize_targets(env, target_dof_positions)
+        visualize_targets(env, target_actuator_positions)
 
     tuned_gains = tune_pc_gains(
         args.env_id,
-        target_dof_positions,
+        target_actuator_positions,
         args.num_iterations,
         args.p_gains_exp_low,
         args.p_gains_exp_high,
@@ -91,4 +93,6 @@ if __name__ == "__main__":
 
     env = gym.make(args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1])
     input("Press any key to visualize the optimized controllers.")
-    evaluate_pc_gains(env, target_dof_positions, repetitions_per_target=1, render=True)
+    evaluate_pc_gains(
+        env, target_actuator_positions, repetitions_per_target=1, render=True
+    )
