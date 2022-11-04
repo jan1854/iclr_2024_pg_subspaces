@@ -1,3 +1,4 @@
+import logging
 from typing import Union, Optional, Sequence
 
 import gym
@@ -13,6 +14,8 @@ from action_space_toolbox.control_modes.check_wrapped import (
     check_wrapped,
 )
 from action_space_toolbox.util.angles import normalize_angle
+
+logger = logging.getLogger(__name__)
 
 
 class PositionControlWrapper(ActionTransformationWrapper):
@@ -38,6 +41,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         assert p_gains.shape == d_gains.shape == env.action_space.shape
         self.p_gains = p_gains
         self.d_gains = d_gains
+        logger.info(f"Using p_gains: {p_gains} and d_gains: {d_gains}.")
         self.positions_relative = positions_relative
         self.adaptive_relative_position_limits = adaptive_relative_position_limits
 

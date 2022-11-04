@@ -35,6 +35,7 @@ class VelocityControlWrapper(ActionTransformationWrapper):
         gains = np.asarray(gains)
         assert gains.shape == env.action_space.shape
         self.gains = gains
+        logger.info(f"Using gains: {gains}.")
         if target_velocity_limits is not None:
             target_velocity_limits = np.asarray(target_velocity_limits)
             # Assume that the limits are the same for each action dimension if a single (low, high) pair is passed
