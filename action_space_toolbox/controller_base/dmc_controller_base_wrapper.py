@@ -36,6 +36,16 @@ class DMCControllerBaseWrapper(ControllerBaseWrapper):
     def actuator_velocities(self) -> np.ndarray:
         return self.env.physics.data.qvel[self.actuated_joints]
 
+    def set_actuator_states(
+        self, positions: np.ndarray, velocities: np.ndarray
+    ) -> None:
+        state = self.env.physics.get_state().copy()
+        qpos = state[: len(state) / 2]
+        qvel = state[len(state) / 2 :]
+        qpos[self.actuated_joints] = positions
+        qvel[self.actuated_joints] = velocities
+        self.env.physics.set_state(np.concat(qpos, qvel))
+
     @property
     def timestep(self) -> float:
         return self.env.physics.model.opt.timestep

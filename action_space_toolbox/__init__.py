@@ -15,6 +15,9 @@ from gym.envs.mujoco.half_cheetah_v3 import HalfCheetahEnv
 from gym.envs.mujoco.hopper_v3 import HopperEnv
 from gym.envs.mujoco.walker2d_v3 import Walker2dEnv
 
+from action_space_toolbox.control_modes.optimal_position_control_wrapper import (
+    OptimalPositionControlWrapper,
+)
 from action_space_toolbox.controller_base.controller_base_wrapper import (
     ControllerBaseWrapper,
 )
@@ -172,6 +175,26 @@ def create_pc_env(
     return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 
 
+def create_opt_pc_env(
+    base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
+    target_position_limits: Optional[Union[float, Sequence[float]]] = None,
+    positions_relative: bool = False,
+    normalize: bool = True,
+    action_repeat: int = 1,
+    max_episode_steps: int = 1000,
+    disable_control_rewards: bool = False,
+    **kwargs,
+) -> gym.Env:
+    env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
+    env = wrap_env_controller_base(env)
+    env = OptimalPositionControlWrapper(
+        env,
+        positions_relative,
+        target_position_limits,
+    )
+    return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
+
+
 def create_tc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
     normalize: bool = True,
@@ -205,6 +228,7 @@ DEFAULT_PARAMETERS = {
     "TC": {},
     "VC": {"gains": 10.0},
     "PC": {"p_gains": 15.0, "d_gains": 2.0},
+    "OPT_PC": {},
 }
 
 res_path = Path(__file__).parent / "res"
@@ -221,11 +245,17 @@ custom_env_args_path = res_path / "custom_env_args.yaml"
 with custom_env_args_path.open("r") as custom_env_args_file:
     custom_env_args = yaml.safe_load(custom_env_args_file)
 
-control_mode_parameters = {"TC": {}, "VC": vc_parameters, "PC": pc_parameters}
+control_mode_parameters = {
+    "TC": {},
+    "VC": vc_parameters,
+    "PC": pc_parameters,
+    "OPT_PC": {},
+}
 ENTRY_POINTS = {
     "TC": "action_space_toolbox:create_tc_env",
     "VC": "action_space_toolbox:create_vc_env",
     "PC": "action_space_toolbox:create_pc_env",
+    "OPT_PC": "action_space_toolbox:create_opt_pc_env",
 }
 
 for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():

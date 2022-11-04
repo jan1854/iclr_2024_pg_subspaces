@@ -38,6 +38,12 @@ class ControllerBaseWrapper(gym.Wrapper):
         The velocity of each controllable actuator.
         """
 
+    @abc.abstractmethod
+    def set_actuator_states(
+        self, positions: np.ndarray, velocities: np.ndarray
+    ) -> None:
+        pass
+
     @property
     @abc.abstractmethod
     def timestep(self) -> float:

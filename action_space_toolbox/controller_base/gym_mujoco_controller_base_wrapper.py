@@ -37,6 +37,14 @@ class GymMujocoControllerBaseWrapper(ControllerBaseWrapper):
     def actuator_velocities(self) -> np.ndarray:
         return self.env.sim.data.qvel[self.actuated_joints]
 
+    def set_actuator_states(
+        self, positions: np.ndarray, velocities: np.ndarray
+    ) -> None:
+        state = self.env.sim.get_state()
+        state.qpos[self.actuated_joints] = positions
+        state.qvel[self.actuated_joints] = velocities
+        self.env.set_state(state.qpos, state.qvel)
+
     @property
     def timestep(self) -> float:
         return self.env.sim.model.opt.timestep

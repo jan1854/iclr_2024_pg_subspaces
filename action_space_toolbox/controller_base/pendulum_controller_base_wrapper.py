@@ -25,6 +25,11 @@ class PendulumControllerBaseWrapper(ControllerBaseWrapper):
     def actuator_velocities(self) -> np.ndarray:
         return np.array([self.env.state[1]])
 
+    def set_actuator_states(
+        self, positions: np.ndarray, velocities: np.ndarray
+    ) -> None:
+        self.env.state = np.concatenate((positions, velocities))
+
     @property
     def timestep(self) -> float:
         return self.env.dt
