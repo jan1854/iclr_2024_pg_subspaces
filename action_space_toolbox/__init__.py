@@ -130,6 +130,8 @@ def create_pc_env(
     p_gains: np.ndarray,
     d_gains: np.ndarray,
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
+    positions_relative: bool = False,
+    adaptive_relative_position_limits: bool = False,
     controller_steps: int = 1,
     keep_base_timestep: bool = True,
     normalize: bool = True,
@@ -143,9 +145,11 @@ def create_pc_env(
         env,
         p_gains,
         d_gains,
-        target_position_limits=target_position_limits,
-        controller_steps=controller_steps,
-        keep_base_timestep=keep_base_timestep,
+        positions_relative,
+        adaptive_relative_position_limits,
+        target_position_limits,
+        controller_steps,
+        keep_base_timestep,
     )
     return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 

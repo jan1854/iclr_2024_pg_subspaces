@@ -13,6 +13,33 @@ from action_space_toolbox.controller_base.controller_base_wrapper import (
 from action_space_toolbox.util.angles import normalize_angle
 
 
+class DummyEnv:
+    action_space = gym.spaces.Box(
+        np.array([-10, -11], dtype=np.float32),
+        np.array([10, 11], dtype=np.float32),
+    )
+
+
+class DummyControllerBaseWrapper(ControllerBaseWrapper):
+    def __init__(self, env: gym.Env):
+        actuators_revolute = np.array([True, True])
+        super().__init__(
+            env,
+            np.array([[-np.pi, np.pi], [-3, 3]]),
+            np.array([[-1, -1], [1, 1]]),
+            actuators_revolute,
+        )
+        self.actuator_velocities_ = np.zeros(2)
+
+    @property
+    def actuator_positions(self) -> np.ndarray:
+        return np.array([np.pi - 0.1, 2.9])
+
+    @property
+    def actuator_velocities(self) -> np.ndarray:
+        return self.actuator_velocities_
+
+
 def execute_episode(env: gym.Env) -> int:
     env.reset()
     done = False
@@ -57,41 +84,6 @@ def test_velocity_control_pendulum():
             )
 
 
-def test_position_control_multiturn():
-    class DummyEnv:
-        action_space = gym.spaces.Box(
-            np.array([-10, -10], dtype=np.float32),
-            np.array([10, 10], dtype=np.float32),
-        )
-
-    class DummyControllerBaseWrapper(ControllerBaseWrapper):
-        def __init__(self, env: gym.Env):
-            actuators_revolute = np.array([True, True])
-            super().__init__(
-                env,
-                np.array([[-np.pi, np.pi], [-3, 3]]),
-                np.array([[-1, -1], [1, 1]]),
-                actuators_revolute,
-            )
-
-        @property
-        def actuator_positions(self) -> np.ndarray:
-            return np.array([np.pi - 0.1, 2.9])
-
-        @property
-        def actuator_velocities(self) -> np.ndarray:
-            return np.zeros(2)
-
-    env = PositionControlWrapper(
-        DummyControllerBaseWrapper(DummyEnv()),  # type: ignore
-        p_gains=1.0,
-        d_gains=0.0,
-        keep_base_timestep=True,
-    )
-    pos_diff = env.transform_action(np.array([-np.pi + 0.1, -2.9]))
-    assert pos_diff == approx(np.array([0.2, -5.8]))
-
-
 def test_position_control_dmc_pendulum():
     env = gym.make("dmc_Pendulum-swingup_PC-v1", normalize=False)
     target_positions = [np.pi - d for d in np.arange(0.0, 0.2, 0.02)] + [
@@ -122,6 +114,36 @@ def test_velocity_control_dmc_pendulum():
             assert np.all(
                 np.abs(env.actuator_velocities[0] - target_velocity).item() < 0.05
             )
+
+
+def test_position_control_multiturn():
+    env = PositionControlWrapper(
+        DummyControllerBaseWrapper(DummyEnv()),  # type: ignore
+        p_gains=1.0,
+        d_gains=0.0,
+        keep_base_timestep=True,
+    )
+    pos_diff = env.transform_action(np.array([-np.pi + 0.1, -2.9]))
+    assert pos_diff == approx(np.array([0.2, -5.8]))
+
+
+def test_adaptive_relative_position_control():
+    env = PositionControlWrapper(
+        DummyControllerBaseWrapper(DummyEnv()),  # type: ignore
+        p_gains=10.0,
+        d_gains=1.0,
+        keep_base_timestep=True,
+        positions_relative=True,
+        adaptive_relative_position_limits=True,
+    )
+    assert env.env.action_space.low == approx(env.transform_action(np.array([-1.0])))
+    assert env.env.action_space.high == approx(env.transform_action(np.array([1.0])))
+    assert 0.5 * (env.env.action_space.high + env.env.action_space.low) == approx(
+        env.transform_action(np.array([0.0]))
+    )
+    env.env.actuator_velocities_ = np.array([1.0, -3.0])
+    assert env.env.action_space.low == approx(env.transform_action(np.array([-1.0])))
+    assert env.env.action_space.high == approx(env.transform_action(np.array([1.0])))
 
 
 # TODO: Make sure that the dm_control environments do not terminate too early
