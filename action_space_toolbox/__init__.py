@@ -239,7 +239,7 @@ for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
             | curr_control_mode_parameters
             | curr_custom_env_args
         )
-        env_args = original_env_args.get(base_env_name, {"max_episode_steps": 1000})
+        env_args = original_env_args.get(base_env_name, {})
 
         gym.register(
             id=construct_env_id(base_env_name, control_mode),
