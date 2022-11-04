@@ -1,0 +1,2 @@
+Reacher-v2:
+  disable_control_rewards: true

@@ -33,6 +33,9 @@ from action_space_toolbox.control_modes.position_control_wrapper import (
 from action_space_toolbox.control_modes.velocity_control_wrapper import (
     VelocityControlWrapper,
 )
+from action_space_toolbox.reward.reacher_disable_control_reward_wrapper import (
+    ReacherDisableControlRewardWrapper,
+)
 from action_space_toolbox.util.construct_env_id import construct_env_id
 from action_space_toolbox.util.action_repeat_wrapper import ActionRepeatWrapper
 
@@ -41,7 +44,11 @@ TEnv = TypeVar("TEnv", bound=gym.Env)
 logger = logging.getLogger(__name__)
 
 
-def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **kwargs):
+def create_base_env(
+    base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
+    disable_control_rewards: bool = False,
+    **kwargs,
+):
     # Action repeat is handled by the ActionRepeatWrapper (accessible with the action_repeat argument to gym.make())
     assert "frame_skip" not in kwargs or kwargs["frame_skip"] == 1
     # The step limit of the environment is problematic when using a different controller frequency, therefore we disable
@@ -58,7 +65,16 @@ def create_base_env(base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]], **k
         # Remove the TimeLimitWrapper added by dmc2gym (see above)
         return time_limit_wrapped_env.env
     else:
-        return base_env_type_or_id(**kwargs)
+        if base_env_type_or_id is ReacherEnv:
+            base_env = base_env_type_or_id(**kwargs)
+            if disable_control_rewards:
+                base_env = ReacherDisableControlRewardWrapper(base_env)
+        else:
+            if disable_control_rewards:
+                base_env = base_env_type_or_id(**kwargs, ctrl_cost_weight=0.0)
+            else:
+                base_env = base_env_type_or_id(**kwargs)
+        return base_env
 
 
 def wrap_env_controller_base(env: gym.Env) -> ControllerBaseWrapper:
@@ -115,9 +131,10 @@ def create_vc_env(
     normalize: bool = True,
     action_repeat: int = 1,
     max_episode_steps: int = 1000,
+    disable_control_rewards: bool = False,
     **kwargs,
 ) -> gym.Env:
-    env = create_base_env(base_env_type_or_id, **kwargs)
+    env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
     env = wrap_env_controller_base(env)
     env = VelocityControlWrapper(
         env, gains, target_velocity_limits, controller_steps, keep_base_timestep
@@ -137,9 +154,10 @@ def create_pc_env(
     normalize: bool = True,
     action_repeat: int = 1,
     max_episode_steps: int = 1000,
+    disable_control_rewards: bool = False,
     **kwargs,
 ) -> gym.Env:
-    env = create_base_env(base_env_type_or_id, **kwargs)
+    env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
     env = wrap_env_controller_base(env)
     env = PositionControlWrapper(
         env,
@@ -159,9 +177,10 @@ def create_tc_env(
     normalize: bool = True,
     action_repeat: int = 1,
     max_episode_steps: int = 1000,
+    disable_control_rewards: bool = False,
     **kwargs,
 ) -> gym.Env:
-    env = create_base_env(base_env_type_or_id, **kwargs)
+    env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
     env = wrap_env_controller_base(env)
     return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 
@@ -188,15 +207,19 @@ DEFAULT_PARAMETERS = {
     "PC": {"p_gains": 15.0, "d_gains": 2.0},
 }
 
-pc_parameters_path = Path(__file__).parent / "res" / "pc_parameters.yaml"
+res_path = Path(__file__).parent / "res"
+pc_parameters_path = res_path / "pc_parameters.yaml"
 with pc_parameters_path.open("r") as pc_parameters_file:
     pc_parameters = yaml.safe_load(pc_parameters_file)
-vc_parameters_path = Path(__file__).parent / "res" / "vc_parameters.yaml"
+vc_parameters_path = res_path / "vc_parameters.yaml"
 with vc_parameters_path.open("r") as vc_parameters_file:
     vc_parameters = yaml.safe_load(vc_parameters_file)
-original_env_args_path = Path(__file__).parent / "res" / "original_env_args.yaml"
+original_env_args_path = res_path / "original_env_args.yaml"
 with original_env_args_path.open("r") as original_env_args_file:
     original_env_args = yaml.safe_load(original_env_args_file)
+custom_env_args_path = res_path / "custom_env_args.yaml"
+with custom_env_args_path.open("r") as custom_env_args_file:
+    custom_env_args = yaml.safe_load(custom_env_args_file)
 
 control_mode_parameters = {"TC": {}, "VC": vc_parameters, "PC": pc_parameters}
 ENTRY_POINTS = {
@@ -207,9 +230,15 @@ ENTRY_POINTS = {
 
 for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
     for control_mode in control_mode_parameters:
-        parameters = DEFAULT_PARAMETERS[control_mode] | control_mode_parameters[
-            control_mode
-        ].get(base_env_name, {})
+        curr_control_mode_parameters = control_mode_parameters[control_mode].get(
+            base_env_name, {}
+        )
+        curr_custom_env_args = custom_env_args.get(base_env_name, {})
+        parameters = (
+            DEFAULT_PARAMETERS[control_mode]
+            | curr_control_mode_parameters
+            | curr_custom_env_args
+        )
         env_args = original_env_args.get(base_env_name, {"max_episode_steps": 1000})
 
         gym.register(
