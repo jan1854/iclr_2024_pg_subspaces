@@ -46,7 +46,11 @@ class ActionTransformationWrapper(gym.Wrapper, abc.ABC):
             rewards.append(reward)
             if done:
                 break
-        return self.transform_state(obs), np.mean(rewards), done, info
+        if self.keep_base_timestep:
+            reward = np.sum(rewards)
+        else:
+            reward = np.mean(rewards)
+        return self.transform_state(obs), reward, done, info
 
     def reset_transformation(self) -> None:
         return
