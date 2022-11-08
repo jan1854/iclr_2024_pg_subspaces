@@ -244,12 +244,9 @@ with pc_parameters_path.open("r") as pc_parameters_file:
 vc_parameters_path = res_path / "vc_parameters.yaml"
 with vc_parameters_path.open("r") as vc_parameters_file:
     vc_parameters = yaml.safe_load(vc_parameters_file)
-original_env_args_path = res_path / "original_env_args.yaml"
-with original_env_args_path.open("r") as original_env_args_file:
-    original_env_args = yaml.safe_load(original_env_args_file)
-custom_env_args_path = res_path / "custom_env_args.yaml"
-with custom_env_args_path.open("r") as custom_env_args_file:
-    custom_env_args = yaml.safe_load(custom_env_args_file)
+env_args_path = res_path / "env_args.yaml"
+with env_args_path.open("r") as env_args_file:
+    env_args = yaml.safe_load(env_args_file)
 
 control_mode_parameters = {
     "TC": {},
@@ -269,17 +266,15 @@ for base_env_name, base_env_type_or_id in BASE_ENV_TYPE_OR_ID.items():
         curr_control_mode_parameters = control_mode_parameters[control_mode].get(
             base_env_name, {}
         )
-        curr_custom_env_args = custom_env_args.get(base_env_name, {})
+        curr_env_args = env_args.get(base_env_name, {})
         parameters = (
             DEFAULT_PARAMETERS[control_mode]
             | curr_control_mode_parameters
-            | curr_custom_env_args
+            | curr_env_args
         )
-        env_args = original_env_args.get(base_env_name, {})
 
         gym.register(
             id=construct_env_id(base_env_name, control_mode),
             entry_point=ENTRY_POINTS[control_mode],
             kwargs={"base_env_type_or_id": base_env_type_or_id, **parameters},
-            **env_args,
         )
