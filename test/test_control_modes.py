@@ -127,25 +127,6 @@ def test_position_control_multiturn():
     assert pos_diff == approx(np.array([0.2, -5.8]))
 
 
-def test_adaptive_relative_position_control():
-    env = PositionControlWrapper(
-        DummyControllerBaseWrapper(DummyEnv()),  # type: ignore
-        p_gains=10.0,
-        d_gains=1.0,
-        keep_base_timestep=True,
-        positions_relative=True,
-        adaptive_relative_position_limits=True,
-    )
-    assert env.env.action_space.low == approx(env.transform_action(np.array([-1.0])))
-    assert env.env.action_space.high == approx(env.transform_action(np.array([1.0])))
-    assert 0.5 * (env.env.action_space.high + env.env.action_space.low) == approx(
-        env.transform_action(np.array([0.0]))
-    )
-    env.env.actuator_velocities_ = np.array([1.0, -3.0])
-    assert env.env.action_space.low == approx(env.transform_action(np.array([-1.0])))
-    assert env.env.action_space.high == approx(env.transform_action(np.array([1.0])))
-
-
 # TODO: Make sure that the dm_control environments do not terminate too early
 def test_controller_frequency():
     controller_steps = 4

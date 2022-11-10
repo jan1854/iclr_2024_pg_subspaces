@@ -25,7 +25,6 @@ class PositionControlWrapper(ActionTransformationWrapper):
         p_gains: Union[float, Sequence[float]] = 1.0,
         d_gains: Union[float, Sequence[float]] = 1.0,
         positions_relative: bool = False,
-        adaptive_relative_position_limits: bool = False,
         target_position_limits: Optional[np.ndarray] = None,
         controller_steps: int = 1,
         keep_base_timestep: bool = True,
@@ -43,7 +42,6 @@ class PositionControlWrapper(ActionTransformationWrapper):
         self.d_gains = d_gains
         logger.info(f"Using p_gains: {p_gains} and d_gains: {d_gains}.")
         self.positions_relative = positions_relative
-        self.adaptive_relative_position_limits = adaptive_relative_position_limits
 
         if target_position_limits is not None:
             target_position_limits = np.asarray(target_position_limits)
@@ -51,15 +49,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
             if target_position_limits.ndim == 1:
                 target_position_limits[None].repeat(env.action_space.shape, axis=0)
         else:
-            if positions_relative and adaptive_relative_position_limits:
-                target_position_limits = np.stack(
-                    (
-                        -np.ones(env.action_space.shape, dtype=np.float32),
-                        np.ones(env.action_space.shape, dtype=np.float32),
-                    ),
-                    axis=1,
-                )
-            elif positions_relative and not adaptive_relative_position_limits:
+            if positions_relative:
                 # TODO: This assumes revolute joints with no joint limits
                 assert np.all(self.actuators_revolute)
                 target_position_limits = np.stack(
@@ -84,18 +74,7 @@ class PositionControlWrapper(ActionTransformationWrapper):
         ).astype(self.env.action_space.dtype)
 
     def _get_target_pos_error(self, action: np.ndarray) -> np.ndarray:
-        if self.positions_relative and self.adaptive_relative_position_limits:
-            max_pos_error = (
-                self.env.action_space.high + self.d_gains * self.actuator_velocities
-            ) / self.p_gains
-            min_pos_error = (
-                self.env.action_space.low + self.d_gains * self.actuator_velocities
-            ) / self.p_gains
-            # Map from [-1, 1] to [min_pos_error, max_pos_error]
-            pos_error = (max_pos_error - min_pos_error) / 2.0 * (
-                action + 1.0
-            ) + min_pos_error
-        elif self.positions_relative and not self.adaptive_relative_position_limits:
+        if self.positions_relative:
             pos_error = action
         else:
             # Normalize the angle distances of multi-turn revolute actuators (so that diff(pi - 0.1, -pi + 0.1) = 0.2
