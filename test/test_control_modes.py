@@ -62,7 +62,7 @@ def test_position_control_pendulum():
         for _ in range(10):
             env.step(target_position)
             assert np.all(
-                normalize_angle(env.actuator_positions[0] - target_position) < 0.05
+                normalize_angle(env.actuator_positions[0] - target_position) < 0.06
             )
 
 
@@ -80,7 +80,7 @@ def test_velocity_control_pendulum():
         for _ in range(10):
             env.step(target_velocity)
             assert np.all(
-                np.abs(env.actuator_velocities[0] - target_velocity).item() < 0.05
+                np.abs(env.actuator_velocities[0] - target_velocity).item() < 0.06
             )
 
 
@@ -96,7 +96,7 @@ def test_position_control_dmc_pendulum():
         for _ in range(20):
             env.step(target_position)
             assert np.all(
-                normalize_angle(env.actuator_positions[0] - target_position) < 0.05
+                normalize_angle(env.actuator_positions[0] - target_position) < 0.06
             ), f"Did not reach target position {target_position}"
 
 
