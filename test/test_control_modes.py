@@ -2,10 +2,14 @@ import gym
 import numpy as np
 from _pytest.python_api import approx
 from dmc2gym.wrappers import DMCWrapper
+from numpy.testing import assert_allclose
 
 import action_space_toolbox
-from action_space_toolbox.control_modes.position_control_wrapper import (
-    PositionControlWrapper,
+from action_space_toolbox.control_modes.variable_gains_position_control_wrapper import (
+    VariableGainsPositionControlWrapper,
+)
+from action_space_toolbox.control_modes.fixed_gains_position_control_wrapper import (
+    FixedGainPositionControlWrapper,
 )
 from action_space_toolbox.controller_base.controller_base_wrapper import (
     ControllerBaseWrapper,
@@ -117,7 +121,7 @@ def test_velocity_control_dmc_pendulum():
 
 
 def test_position_control_multiturn():
-    env = PositionControlWrapper(
+    env = FixedGainPositionControlWrapper(
         DummyControllerBaseWrapper(DummyEnv()),  # type: ignore
         p_gains=1.0,
         d_gains=0.0,
@@ -168,3 +172,45 @@ def test_controller_frequency():
                     * base_action_repeat
                     * controller_steps
                 )
+
+
+def test_var_position_control():
+    p_gains = np.array([10.0, 20.0])
+    d_gains = np.array([2.0, 5.0])
+    base_env = DummyEnv()
+    base_env.actuator_velocities = np.array([-2.0, 3.0])
+    fixed_gains_env = FixedGainPositionControlWrapper(
+        DummyControllerBaseWrapper(base_env),  # type: ignore
+        p_gains=p_gains,
+        d_gains=d_gains,
+        keep_base_timestep=True,
+    )
+    variable_p_gains_env = VariableGainsPositionControlWrapper(
+        DummyControllerBaseWrapper(base_env),  # type: ignore
+        p_gains_limits=(0.0, 100.0),
+        d_gains_limits=None,
+        keep_base_timestep=True,
+    )
+
+    variable_gains_env = VariableGainsPositionControlWrapper(
+        DummyControllerBaseWrapper(base_env),  # type: ignore
+        p_gains_limits=(0.0, 100.0),
+        d_gains_limits=(0.0, 100.0),
+        keep_base_timestep=True,
+    )
+    target_pos = np.array([-np.pi + 0.1, -2.9])
+    target_pos_and_p_gains = np.concatenate((target_pos, p_gains), axis=0)
+    target_pos_and_gains = np.concatenate((target_pos_and_p_gains, d_gains), axis=0)
+    target_pos_and_gains_sqrt_heuristic = np.concatenate(
+        (target_pos_and_p_gains, np.sqrt(p_gains)), axis=0
+    )
+
+    assert_allclose(
+        variable_gains_env.transform_action(target_pos_and_gains),
+        fixed_gains_env.transform_action(target_pos),
+    )
+
+    assert_allclose(
+        variable_p_gains_env.transform_action(target_pos_and_p_gains),
+        variable_gains_env.transform_action(target_pos_and_gains_sqrt_heuristic),
+    )

@@ -9,7 +9,7 @@ import gym
 import gym.envs.mujoco
 import numpy as np
 
-from action_space_toolbox import PositionControlWrapper
+from action_space_toolbox import FixedGainPositionControlWrapper
 from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 from action_space_toolbox.util.angles import normalize_angle
 
@@ -19,7 +19,7 @@ def sample_targets(env_id: str, num_targets: int) -> List[np.ndarray]:
     env = gym.make(env_id)
     env.seed(42)
     tmp_env = env
-    while not isinstance(tmp_env.env, PositionControlWrapper):
+    while not isinstance(tmp_env.env, FixedGainPositionControlWrapper):
         tmp_env = tmp_env.env
     tmp_env.env = tmp_env.env.env
     actuator_positions = []
@@ -55,7 +55,7 @@ def evaluate_pc_gains(
     render: bool = False,
     max_steps_per_episode: Optional[int] = None,
 ) -> float:
-    assert check_wrapped(env, PositionControlWrapper)
+    assert check_wrapped(env, FixedGainPositionControlWrapper)
     joint_errors = []
     for target_actuator_position in target_actuator_positions:
         for _ in range(repetitions_per_target):
