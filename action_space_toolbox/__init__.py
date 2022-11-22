@@ -179,8 +179,8 @@ def create_pc_env(
 
 def create_var_pc_env(
     base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
-    p_gains_limit: Sequence[float],
-    d_gains_limit: Optional[Sequence[float]],
+    p_gains_limits: Sequence[float],
+    d_gains_limits: Optional[Sequence[float]],
     target_position_limits: Optional[Union[float, Sequence[float]]] = None,
     positions_relative: bool = False,
     controller_steps: int = 1,
@@ -193,12 +193,12 @@ def create_var_pc_env(
 ) -> gym.Env:
     env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
     env = wrap_env_controller_base(env)
-    assert len(p_gains_limit) == 2
-    assert d_gains_limit is None or len(d_gains_limit) == 2
+    assert len(p_gains_limits) == 2
+    assert d_gains_limits is None or len(d_gains_limits) == 2
     env = VariableGainsPositionControlWrapper(
         env,
-        tuple(p_gains_limit),
-        tuple(d_gains_limit),
+        tuple(p_gains_limits),
+        tuple(d_gains_limits) if d_gains_limits is not None else None,
         positions_relative,
         target_position_limits,
         controller_steps,
