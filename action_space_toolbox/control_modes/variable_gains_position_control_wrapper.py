@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence, Union, Tuple, Optional
+from typing import Optional, Tuple
 
 import gym
 import numpy as np
