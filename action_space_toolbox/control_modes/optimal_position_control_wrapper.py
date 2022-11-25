@@ -1,5 +1,5 @@
 import logging
-from typing import Union, Optional, Sequence, Dict, Tuple
+from typing import Optional, Dict, Tuple
 
 import gym
 import numpy as np
@@ -7,13 +7,9 @@ import numpy as np
 from action_space_toolbox.controller_base.controller_base_wrapper import (
     ControllerBaseWrapper,
 )
-from action_space_toolbox.action_transformation_wrapper import (
-    ActionTransformationWrapper,
-)
 from action_space_toolbox.control_modes.check_wrapped import (
     check_wrapped,
 )
-from action_space_toolbox.util.angles import normalize_angle
 
 logger = logging.getLogger(__name__)
 
