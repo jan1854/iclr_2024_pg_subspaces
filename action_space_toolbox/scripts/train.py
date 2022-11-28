@@ -58,11 +58,16 @@ def train(cfg: omegaconf.DictConfig) -> None:
     algorithm.set_logger(
         SB3CustomLogger("tensorboard", [tb_output_format], env.base_env_timestep_factor)
     )
-    training_steps = cfg.algorithm.training.steps // env.base_env_timestep_factor
+    checkpoints_path = Path("checkpoints")
+    checkpoints_path.mkdir()
+    # Save the initial agent
+    path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
+    algorithm.save(path)
     callbacks = [
-        CheckpointCallback(10000, str(Path.cwd() / "checkpoints"), cfg.algorithm.name),
+        CheckpointCallback(10000, str(checkpoints_path), cfg.algorithm.name),
         FixEpInfoBufferCallback(),
     ]
+    training_steps = cfg.algorithm.training.steps // env.base_env_timestep_factor
     try:
         algorithm.learn(total_timesteps=training_steps, callback=callbacks)
     finally:
