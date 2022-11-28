@@ -1,0 +1,20 @@
+defaults:
+  - _self_
+  - action_transformation: null
+  - algorithm: ppo_default
+
+env: Pendulum-v1
+env_args: {}
+seed: null
+
+log_dir: logs
+run_log_dir: ${log_dir}/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${run_log_dir}
+  sweep:
+    dir: ${run_log_dir}
+  job:
+    chdir: true
+  verbose: [__main__, action_space_optimization]

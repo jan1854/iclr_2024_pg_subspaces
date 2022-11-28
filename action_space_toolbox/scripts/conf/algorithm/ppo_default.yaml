@@ -1,0 +1,11 @@
+# TODO: Most parameters should be in a default PPO config
+name: "ppo"
+
+algorithm:
+  _target_: stable_baselines3.PPO
+  policy: "MlpPolicy"
+  device: "auto"
+  tensorboard_log: tensorboard
+
+training:
+  steps: 1000000
