@@ -7,6 +7,7 @@ import gym
 import hydra
 import numpy as np
 import omegaconf
+
 import stable_baselines3.common.logger
 import torch
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -27,7 +28,7 @@ def make_env(cfg: omegaconf.DictConfig) -> gym.Env:
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
-def train(cfg: omegaconf.DictConfig):
+def train(cfg: omegaconf.DictConfig) -> None:
     # This needs to be a local import to get the environments registered in action_space_toolbox to work with the hydra
     # joblib launcher (see also https://github.com/facebookresearch/hydra/issues/1802#issuecomment-908722829)
     import action_space_toolbox
