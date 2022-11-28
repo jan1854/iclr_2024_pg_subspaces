@@ -42,7 +42,9 @@ class AbstractVelocityControlWrapper(ActionTransformationWrapper, abc.ABC):
                 )
         # Assume that the limits are the same for each action dimension if a single (low, high) pair is passed
         if self.target_velocity_limits.ndim == 1:
-            self.target_velocity_limits[None].repeat(env.action_space.shape, axis=0)
+            self.target_velocity_limits = self.target_velocity_limits[None].repeat(
+                env.action_space.shape, axis=0
+            )
 
     def transform_action(self, action: np.ndarray) -> np.ndarray:
         vel = self.actuator_velocities
