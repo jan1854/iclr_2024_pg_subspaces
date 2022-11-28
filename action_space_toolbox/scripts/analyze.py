@@ -16,7 +16,7 @@ import action_space_toolbox
 def analysis_worker(
     analysis_cfg: omegaconf.DictConfig,
     log_path: Path,
-    step: int,
+    agent_step: int,
     device: Optional[torch.device],
 ):
     train_cfg = OmegaConf.load(log_path / ".hydra" / "config.yaml")
@@ -25,7 +25,7 @@ def analysis_worker(
     if device is None:
         device = train_cfg.algorithm.algorithm.device
     agent = agent_class.load(
-        log_path / "checkpoints" / f"{train_cfg.algorithm.name}_{step}_steps",
+        log_path / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps",
         env,
         device=device,
     )
@@ -33,7 +33,7 @@ def analysis_worker(
     analysis = hydra.utils.instantiate(
         analysis_cfg, env=env, agent=agent, summary_writer=summary_writer
     )
-    analysis.do_analysis(step)
+    analysis.do_analysis(agent_step * env.base_env_timestep_factor)
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
@@ -48,6 +48,12 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         run_logs = [train_logs]
     else:
         run_logs = [d for d in train_logs.iterdir() if d.is_dir() and d.name.isdigit()]
+
+    # Determine the base_env_timestep_factor to load the correct checkpoints
+    train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
+    env = gym.make(train_cfg.env, **train_cfg.env_args)
+    base_env_timestep_factor = env.base_env_timestep_factor
+
     jobs = []
     for log_dir in run_logs:
         checkpoints_dir = log_dir / "checkpoints"
@@ -57,21 +63,23 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         ]
         checkpoint_steps.sort()
         steps_for_analysis = []
-        # TODO: Deal with multiple seeds configurations
         # TODO: Check whether it was already executed, probably one level below is better
-        for step in checkpoint_steps:
-            if step >= len(steps_for_analysis) * cfg.min_interval:
-                steps_for_analysis.append((log_dir, step))
+        for agent_step in checkpoint_steps:
+            if (
+                agent_step * base_env_timestep_factor
+                >= len(steps_for_analysis) * cfg.min_interval
+            ):
+                steps_for_analysis.append((log_dir, agent_step))
         jobs.extend(steps_for_analysis)
     jobs.sort(key=lambda j: (j[1], j[0]))
 
     pool = multiprocessing.Pool(cfg.num_workers)
     results = []
-    for log_dir, step in jobs:
+    for log_dir, agent_step in jobs:
         results.append(
             pool.apply_async(
                 analysis_worker,
-                args=(cfg.analysis, log_dir, step, cfg.device),
+                args=(cfg.analysis, log_dir, agent_step, cfg.device),
             )
         )
     try:

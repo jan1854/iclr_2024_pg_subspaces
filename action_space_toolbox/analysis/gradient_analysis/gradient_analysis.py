@@ -69,8 +69,7 @@ class GradientAnalysis:
             self.agent.gamma,
         )
 
-    def do_analysis(self, step: int) -> bool:
-        env_step = step * self.env.envs[0].base_env_timestep_factor
+    def do_analysis(self, env_step: int) -> bool:
         policy = self.agent.policy
         self._fill_rollout_buffer(
             self.env, self._rollout_buffer_true_gradient, verbose=True
