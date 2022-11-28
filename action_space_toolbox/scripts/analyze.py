@@ -43,26 +43,35 @@ def get_step_from_checkpoint(file_name: str) -> int:
 
 @hydra.main(version_base=None, config_path="conf", config_name="analyze")
 def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
-    checkpoints_dir = Path(cfg.train_logs) / "checkpoints"
-    checkpoint_steps = [
-        get_step_from_checkpoint(checkpoint.name)
-        for checkpoint in checkpoints_dir.iterdir()
-    ]
-    checkpoint_steps.sort()
-    steps_for_analysis = []
-    # TODO: Deal with multiple seeds configurations
-    # TODO: Check whether it was already executed, probably one level below is better
-    for step in checkpoint_steps:
-        if step >= len(steps_for_analysis) * cfg.min_interval:
-            steps_for_analysis.append(step)
+    train_logs = Path(cfg.train_logs)
+    if (train_logs / "checkpoints").exists():
+        run_logs = [train_logs]
+    else:
+        run_logs = [d for d in train_logs.iterdir() if d.is_dir() and d.name.isdigit()]
+    jobs = []
+    for log_dir in run_logs:
+        checkpoints_dir = log_dir / "checkpoints"
+        checkpoint_steps = [
+            get_step_from_checkpoint(checkpoint.name)
+            for checkpoint in checkpoints_dir.iterdir()
+        ]
+        checkpoint_steps.sort()
+        steps_for_analysis = []
+        # TODO: Deal with multiple seeds configurations
+        # TODO: Check whether it was already executed, probably one level below is better
+        for step in checkpoint_steps:
+            if step >= len(steps_for_analysis) * cfg.min_interval:
+                steps_for_analysis.append((log_dir, step))
+        jobs.extend(steps_for_analysis)
+    jobs.sort(key=lambda j: (j[1], j[0]))
 
     pool = multiprocessing.Pool(cfg.num_workers)
     results = []
-    for step in steps_for_analysis:
+    for log_dir, step in jobs:
         results.append(
             pool.apply_async(
                 analysis_worker,
-                args=(cfg.analysis, Path(cfg.train_logs), step, cfg.device),
+                args=(cfg.analysis, log_dir, step, cfg.device),
             )
         )
     try:
