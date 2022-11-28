@@ -20,7 +20,10 @@ def test_instantiation():
             assert np.all(env.action_space.low == -1) and np.all(
                 env.action_space.high == 1
             )
-            assert env.action_space.shape == env.unwrapped.action_space.shape
+            assert (
+                env.action_space.shape == env.unwrapped.action_space.shape
+                or control_mode in ["VarVC", "VarPC"]
+            )
 
 
 def test_unused_parameters():

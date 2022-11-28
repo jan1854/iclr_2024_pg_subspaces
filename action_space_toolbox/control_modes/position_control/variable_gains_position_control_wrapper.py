@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 import gym
 import numpy as np
 
-from action_space_toolbox.control_modes.abstract_position_control_wrapper import (
+from action_space_toolbox.control_modes.position_control.abstract_position_control_wrapper import (
     AbstractPositionControlWrapper,
 )
 

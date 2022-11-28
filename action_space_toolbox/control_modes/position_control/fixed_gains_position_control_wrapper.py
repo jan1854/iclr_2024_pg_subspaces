@@ -4,14 +4,14 @@ from typing import Sequence, Union, Tuple, Optional
 import gym
 import numpy as np
 
-from action_space_toolbox.control_modes.abstract_position_control_wrapper import (
+from action_space_toolbox.control_modes.position_control.abstract_position_control_wrapper import (
     AbstractPositionControlWrapper,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class FixedGainPositionControlWrapper(AbstractPositionControlWrapper):
+class FixedGainsPositionControlWrapper(AbstractPositionControlWrapper):
     def __init__(
         self,
         env: gym.Env,

@@ -16,11 +16,14 @@ from gym.envs.mujoco.half_cheetah_v3 import HalfCheetahEnv
 from gym.envs.mujoco.hopper_v3 import HopperEnv
 from gym.envs.mujoco.walker2d_v3 import Walker2dEnv
 
-from action_space_toolbox.control_modes.optimal_position_control_wrapper import (
+from action_space_toolbox.control_modes.position_control.optimal_position_control_wrapper import (
     OptimalPositionControlWrapper,
 )
-from action_space_toolbox.control_modes.variable_gains_position_control_wrapper import (
+from action_space_toolbox.control_modes.position_control.variable_gains_position_control_wrapper import (
     VariableGainsPositionControlWrapper,
+)
+from action_space_toolbox.control_modes.velocity_control.variable_gains_velocity_control_wrapper import (
+    VariableGainsVelocityControlWrapper,
 )
 from action_space_toolbox.controller_base.controller_base_wrapper import (
     ControllerBaseWrapper,
@@ -34,8 +37,8 @@ from action_space_toolbox.controller_base.gym_mujoco_controller_base_wrapper imp
 from action_space_toolbox.controller_base.pendulum_controller_base_wrapper import (
     PendulumControllerBaseWrapper,
 )
-from action_space_toolbox.control_modes.fixed_gains_position_control_wrapper import (
-    FixedGainPositionControlWrapper,
+from action_space_toolbox.control_modes.position_control.fixed_gains_position_control_wrapper import (
+    FixedGainsPositionControlWrapper,
 )
 from action_space_toolbox.control_modes.velocity_control_wrapper import (
     VelocityControlWrapper,
@@ -165,7 +168,7 @@ def create_pc_env(
 ) -> gym.Env:
     env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
     env = wrap_env_controller_base(env)
-    env = FixedGainPositionControlWrapper(
+    env = FixedGainsPositionControlWrapper(
         env,
         p_gains,
         d_gains,
@@ -201,6 +204,32 @@ def create_var_pc_env(
         tuple(d_gains_limits) if d_gains_limits is not None else None,
         positions_relative,
         target_position_limits,
+        controller_steps,
+        keep_base_timestep,
+    )
+    return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
+
+
+def create_var_vc_env(
+    base_env_type_or_id: Union[Type[TEnv], Tuple[str, str]],
+    gains_limits: Sequence[float],
+    target_velocity_limits: Optional[Union[float, Sequence[float]]] = None,
+    controller_steps: int = 1,
+    keep_base_timestep: bool = True,
+    normalize: bool = True,
+    action_repeat: int = 1,
+    max_episode_steps: int = 1000,
+    disable_control_rewards: bool = False,
+    **kwargs,
+) -> gym.Env:
+    env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
+    env = wrap_env_controller_base(env)
+    assert len(gains_limits) == 2
+    assert gains_limits is None or len(gains_limits) == 2
+    env = VariableGainsVelocityControlWrapper(
+        env,
+        tuple(gains_limits),
+        target_velocity_limits,
         controller_steps,
         keep_base_timestep,
     )
@@ -266,6 +295,7 @@ DEFAULT_PARAMETERS = {
     "VC": {"gains": 10.0},
     "PC": {"p_gains": 15.0, "d_gains": 2.0},
     "OptPC": {},
+    "VarVC": {"gains_limits": (0.0, 100.0)},
     "VarPC": {"p_gains_limits": (0.0, 100.0), "d_gains_limits": None},
 }
 
@@ -284,14 +314,16 @@ control_mode_parameters = {
     "TC": {},
     "VC": vc_parameters,
     "PC": pc_parameters,
-    "OptPC": {},
+    "VarVC": {},
     "VarPC": {},
+    "OptPC": {},
 }
 ENTRY_POINTS = {
     "TC": "action_space_toolbox:create_tc_env",
     "VC": "action_space_toolbox:create_vc_env",
     "PC": "action_space_toolbox:create_pc_env",
     "OptPC": "action_space_toolbox:create_opt_pc_env",
+    "VarVC": "action_space_toolbox:create_var_vc_env",
     "VarPC": "action_space_toolbox:create_var_pc_env",
 }
 
