@@ -19,6 +19,7 @@ dependencies = [
     "hydra-core",
     "numpy",
     "omegaconf",
+    "Pillow",
     "stable-baselines3",
     "torch"
 ]
