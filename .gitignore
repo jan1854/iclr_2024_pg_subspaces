@@ -3,3 +3,4 @@ __pycache__
 action_transformations.egg-info
 logs
 logs_test
+*.egg-info
