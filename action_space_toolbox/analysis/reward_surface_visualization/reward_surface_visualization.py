@@ -1,4 +1,6 @@
+import functools
 import math
+import multiprocessing
 from pathlib import Path
 from typing import Callable
 
@@ -23,15 +25,17 @@ class RewardSurfaceVisualization(Analysis):
         agent_factory: Callable[[], stable_baselines3.ppo.PPO],
         run_dir: Path,
         grid_size: int,
-        num_env_steps: int,
+        num_steps: int,
         num_plots: int,
+        num_processes: int,
     ):
         super().__init__(
             "reward_surface_visualization", env_factory, agent_factory, run_dir
         )
         self.grid_size = grid_size
-        self.num_env_steps = num_env_steps
+        self.num_steps = num_steps
         self.num_plots = num_plots
+        self.num_processes = num_processes
         self.out_dir = run_dir / "analyses" / "reward_surface_visualization"
         self.out_dir.mkdir(exist_ok=True, parents=True)
 
@@ -41,15 +45,15 @@ class RewardSurfaceVisualization(Analysis):
                 continue
             agent = self.agent_factory()
             direction1 = [
-                self.sample_filter_normalized_direction(p)
+                self.sample_filter_normalized_direction(p.detach())
                 for p in agent.policy.parameters()
             ]
             direction2 = [
-                self.sample_filter_normalized_direction(p)
+                self.sample_filter_normalized_direction(p.detach())
                 for p in agent.policy.parameters()
             ]
 
-            agent_weights = [p.data.clone() for p in agent.policy.parameters()]
+            agent_weights = [p.data.detach() for p in agent.policy.parameters()]
             weights_offsets = [[None] * (self.grid_size + 1)] * (self.grid_size + 1)
 
             for offset_idx1 in range(self.grid_size + 1):
@@ -74,12 +78,16 @@ class RewardSurfaceVisualization(Analysis):
                 item for sublist in weights_offsets for item in sublist
             ]
 
-            returns_offsets_flat = [
-                eval_parameters(
-                    weights, self.env_factory, self.agent_factory, self.num_env_steps
+            with multiprocessing.get_context("spawn").Pool(self.num_processes) as pool:
+                returns_offsets_flat = pool.map(
+                    functools.partial(
+                        eval_parameters,
+                        env_factory=self.env_factory,
+                        agent_factory=self.agent_factory,
+                        num_steps=self.num_steps,
+                    ),
+                    weights_offsets_flat,
                 )
-                for weights in weights_offsets_flat
-            ]
             returns_offsets = np.array(returns_offsets_flat).reshape(
                 self.grid_size + 1, self.grid_size + 1
             )

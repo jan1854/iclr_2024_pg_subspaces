@@ -1,3 +1,4 @@
+import functools
 import logging
 import multiprocessing
 import re
@@ -27,22 +28,17 @@ def analysis_worker(
     if device is None:
         device = train_cfg.algorithm.algorithm.device
 
-    def env_factory():
-        return gym.make(train_cfg.env, **train_cfg.env_args)
+    env = gym.make(train_cfg.env, **train_cfg.env_args)
 
-    env = env_factory()
-
-    def agent_factory():
-        return agent_class.load(
-            run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps",
-            env,
-            device=device,
-        )
-
+    agent_checkpoint = (
+        run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps"
+    )
     analysis = hydra.utils.instantiate(
         analysis_cfg,
-        env_factory=env_factory,
-        agent_factory=agent_factory,
+        env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
+        agent_factory=functools.partial(
+            agent_class.load, agent_checkpoint, env, device=device
+        ),
         run_dir=run_dir,
     )
     analysis.do_analysis(agent_step * env.base_env_timestep_factor)
