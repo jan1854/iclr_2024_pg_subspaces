@@ -52,33 +52,27 @@ def combine_metrics(log_path: Path) -> None:
                     for d in experiment_dir.iterdir()
                     if d.is_dir() and d.name.isnumeric()
                 ]
-                all_done = True
+
+                # Create the combined metrics if either the "combined" directory is missing or any of the runs contains
+                # new data
+                combined_dir = experiment_dir / "combined"
+                update = not combined_dir.exists()
                 for curr_run_dir in run_dirs:
                     if curr_run_dir.exists():
-                        all_done &= (curr_run_dir / "done").exists()
+                        update |= (curr_run_dir / ".new_data").exists()
                     else:
                         break
-                combined_dir = experiment_dir / "combined"
-                meta_path = combined_dir / ".meta.yaml"
-                if meta_path.exists():
-                    with meta_path.open("r") as meta_file:
-                        meta = yaml.safe_load(meta_file)
-                        update = (
-                            meta["num_runs"] < len(run_dirs) or not meta["all_done"]
-                        )
-                else:
-                    update = True
 
                 if len(run_dirs) > 1 and same_configurations(run_dirs) and update:
-                    jobs.append((run_dirs, combined_dir, all_done))
+                    jobs.append((run_dirs, combined_dir))
 
-    for run_dirs, combined_dir, all_done in tqdm(jobs):
+    for run_dirs, combined_dir in tqdm(jobs):
         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
         if combined_dir.exists():
             shutil.rmtree(combined_dir)
         combine_tb_logs(tb_dirs, combined_dir)
-        with (combined_dir / ".meta.yaml").open("w") as meta_file:
-            yaml.dump({"num_runs": len(tb_dirs), "all_done": all_done}, meta_file)
+        for run_dir in run_dirs:
+            (run_dir / ".new_data").unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

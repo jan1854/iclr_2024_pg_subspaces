@@ -95,14 +95,11 @@ def add_mean_std_scalars(
 def create_event_accumulators(tb_dirs: Sequence[Path]):
     event_accumulators = []
     for tb_dir in tb_dirs:
-        event_file_dirs = list(tb_dir.glob("**/events.out.tfevents*"))
-        assert len(event_file_dirs) == 1
-        event_file_dir = event_file_dirs[0]
-        ea = event_accumulator.EventAccumulator(str(event_file_dir))
+        ea = event_accumulator.EventAccumulator(str(tb_dir))
         ea.Reload()
         assert (
             len(ea.Tags()["scalars"]) > 0
-        ), f"Log files in directory {event_file_dir} contain no data."
+        ), f"Log files in directory {tb_dir} contain no data."
         event_accumulators.append(ea)
     return event_accumulators
 

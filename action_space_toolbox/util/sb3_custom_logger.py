@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import stable_baselines3.common.logger
@@ -28,6 +29,8 @@ class SB3CustomLogger(stable_baselines3.common.logger.Logger):
                     self._add_key_prefix(self.name_to_excluded, "z_agent_timestep"),
                     step,
                 )
+        run_dir = Path(self.dir).parent
+        (run_dir / ".new_data").touch()
 
         self.name_to_value.clear()
         self.name_to_count.clear()
