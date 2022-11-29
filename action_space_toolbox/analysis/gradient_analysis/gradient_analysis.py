@@ -15,6 +15,7 @@ from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.gradient_analysis.value_function import (
     ValueFunctionTrainer,
     ValueFunction,
@@ -26,21 +27,18 @@ from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 logger = logging.getLogger(__name__)
 
 
-class GradientAnalysis:
+class GradientAnalysis(Analysis):
     def __init__(
         self,
         env: gym.Env,
         agent: stable_baselines3.ppo.PPO,
-        summary_writer: SummaryWriter,
+        run_dir: Path,
         num_gradient_estimates: int = 500,
         samples_true_gradient: int = 10**7,
         epochs_gt_value_function_training: int = 1,
         dump_gt_value_function_dataset: bool = False,
     ):
-        super().__init__()
-        self.env = DummyVecEnv([lambda: env])
-        self.agent = agent
-        self.summary_writer = summary_writer
+        super().__init__("gradient_analysis", env, agent, run_dir)
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
         self.epochs_gt_value_function_training = epochs_gt_value_function_training
@@ -69,7 +67,7 @@ class GradientAnalysis:
             self.agent.gamma,
         )
 
-    def do_analysis(self, env_step: int) -> bool:
+    def _do_analysis(self, env_step: int) -> None:
         policy = self.agent.policy
         self._fill_rollout_buffer(
             self.env, self._rollout_buffer_true_gradient, verbose=True
@@ -186,8 +184,6 @@ class GradientAnalysis:
             }
             self.summary_writer.add_custom_scalars(layout)
             self._gradient_estimates_value_function_custom_scalars_added = True
-
-        return True
 
     def compute_similarity_true_gradient(self, rollout_buffer: RolloutBuffer) -> float:
         assert isinstance(self.agent, stable_baselines3.ppo.PPO)

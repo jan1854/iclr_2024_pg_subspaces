@@ -1,3 +1,4 @@
+import logging
 import multiprocessing
 import re
 from pathlib import Path
@@ -8,30 +9,31 @@ import hydra
 import omegaconf
 import torch
 from omegaconf import OmegaConf
-from torch.utils.tensorboard import SummaryWriter
 
 import action_space_toolbox
 
 
+logger = logging.getLogger(__file__)
+
+
 def analysis_worker(
     analysis_cfg: omegaconf.DictConfig,
-    log_path: Path,
+    run_dir: Path,
     agent_step: int,
     device: Optional[torch.device],
 ):
-    train_cfg = OmegaConf.load(log_path / ".hydra" / "config.yaml")
+    train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
     env = gym.make(train_cfg.env, **train_cfg.env_args)
     agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
     if device is None:
         device = train_cfg.algorithm.algorithm.device
     agent = agent_class.load(
-        log_path / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps",
+        run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps",
         env,
         device=device,
     )
-    summary_writer = SummaryWriter(str(log_path / "tensorboard"))
     analysis = hydra.utils.instantiate(
-        analysis_cfg, env=env, agent=agent, summary_writer=summary_writer
+        analysis_cfg, env=env, agent=agent, run_dir=run_dir
     )
     analysis.do_analysis(agent_step * env.base_env_timestep_factor)
 
@@ -43,6 +45,7 @@ def get_step_from_checkpoint(file_name: str) -> int:
 
 @hydra.main(version_base=None, config_path="conf", config_name="analyze")
 def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
+    logger.info(f"Analyzing results in {cfg.train_logs}")
     train_logs = Path(cfg.train_logs)
     if (train_logs / "checkpoints").exists():
         run_logs = [train_logs]

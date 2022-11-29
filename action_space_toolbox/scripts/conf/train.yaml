@@ -8,7 +8,7 @@ env_args: {}
 seed: null
 
 log_dir: logs
-run_log_dir: ${log_dir}/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+run_log_dir: ${log_dir}/training/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 hydra:
   run:
