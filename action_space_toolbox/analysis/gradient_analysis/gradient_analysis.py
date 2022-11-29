@@ -12,7 +12,6 @@ from stable_baselines3.common.type_aliases import RolloutBufferSamples
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import DummyVecEnv
 from torch.nn import functional as F
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
