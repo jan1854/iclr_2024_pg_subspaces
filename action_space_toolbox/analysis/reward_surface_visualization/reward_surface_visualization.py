@@ -8,6 +8,7 @@ import gym
 import numpy as np
 import stable_baselines3.common.base_class
 import torch
+from PIL import Image
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
@@ -92,11 +93,17 @@ class RewardSurfaceVisualization(Analysis):
                 self.grid_size + 1, self.grid_size + 1
             )
             coords = np.linspace(-1.0, 1.0, num=self.grid_size + 1)
+            plot_outpath = self.out_dir / self._plot_filename(env_step, i)
             self._plot_surface(
                 coords,
                 coords,
                 returns_offsets,
-                self.out_dir / self._plot_filename(env_step, i),
+                plot_outpath,
+            )
+            im = Image.open(plot_outpath)
+            im_np = np.array(im)[..., :-1]
+            self.summary_writer.add_image(
+                f"reward_surfaces/{env_step}_{i}", im_np, dataformats="HWC"
             )
 
     @staticmethod
@@ -255,4 +262,4 @@ class RewardSurfaceVisualization(Analysis):
 
     @staticmethod
     def _plot_filename(env_step: int, plot_idx: int) -> str:
-        return f"{env_step:07d}_{plot_idx:02d}.pdf"
+        return f"{env_step:07d}_{plot_idx:02d}.png"
