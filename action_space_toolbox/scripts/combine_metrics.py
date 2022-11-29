@@ -6,7 +6,7 @@ from typing import Sequence, Any, Dict
 import yaml
 from tqdm import tqdm
 
-from action_space_optimization.util.tensorboard_logs import combine_tb_logs
+from action_space_toolbox.util.tensorboard_logs import combine_tb_logs
 
 
 def same_configurations(run_dirs: Sequence[Path]) -> bool:
