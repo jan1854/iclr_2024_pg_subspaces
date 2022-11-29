@@ -2,6 +2,9 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-dir = {"" = "action_space_toolbox"}
+
 [project]
 name = "action-space-toolbox"
 description = ""
@@ -12,8 +15,12 @@ authors = [
 dependencies = [
     "dm_control",
     "dmc2gym @ git+https://github.com/denisyarats/dmc2gym.git",
-    "gym[mujoco]==0.21",    # To ensure compatibility to stable-baselines3
-    "numpy"
+    "gym[mujoco]",
+    "hydra-core",
+    "numpy",
+    "omegaconf",
+    "stable-baselines3",
+    "torch"
 ]
 
 [project.optional-dependencies]
