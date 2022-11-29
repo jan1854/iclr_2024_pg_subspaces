@@ -40,8 +40,8 @@ from action_space_toolbox.controller_base.pendulum_controller_base_wrapper impor
 from action_space_toolbox.control_modes.position_control.fixed_gains_position_control_wrapper import (
     FixedGainsPositionControlWrapper,
 )
-from action_space_toolbox.control_modes.velocity_control_wrapper import (
-    VelocityControlWrapper,
+from action_space_toolbox.control_modes.velocity_control.fixed_gains_velocity_control_wrapper import (
+    FixedGainsVelocityControlWrapper,
 )
 from action_space_toolbox.reward.reacher_disable_control_reward_wrapper import (
     ReacherDisableControlRewardWrapper,
@@ -146,7 +146,7 @@ def create_vc_env(
 ) -> gym.Env:
     env = create_base_env(base_env_type_or_id, disable_control_rewards, **kwargs)
     env = wrap_env_controller_base(env)
-    env = VelocityControlWrapper(
+    env = FixedGainsVelocityControlWrapper(
         env, gains, target_velocity_limits, controller_steps, keep_base_timestep
     )
     return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
