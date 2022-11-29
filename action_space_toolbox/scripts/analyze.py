@@ -23,17 +23,27 @@ def analysis_worker(
     device: Optional[torch.device],
 ):
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
-    env = gym.make(train_cfg.env, **train_cfg.env_args)
     agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
     if device is None:
         device = train_cfg.algorithm.algorithm.device
-    agent = agent_class.load(
-        run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps",
-        env,
-        device=device,
-    )
+
+    def env_factory():
+        return gym.make(train_cfg.env, **train_cfg.env_args)
+
+    env = env_factory()
+
+    def agent_factory():
+        return agent_class.load(
+            run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps",
+            env,
+            device=device,
+        )
+
     analysis = hydra.utils.instantiate(
-        analysis_cfg, env=env, agent=agent, run_dir=run_dir
+        analysis_cfg,
+        env_factory=env_factory,
+        agent_factory=agent_factory,
+        run_dir=run_dir,
     )
     analysis.do_analysis(agent_step * env.base_env_timestep_factor)
 
@@ -76,23 +86,27 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         jobs.extend(steps_for_analysis)
     jobs.sort(key=lambda j: (j[1], j[0]))
 
-    pool = multiprocessing.Pool(cfg.num_workers)
-    results = []
-    for log_dir, agent_step in jobs:
-        results.append(
-            pool.apply_async(
-                analysis_worker,
-                args=(cfg.analysis, log_dir, agent_step, cfg.device),
+    if cfg.num_workers == 1:
+        for log_dir, agent_step in jobs:
+            analysis_worker(cfg.analysis, log_dir, agent_step, cfg.device)
+    else:
+        pool = multiprocessing.get_context("spawn").Pool(cfg.num_workers)
+        results = []
+        for log_dir, agent_step in jobs:
+            results.append(
+                pool.apply_async(
+                    analysis_worker,
+                    args=(cfg.analysis, log_dir, agent_step, cfg.device),
+                )
             )
-        )
-    try:
-        for result in results:
-            result.get()  # Check for errors
-        pool.close()
-        pool.join()
-    except:
-        pool.terminate()
-        raise
+        try:
+            for result in results:
+                result.get()  # Check for errors
+            pool.close()
+            pool.join()
+        except:
+            pool.terminate()
+            raise
 
 
 if __name__ == "__main__":

@@ -1,23 +1,24 @@
+import abc
 from pathlib import Path
+from typing import Callable
 
 import gym
 import stable_baselines3
 import yaml
-from stable_baselines3.common.vec_env import DummyVecEnv
 from torch.utils.tensorboard import SummaryWriter
 
 
-class Analysis:
+class Analysis(abc.ABC):
     def __init__(
         self,
         analysis_name: str,
-        env: gym.Env,
-        agent: stable_baselines3.ppo.PPO,
+        env_factory: Callable[[], gym.Env],
+        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
         run_dir: Path,
     ):
         self.analysis_name = analysis_name
-        self.env = DummyVecEnv([lambda: env])
-        self.agent = agent
+        self.env_factory = env_factory
+        self.agent_factory = agent_factory
         self.run_dir = run_dir
         self.summary_writer = SummaryWriter(str(run_dir / "tensorboard"))
         self._analyses_log_file = run_dir / ".analyses.yaml"
@@ -41,5 +42,6 @@ class Analysis:
                 yaml.dump(analyses_logs, analyses_log_file)
             self._new_data_indicator.touch()
 
+    @abc.abstractmethod
     def _do_analysis(self, env_step: int) -> None:
         pass

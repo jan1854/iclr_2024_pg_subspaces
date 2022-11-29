@@ -1,7 +1,7 @@
 import logging
 import pickle
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import gym
 import numpy as np
@@ -29,20 +29,23 @@ logger = logging.getLogger(__name__)
 class GradientAnalysis(Analysis):
     def __init__(
         self,
-        env: gym.Env,
-        agent: stable_baselines3.ppo.PPO,
+        env_factory: Callable[[], gym.Env],
+        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
         run_dir: Path,
         num_gradient_estimates: int = 500,
         samples_true_gradient: int = 10**7,
         epochs_gt_value_function_training: int = 1,
         dump_gt_value_function_dataset: bool = False,
     ):
-        super().__init__("gradient_analysis", env, agent, run_dir)
+        super().__init__("gradient_analysis", env_factory, agent_factory, run_dir)
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
         self.epochs_gt_value_function_training = epochs_gt_value_function_training
         self._gradient_estimates_value_function_custom_scalars_added = False
         self._dump_gt_value_function_dataset = dump_gt_value_function_dataset
+
+        self.agent = agent_factory()
+        self.env = DummyVecEnv([env_factory])
 
         assert isinstance(self.agent, stable_baselines3.ppo.PPO)
         self.value_function_trainer = ValueFunctionTrainer(
@@ -287,14 +290,13 @@ class GradientAnalysis(Analysis):
                 rewards_value = rewards_ep
             # We cannot know whether the last episode is shorter because it was terminated or because of the size limit
             # of the rollout buffer, so we just throw it out in this case.
-            if i == len(states_episodes) - 1 and len(states_ep) < episode_length:
-                continue
-            values_curr_episode_reversed = []
-            for reward in reversed(rewards_value):
-                curr_value = reward + rollout_buffer.gamma * curr_value
-                values_curr_episode_reversed.append(curr_value)
-            states.extend(states_value)
-            values.extend(reversed(values_curr_episode_reversed))
+            if i < len(states_episodes) - 1 or len(states_ep) == episode_length:
+                values_curr_episode_reversed = []
+                for reward in reversed(rewards_value):
+                    curr_value = reward + rollout_buffer.gamma * curr_value
+                    values_curr_episode_reversed.append(curr_value)
+                states.extend(states_value)
+                values.extend(reversed(values_curr_episode_reversed))
         states_torch = torch.tensor(np.stack(states, axis=0), device=self.agent.device)
         values_torch = torch.tensor(np.stack(values, axis=0), device=self.agent.device)
         return states_torch, values_torch
@@ -417,7 +419,7 @@ class GradientAnalysis(Analysis):
 
             # Rescale and perform action
             clipped_actions = actions
-            # Clip the actions to avoid out of bound error
+            # Clip the actions to avoid out of bounds error
             if isinstance(self.agent.action_space, gym.spaces.Box):
                 clipped_actions = np.clip(
                     actions, self.agent.action_space.low, self.agent.action_space.high

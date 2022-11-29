@@ -1,0 +1,4 @@
+_target_: action_space_toolbox.analysis.reward_surface_visualization.reward_surface_visualization.RewardSurfaceVisualization
+grid_size: 31
+num_env_steps: 200000
+num_plots: 1
