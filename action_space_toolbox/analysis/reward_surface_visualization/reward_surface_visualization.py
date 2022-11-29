@@ -126,8 +126,8 @@ class RewardSurfaceVisualization(Analysis):
                 f"Only 1, 2, 4 dimensional filters allowed, got {param.shape}."
             )
 
+    @staticmethod
     def _plot_surface(
-        self,
         x_coords: np.ndarray,
         y_coords: np.ndarray,
         values: np.ndarray,
@@ -137,7 +137,6 @@ class RewardSurfaceVisualization(Analysis):
         magnitude: float = 1.0,
     ) -> None:
         fig = plt.figure()
-        tnrfont = {"fontname": "Sans"}
         ax = Axes3D(fig)
 
         fig.suptitle(title)
