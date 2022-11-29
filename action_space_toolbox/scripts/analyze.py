@@ -72,7 +72,6 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         ]
         checkpoint_steps.sort()
         steps_for_analysis = []
-        # TODO: Check whether it was already executed, probably one level below is better
         for agent_step in checkpoint_steps:
             if (
                 agent_step * base_env_timestep_factor
