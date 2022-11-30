@@ -71,14 +71,17 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
             for checkpoint in checkpoints_dir.iterdir()
         ]
         checkpoint_steps.sort()
-        steps_for_analysis = []
-        for agent_step in checkpoint_steps:
-            if (
-                agent_step * base_env_timestep_factor
-                >= len(steps_for_analysis) * cfg.min_interval
-            ):
-                steps_for_analysis.append((log_dir, agent_step))
-        jobs.extend(steps_for_analysis)
+        if cfg.checkpoints_to_analyze is not None:
+            checkpoints_to_analyze = cfg.checkpoints_to_analyze
+        else:
+            checkpoints_to_analyze = []
+            for agent_step in checkpoint_steps:
+                if (
+                    agent_step * base_env_timestep_factor
+                    >= len(checkpoints_to_analyze) * cfg.min_interval
+                ):
+                    checkpoints_to_analyze.append((log_dir, agent_step))
+        jobs.extend(checkpoints_to_analyze)
     jobs.sort(key=lambda j: (j[1], j[0]))
 
     if cfg.num_workers == 1:

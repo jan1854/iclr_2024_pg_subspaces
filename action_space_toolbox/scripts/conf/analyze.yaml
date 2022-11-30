@@ -6,6 +6,7 @@ defaults:
 train_logs: ??
 
 min_interval: 50_000
+checkpoints_to_analyze: null
 num_workers: 4
 device: null
 
