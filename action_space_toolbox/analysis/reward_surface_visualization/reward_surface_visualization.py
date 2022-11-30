@@ -42,9 +42,14 @@ class RewardSurfaceVisualization(Analysis):
         self.data_dir = self.out_dir / "data"
         self.data_dir.mkdir(exist_ok=True)
 
-    def _do_analysis(self, env_step: int) -> None:
+    def _do_analysis(self, env_step: int, overwrite_results: bool) -> None:
         for i in range(self.num_plots):
-            if (self.out_dir / f"{self._result_filename(env_step, i)}.png").exists():
+            if (
+                not overwrite_results
+                and (
+                    self.out_dir / f"{self._result_filename(env_step, i)}.png"
+                ).exists()
+            ):
                 continue
             agent = self.agent_factory()
             direction1 = [

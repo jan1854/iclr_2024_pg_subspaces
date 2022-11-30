@@ -26,15 +26,15 @@ class Analysis(abc.ABC):
             self._analyses_log_file.touch()
         self._new_data_indicator = run_dir / ".new_data"
 
-    def do_analysis(self, env_step: int, overwrite: bool = False) -> None:
+    def do_analysis(self, env_step: int, overwrite_results: bool = False) -> None:
         # Check whether the analysis was already done for the current step
         with self._analyses_log_file.open("r") as analyses_log_file:
             analyses_logs = yaml.safe_load(analyses_log_file)
         if analyses_logs is None:
             analyses_logs = {}
         curr_analysis_logs = analyses_logs.get(self.analysis_name, [])
-        if env_step not in curr_analysis_logs or overwrite:
-            self._do_analysis(env_step)
+        if env_step not in curr_analysis_logs or overwrite_results:
+            self._do_analysis(env_step, overwrite_results)
             # Safe that the analysis was done for this step
             curr_analysis_logs = sorted(curr_analysis_logs + [env_step])
             analyses_logs[self.analysis_name] = curr_analysis_logs
@@ -43,5 +43,5 @@ class Analysis(abc.ABC):
             self._new_data_indicator.touch()
 
     @abc.abstractmethod
-    def _do_analysis(self, env_step: int) -> None:
+    def _do_analysis(self, env_step: int, overwrite_results: bool) -> None:
         pass
