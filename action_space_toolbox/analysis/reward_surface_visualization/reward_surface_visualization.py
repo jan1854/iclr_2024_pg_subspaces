@@ -93,10 +93,11 @@ class RewardSurfaceVisualization(Analysis):
                 self.grid_size + 1, self.grid_size + 1
             )
             coords = np.linspace(-1.0, 1.0, num=self.grid_size + 1)
+            x_coords, y_coords = np.meshgrid(coords, coords)
             plot_outpath = self.out_dir / self._plot_filename(env_step, i)
             self._plot_surface(
-                coords,
-                coords,
+                x_coords,
+                y_coords,
                 returns_offsets,
                 plot_outpath,
             )
