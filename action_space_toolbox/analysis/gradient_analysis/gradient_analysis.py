@@ -49,9 +49,7 @@ class GradientAnalysis(Analysis):
         self.env = DummyVecEnv([env_factory])
 
         assert isinstance(self.agent, stable_baselines3.ppo.PPO)
-        self.value_function_trainer = ValueFunctionTrainer(
-            self.summary_writer, self.agent.batch_size
-        )
+        self.value_function_trainer = ValueFunctionTrainer(self.agent.batch_size)
 
         self._rollout_buffer_true_gradient = RolloutBuffer(
             self.samples_true_gradient,

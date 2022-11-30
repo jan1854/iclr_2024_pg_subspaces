@@ -55,10 +55,8 @@ class ValueFunction(torch.nn.Module):
 class ValueFunctionTrainer:
     def __init__(
         self,
-        summary_writer: Optional[SummaryWriter],
         batch_size: int,
     ):
-        self.summary_writer = summary_writer
         self._gt_value_function_custom_scalars_added = False
         self.batch_size = batch_size
 
