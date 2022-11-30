@@ -39,10 +39,12 @@ class RewardSurfaceVisualization(Analysis):
         self.num_processes = num_processes
         self.out_dir = run_dir / "analyses" / "reward_surface_visualization"
         self.out_dir.mkdir(exist_ok=True, parents=True)
+        self.data_dir = self.out_dir / "data"
+        self.data_dir.mkdir(exist_ok=True)
 
     def _do_analysis(self, env_step: int) -> None:
         for i in range(self.num_plots):
-            if (self.out_dir / self._plot_filename(env_step, i)).exists():
+            if (self.out_dir / f"{self._result_filename(env_step, i)}.png").exists():
                 continue
             agent = self.agent_factory()
             direction1 = [
@@ -92,9 +94,11 @@ class RewardSurfaceVisualization(Analysis):
             returns_offsets = np.array(returns_offsets_flat).reshape(
                 self.grid_size + 1, self.grid_size + 1
             )
+            data_file = self.data_dir / self._result_filename(env_step, i)
+            np.save(str(data_file), returns_offsets)
             coords = np.linspace(-1.0, 1.0, num=self.grid_size + 1)
             x_coords, y_coords = np.meshgrid(coords, coords)
-            plot_outpath = self.out_dir / self._plot_filename(env_step, i)
+            plot_outpath = self.out_dir / f"{self._result_filename(env_step, i)}.png"
             self._plot_surface(
                 x_coords,
                 y_coords,
@@ -264,5 +268,5 @@ class RewardSurfaceVisualization(Analysis):
         plt.close()
 
     @staticmethod
-    def _plot_filename(env_step: int, plot_idx: int) -> str:
-        return f"{env_step:07d}_{plot_idx:02d}.png"
+    def _result_filename(env_step: int, plot_idx: int) -> str:
+        return f"{env_step:07d}_{plot_idx:02d}"
