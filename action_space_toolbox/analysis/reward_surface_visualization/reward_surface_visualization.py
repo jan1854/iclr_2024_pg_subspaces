@@ -260,6 +260,7 @@ class RewardSurfaceVisualization(Analysis):
             fig.colorbar(surf, shrink=0.5, aspect=5, pad=0.05)
 
         fig.savefig(outpath, dpi=300, bbox_inches="tight")
+        plt.close()
 
     @staticmethod
     def _plot_filename(env_step: int, plot_idx: int) -> str:
