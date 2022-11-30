@@ -1,3 +1,4 @@
+import concurrent.futures
 import functools
 import logging
 import multiprocessing
@@ -10,9 +11,10 @@ import hydra
 import omegaconf
 import torch
 from omegaconf import OmegaConf
+from torch.utils.tensorboard import SummaryWriter
 
 import action_space_toolbox
-
+from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 logger = logging.getLogger(__file__)
 
@@ -23,7 +25,7 @@ def analysis_worker(
     agent_step: int,
     device: Optional[torch.device],
     overwrite_results: bool,
-):
+) -> TensorboardLogs:
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
     agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
     if device is None:
@@ -42,7 +44,9 @@ def analysis_worker(
         ),
         run_dir=run_dir,
     )
-    analysis.do_analysis(agent_step * env.base_env_timestep_factor, overwrite_results)
+    return analysis.do_analysis(
+        agent_step * env.base_env_timestep_factor, overwrite_results
+    )
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
@@ -65,7 +69,9 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
     base_env_timestep_factor = env.base_env_timestep_factor
 
     jobs = []
+    summary_writers = {}
     for log_dir in run_logs:
+        summary_writers[log_dir] = SummaryWriter(str(log_dir / "tensorboard"))
         checkpoints_dir = log_dir / "checkpoints"
         checkpoint_steps = [
             get_step_from_checkpoint(checkpoint.name)
@@ -73,7 +79,9 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         ]
         checkpoint_steps.sort()
         if cfg.checkpoints_to_analyze is not None:
-            checkpoints_to_analyze = cfg.checkpoints_to_analyze
+            checkpoints_to_analyze = [
+                (log_dir, checkpoint) for checkpoint in cfg.checkpoints_to_analyze
+            ]
         else:
             checkpoints_to_analyze = []
             for agent_step in checkpoint_steps:
@@ -91,23 +99,25 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
                 cfg.analysis, log_dir, agent_step, cfg.device, cfg.overwrite_results
             )
     else:
-        pool = multiprocessing.get_context("spawn").Pool(cfg.num_workers)
+        pool = concurrent.futures.ProcessPoolExecutor(cfg.num_workers)
         results = []
         for log_dir, agent_step in jobs:
             results.append(
-                pool.apply_async(
+                pool.submit(
                     analysis_worker,
-                    args=(cfg.analysis, log_dir, agent_step, cfg.device),
+                    cfg.analysis,
+                    log_dir,
+                    agent_step,
+                    cfg.device,
+                    cfg.overwrite_results
                 )
             )
         try:
-            for result in results:
-                result.get()  # Check for errors
-            pool.close()
-            pool.join()
-        except:
-            pool.terminate()
-            raise
+            for result, (log_dir, _) in zip(results, jobs):
+                logs = result.result()
+                logs.log(summary_writers[log_dir])
+        finally:
+            pool.shutdown(cancel_futures=True)
 
 
 if __name__ == "__main__":

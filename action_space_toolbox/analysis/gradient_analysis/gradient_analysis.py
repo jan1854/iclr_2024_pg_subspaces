@@ -20,6 +20,7 @@ from action_space_toolbox.analysis.gradient_analysis.value_function import (
     ValueFunction,
 )
 from action_space_toolbox.util import metrics
+from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from action_space_toolbox.util.tensors import weighted_mean
 from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 
@@ -69,7 +70,7 @@ class GradientAnalysis(Analysis):
             self.agent.gamma,
         )
 
-    def _do_analysis(self, env_step: int, overwrite_results: bool) -> None:
+    def _do_analysis(self, env_step: int, overwrite_results: bool) -> TensorboardLogs:
         policy = self.agent.policy
         self._fill_rollout_buffer(
             self.env, self._rollout_buffer_true_gradient, verbose=True
@@ -86,6 +87,8 @@ class GradientAnalysis(Analysis):
         )
         # Measure how well the value function predicts the "true" value
         value_function_gae_mre = self.compute_value_function_gae_mre()
+
+        logs = TensorboardLogs()
 
         states_gt, values_gt = self._compute_gt_values()
         if self._dump_gt_value_function_dataset:
@@ -113,7 +116,7 @@ class GradientAnalysis(Analysis):
             lr=policy.optimizer.param_groups[0]["lr"],
             **policy.optimizer_kwargs,
         )
-        self.value_function_trainer.fit_value_function(
+        fit_value_function_logs = self.value_function_trainer.fit_value_function(
             gt_value_function,
             value_function_optimizer,
             states_gt,
@@ -121,6 +124,7 @@ class GradientAnalysis(Analysis):
             self.epochs_gt_value_function_training,
             env_step,
         )
+        logs.update(fit_value_function_logs)
         rollout_buffer_gradient_estimates_gt_values = (
             self._create_and_fill_gt_rollout_buffer(gt_value_function)
         )
@@ -133,32 +137,32 @@ class GradientAnalysis(Analysis):
             )
         )
 
-        self.summary_writer.add_scalar(
+        logs.add_scalar(
             "gradient_analysis/similarity_estimates_true_gradient",
             gradient_similarity_true,
             env_step,
         )
-        self.summary_writer.add_scalar(
+        logs.add_scalar(
             "gradient_analysis/similarity_gradient_estimates",
             gradient_similarity_estimates,
             env_step,
         )
-        self.summary_writer.add_scalar(
+        logs.add_scalar(
             "gradient_analysis/value_function_gae_mre",
             value_function_gae_mre,
             env_step,
         )
-        self.summary_writer.add_scalar(
+        logs.add_scalar(
             "gradient_analysis/value_function_gt_mre",
             value_function_gt_mre,
             env_step,
         )
-        self.summary_writer.add_scalar(
+        logs.add_scalar(
             "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
             gradient_similarity_true_gt_value,
             env_step,
         )
-        self.summary_writer.add_scalar(
+        logs.add_scalar(
             "gradient_analysis/similarity_gradient_estimates_gt_value_function",
             gradient_similarity_estimates_gt_value,
             env_step,
@@ -184,8 +188,9 @@ class GradientAnalysis(Analysis):
                     ],
                 }
             }
-            self.summary_writer.add_custom_scalars(layout)
+            logs.add_custom_scalars(layout)
             self._gradient_estimates_value_function_custom_scalars_added = True
+        return logs
 
     def compute_similarity_true_gradient(self, rollout_buffer: RolloutBuffer) -> float:
         assert isinstance(self.agent, stable_baselines3.ppo.PPO)

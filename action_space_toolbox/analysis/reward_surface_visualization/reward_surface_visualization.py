@@ -4,6 +4,7 @@ import multiprocessing
 from pathlib import Path
 from typing import Callable, Optional
 
+import PIL
 import gym
 import numpy as np
 import stable_baselines3.common.base_class
@@ -17,6 +18,10 @@ from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters import (
     eval_parameters,
 )
+from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+
+
+plt.switch_backend("agg")       # To avoid "main thread is not in main loop"-problems
 
 
 class RewardSurfaceVisualization(Analysis):
@@ -42,7 +47,8 @@ class RewardSurfaceVisualization(Analysis):
         self.data_dir = self.out_dir / "data"
         self.data_dir.mkdir(exist_ok=True)
 
-    def _do_analysis(self, env_step: int, overwrite_results: bool) -> None:
+    def _do_analysis(self, env_step: int, overwrite_results: bool) -> TensorboardLogs:
+        logs = TensorboardLogs()
         for i in range(self.num_plots):
             if (
                 not overwrite_results
@@ -111,10 +117,10 @@ class RewardSurfaceVisualization(Analysis):
                 plot_outpath,
             )
             im = Image.open(plot_outpath)
-            im_np = np.array(im)[..., :-1]
-            self.summary_writer.add_image(
-                f"reward_surfaces/{env_step}_{i}", im_np, dataformats="HWC"
-            )
+            # Make the image smaller so that it fits better in tensorboard
+            im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
+            logs.add_image(f"reward_surfaces/{i}", im, env_step)
+        return logs
 
     @staticmethod
     def sample_filter_normalized_direction(param: torch.Tensor) -> torch.Tensor:

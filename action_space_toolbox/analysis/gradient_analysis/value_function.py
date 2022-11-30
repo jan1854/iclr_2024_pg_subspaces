@@ -1,5 +1,5 @@
 import functools
-from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union, Any
 
 import numpy as np
 import torch
@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
 from action_space_toolbox.util import metrics
+from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
 class ValueFunction(torch.nn.Module):
@@ -70,7 +71,7 @@ class ValueFunctionTrainer:
         epochs: int,
         env_step: int,
         val_data_ratio: float = 0.05,
-    ) -> None:
+    ) -> TensorboardLogs:
 
         train_dataset_size = round((1.0 - val_data_ratio) * states.size(0))
         dataset_train = TensorDataset(
@@ -88,6 +89,8 @@ class ValueFunctionTrainer:
             states_val,
             values_val,
         )
+
+        logs = TensorboardLogs()
 
         train_pbar = trange(
             epochs,
@@ -119,86 +122,84 @@ class ValueFunctionTrainer:
                 f"validation loss: {val_loss.item():.4f}, validation mean absolute error: {val_metrics['mae']:.4f}, "
                 f"validation mean relative error: {val_metrics['mre']:.4f})."
             )
-            if self.summary_writer is not None:
-                if epochs > 1:
-                    self.summary_writer.add_scalar(
-                        f"gradient_analysis/zz_details/gt_value_function_train_loss_step_{env_step}",
-                        train_set_loss,
-                        epoch,
-                    )
-                    self.summary_writer.add_scalar(
-                        f"gradient_analysis/zz_details/gt_value_function_val_loss_step_{env_step}",
-                        val_loss.item(),
-                        epoch,
-                    )
-                    self.summary_writer.add_scalar(
-                        f"gradient_analysis/zz_details/gt_value_function_val_mae_step_{env_step}",
-                        val_metrics["mae"],
-                        epoch,
-                    )
-                    self.summary_writer.add_scalar(
-                        f"gradient_analysis/zz_details/gt_value_function_val_mre_step_{env_step}",
-                        val_metrics["mre"],
-                        epoch,
-                    )
+            if epochs > 1:
+                logs.add_scalar(
+                    f"gradient_analysis/zz_details/gt_value_function_train_loss_step_{env_step}",
+                    train_set_loss,
+                    epoch,
+                )
+                logs.add_scalar(
+                    f"gradient_analysis/zz_details/gt_value_function_val_loss_step_{env_step}",
+                    val_loss.item(),
+                    epoch,
+                )
+                logs.add_scalar(
+                    f"gradient_analysis/zz_details/gt_value_function_val_mae_step_{env_step}",
+                    val_metrics["mae"],
+                    epoch,
+                )
+                logs.add_scalar(
+                    f"gradient_analysis/zz_details/gt_value_function_val_mre_step_{env_step}",
+                    val_metrics["mre"],
+                    epoch,
+                )
 
-        if self.summary_writer is not None:
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_train_loss",
                 train_set_loss,
                 env_step,
             )
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_val_loss",
                 val_loss.item(),
                 env_step,
             )
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_val_mae",
                 val_metrics["mae"],
                 env_step,
             )
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_val_mre",
                 val_metrics["mre"],
                 env_step,
             )
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_val_loss_mean_baseline",
                 val_loss_baseline.item(),
                 env_step,
             )
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_val_mae_mean_baseline",
                 val_metrics_baseline["mae"],
                 env_step,
             )
-            self.summary_writer.add_scalar(
+            logs.add_scalar(
                 "gradient_analysis/gt_value_function_val_mre_mean_baseline",
                 val_metrics_baseline["mre"],
                 env_step,
             )
-            if not self._gt_value_function_custom_scalars_added:
-                layout = {
-                    "gradient_analysis": {
-                        "gt_value_function_loss_train_val": [
-                            "Multiline",
-                            [
-                                "gradient_analysis/gt_value_function_train_loss",
-                                "gradient_analysis/gt_value_function_val_loss",
-                            ],
+
+            layout = {
+                "gradient_analysis": {
+                    "gt_value_function_loss_train_val": [
+                        "Multiline",
+                        [
+                            "gradient_analysis/gt_value_function_train_loss",
+                            "gradient_analysis/gt_value_function_val_loss",
                         ],
-                        "gt_value_function_loss_model_baseline": [
-                            "Multiline",
-                            [
-                                "gradient_analysis/gt_value_function_val_loss",
-                                "gradient_analysis/gt_value_function_val_loss_mean_baseline",
-                            ],
+                    ],
+                    "gt_value_function_loss_model_baseline": [
+                        "Multiline",
+                        [
+                            "gradient_analysis/gt_value_function_val_loss",
+                            "gradient_analysis/gt_value_function_val_loss_mean_baseline",
                         ],
-                    }
+                    ],
                 }
-                self.summary_writer.add_custom_scalars(layout)
-                self._gt_value_function_custom_scalars_added = True
+            }
+            logs.add_custom_scalars(layout)
+            return logs
 
     @staticmethod
     def _calculate_loss_and_metrics(

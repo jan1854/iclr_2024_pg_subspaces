@@ -1,10 +1,70 @@
 import logging
+import time
 from pathlib import Path
-from typing import Sequence, Tuple, Optional
+from typing import Sequence, Tuple, Optional, Union, Any, Dict
 
+import PIL.Image
 import numpy as np
 from tensorboard.backend.event_processing import event_accumulator
 from torch.utils.tensorboard import SummaryWriter
+
+
+class TensorboardLogs:
+    """
+    Tensorboard SummaryWriters are not serializable which makes it impossible to pass them around to different
+    processes. Creating a new SummaryWriter in each process can result in a large number of event files. This class
+    is serializable and thus provides a way to pass tensorboard logs between processes (to log them with a single
+    SummaryWriter later on).
+    """
+
+    def __init__(self):
+        self.scalars = {}
+        self.images = {}
+        self.custom_scalars_layout = {}
+
+    def add_scalar(
+        self, key: str, value: float, step: int, walltime: Optional[float] = None
+    ) -> None:
+        if walltime is None:
+            walltime = time.time()
+        if key in self.scalars:
+            self.scalars[key].append((value, step, walltime))
+        else:
+            self.scalars[key] = [(value, step, walltime)]
+
+    def add_image(
+        self,
+        key: str,
+        image: Union[np.ndarray, PIL.Image.Image],
+        step: int,
+        walltime: Optional[float] = None,
+    ) -> None:
+        if walltime is None:
+            walltime = time.time()
+        if isinstance(image, PIL.Image.Image):
+            image = image.convert("RGB")
+            image = np.array(image)
+        if key in self.images:
+            self.images[key].append((image, step, walltime))
+        else:
+            self.images[key] = [(image, step, walltime)]
+
+    def add_custom_scalars(self, layout: Dict[str, Any]) -> None:
+        self.custom_scalars_layout.update(layout)
+
+    def log(self, summary_writer: SummaryWriter) -> None:
+        for key, scalars in self.scalars.items():
+            for value, step, walltime in scalars:
+                summary_writer.add_scalar(key, value, step, walltime)
+        for key, images in self.images.items():
+            for image, step, walltime in images:
+                summary_writer.add_image(key, image, step, walltime, dataformats="HWC")
+        summary_writer.add_custom_scalars(self.custom_scalars_layout)
+
+    def update(self, logs: "TensorboardLogs") -> None:
+        self.scalars.update(logs.scalars)
+        self.images.update(logs.images)
+        self.custom_scalars_layout.update(logs.custom_scalars_layout)
 
 
 def get_output_keys(key: str, key_prefix: Optional[str]) -> Tuple[str, str, str]:
