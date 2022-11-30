@@ -42,7 +42,6 @@ class GradientAnalysis(Analysis):
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
         self.epochs_gt_value_function_training = epochs_gt_value_function_training
-        self._gradient_estimates_value_function_custom_scalars_added = False
         self._dump_gt_value_function_dataset = dump_gt_value_function_dataset
 
         self.agent = agent_factory()
@@ -166,28 +165,25 @@ class GradientAnalysis(Analysis):
             env_step,
         )
 
-        # TODO: This check is not necessary anymore
-        if not self._gradient_estimates_value_function_custom_scalars_added:
-            layout = {
-                "gradient_analysis": {
-                    "similarity_estimates_true_gradient": [
-                        "Multiline",
-                        [
-                            "gradient_analysis/similarity_estimates_true_gradient",
-                            "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
-                        ],
+        layout = {
+            "gradient_analysis": {
+                "similarity_estimates_true_gradient": [
+                    "Multiline",
+                    [
+                        "gradient_analysis/similarity_estimates_true_gradient",
+                        "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
                     ],
-                    "similarity_gradient_estimates": [
-                        "Multiline",
-                        [
-                            "gradient_analysis/similarity_gradient_estimates",
-                            "gradient_analysis/similarity_gradient_estimates_gt_value_function",
-                        ],
+                ],
+                "similarity_gradient_estimates": [
+                    "Multiline",
+                    [
+                        "gradient_analysis/similarity_gradient_estimates",
+                        "gradient_analysis/similarity_gradient_estimates_gt_value_function",
                     ],
-                }
+                ],
             }
-            logs.add_custom_scalars(layout)
-            self._gradient_estimates_value_function_custom_scalars_added = True
+        }
+        logs.add_custom_scalars(layout)
         return logs
 
     def compute_similarity_true_gradient(self, rollout_buffer: RolloutBuffer) -> float:
