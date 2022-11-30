@@ -68,25 +68,20 @@ class RewardSurfaceVisualization(Analysis):
             ]
 
             agent_weights = [p.data.detach() for p in agent.policy.parameters()]
-            weights_offsets = [[None] * (self.grid_size + 1)] * (self.grid_size + 1)
+            weights_offsets = [[None] * self.grid_size] * self.grid_size
+            coords = np.linspace(-1.0, 1.0, num=self.grid_size)
 
-            for offset_idx1 in range(self.grid_size + 1):
-                offset1_scalar = (self.grid_size // 2 - offset_idx1) / (
-                    self.grid_size // 2
-                )
+            for offset1_idx, offset1_scalar in enumerate(coords):
                 weights_curr_offset1 = [
                     a_weight + off * offset1_scalar
                     for a_weight, off in zip(agent_weights, direction1)
                 ]
-                for offset_idx2 in range(self.grid_size + 1):
-                    offset2_scalar = (self.grid_size // 2 - offset_idx2) / (
-                        self.grid_size // 2
-                    )
+                for offset2_idx, offset2_scalar in enumerate(coords):
                     weights_curr_offsets = [
                         a_weight + off * offset2_scalar
                         for a_weight, off in zip(weights_curr_offset1, direction2)
                     ]
-                    weights_offsets[offset_idx1][offset_idx2] = weights_curr_offsets
+                    weights_offsets[offset1_idx][offset2_idx] = weights_curr_offsets
 
             weights_offsets_flat = [
                 item for sublist in weights_offsets for item in sublist
@@ -102,12 +97,11 @@ class RewardSurfaceVisualization(Analysis):
                     ),
                     weights_offsets_flat,
                 )
-            returns_offsets = np.fromiter(returns_offsets_flat, dtype=float, count=(self.grid_size + 1) ** 2).reshape(
-                self.grid_size + 1, self.grid_size + 1
+            returns_offsets = np.fromiter(returns_offsets_flat, dtype=float, count=self.grid_size ** 2).reshape(
+                self.grid_size, self.grid_size
             )
             data_file = self.data_dir / self._result_filename(env_step, i)
             np.save(str(data_file), returns_offsets)
-            coords = np.linspace(-1.0, 1.0, num=self.grid_size + 1)
             x_coords, y_coords = np.meshgrid(coords, coords)
             plot_outpath = self.out_dir / f"{self._result_filename(env_step, i)}.png"
             self._plot_surface(
