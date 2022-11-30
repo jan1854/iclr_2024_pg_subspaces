@@ -2,7 +2,7 @@ import functools
 import math
 import multiprocessing
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 import gym
 import numpy as np
@@ -140,14 +140,15 @@ class RewardSurfaceVisualization(Analysis):
         y_coords: np.ndarray,
         values: np.ndarray,
         outpath: Path,
-        title: str = "",
+        title: Optional[str] = None,
         logscale: bool = False,
         magnitude: float = 1.0,
     ) -> None:
         fig = plt.figure()
         ax = Axes3D(fig)
 
-        fig.suptitle(title)
+        if title is not None:
+            fig.suptitle(title)
 
         if np.min(values) < -1e9 and not logscale:
             print(
