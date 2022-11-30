@@ -1,6 +1,6 @@
+import concurrent.futures
 import functools
 import math
-import multiprocessing
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -92,7 +92,7 @@ class RewardSurfaceVisualization(Analysis):
                 item for sublist in weights_offsets for item in sublist
             ]
 
-            with multiprocessing.get_context("spawn").Pool(self.num_processes) as pool:
+            with concurrent.futures.ProcessPoolExecutor(self.num_processes) as pool:
                 returns_offsets_flat = pool.map(
                     functools.partial(
                         eval_parameters,
@@ -102,7 +102,7 @@ class RewardSurfaceVisualization(Analysis):
                     ),
                     weights_offsets_flat,
                 )
-            returns_offsets = np.array(returns_offsets_flat).reshape(
+            returns_offsets = np.fromiter(returns_offsets_flat, dtype=float, count=(self.grid_size + 1) ** 2).reshape(
                 self.grid_size + 1, self.grid_size + 1
             )
             data_file = self.data_dir / self._result_filename(env_step, i)
