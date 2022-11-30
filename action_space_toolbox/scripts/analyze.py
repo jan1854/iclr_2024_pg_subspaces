@@ -22,6 +22,7 @@ def analysis_worker(
     run_dir: Path,
     agent_step: int,
     device: Optional[torch.device],
+    overwrite_results: bool,
 ):
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
     agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
@@ -41,7 +42,7 @@ def analysis_worker(
         ),
         run_dir=run_dir,
     )
-    analysis.do_analysis(agent_step * env.base_env_timestep_factor)
+    analysis.do_analysis(agent_step * env.base_env_timestep_factor, overwrite_results)
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
@@ -86,7 +87,9 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
 
     if cfg.num_workers == 1:
         for log_dir, agent_step in jobs:
-            analysis_worker(cfg.analysis, log_dir, agent_step, cfg.device)
+            analysis_worker(
+                cfg.analysis, log_dir, agent_step, cfg.device, cfg.overwrite_results
+            )
     else:
         pool = multiprocessing.get_context("spawn").Pool(cfg.num_workers)
         results = []

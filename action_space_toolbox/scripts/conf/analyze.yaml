@@ -9,6 +9,7 @@ min_interval: 50_000
 checkpoints_to_analyze: null
 num_workers: 4
 device: null
+overwrite_results: false
 
 log_dir: logs
 
