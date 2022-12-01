@@ -21,7 +21,7 @@ from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
-plt.switch_backend("agg")       # To avoid "main thread is not in main loop"-problems
+plt.switch_backend("agg")  # To avoid "main thread is not in main loop"-problems
 
 
 class RewardSurfaceVisualization(Analysis):
@@ -68,7 +68,7 @@ class RewardSurfaceVisualization(Analysis):
             ]
 
             agent_weights = [p.data.detach() for p in agent.policy.parameters()]
-            weights_offsets = [[None] * self.grid_size] * self.grid_size
+            weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
             coords = np.linspace(-1.0, 1.0, num=self.grid_size)
 
             for offset1_idx, offset1_scalar in enumerate(coords):
@@ -97,9 +97,9 @@ class RewardSurfaceVisualization(Analysis):
                     ),
                     weights_offsets_flat,
                 )
-            returns_offsets = np.fromiter(returns_offsets_flat, dtype=float, count=self.grid_size ** 2).reshape(
-                self.grid_size, self.grid_size
-            )
+            returns_offsets = np.fromiter(
+                returns_offsets_flat, dtype=float, count=self.grid_size**2
+            ).reshape(self.grid_size, self.grid_size)
             data_file = self.data_dir / self._result_filename(env_step, i)
             np.save(str(data_file), returns_offsets)
             x_coords, y_coords = np.meshgrid(coords, coords)
