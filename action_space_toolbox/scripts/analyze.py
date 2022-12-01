@@ -94,9 +94,10 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
 
     if cfg.num_workers == 1:
         for log_dir, agent_step in jobs:
-            analysis_worker(
+            logs = analysis_worker(
                 cfg.analysis, log_dir, agent_step, cfg.device, cfg.overwrite_results
             )
+            logs.log(summary_writers[log_dir])
     else:
         pool = concurrent.futures.ProcessPoolExecutor(cfg.num_workers)
         results = []
@@ -108,7 +109,7 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
                     log_dir,
                     agent_step,
                     cfg.device,
-                    cfg.overwrite_results
+                    cfg.overwrite_results,
                 )
             )
         try:
