@@ -110,10 +110,10 @@ class RewardSurfaceVisualization(Analysis):
                 returns_offsets,
                 plot_outpath,
             )
-            im = Image.open(plot_outpath)
-            # Make the image smaller so that it fits better in tensorboard
-            im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
-            logs.add_image(f"reward_surfaces/{i}", im, env_step)
+            with Image.open(plot_outpath) as im:
+                # Make the image smaller so that it fits better in tensorboard
+                im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
+                logs.add_image(f"reward_surfaces/{i}", im, env_step)
         return logs
 
     @staticmethod
