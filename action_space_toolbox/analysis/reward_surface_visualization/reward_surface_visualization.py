@@ -1,4 +1,3 @@
-import concurrent.futures
 import functools
 import math
 from pathlib import Path
@@ -20,7 +19,9 @@ from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters 
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
-
+# To avoid too many open files problems when passing tensors between processes (see
+# https://github.com/pytorch/pytorch/issues/11201#issuecomment-421146936)
+torch.multiprocessing.set_sharing_strategy("file_system")
 plt.switch_backend("agg")  # To avoid "main thread is not in main loop"-problems
 
 
@@ -87,7 +88,9 @@ class RewardSurfaceVisualization(Analysis):
                 item for sublist in weights_offsets for item in sublist
             ]
 
-            with concurrent.futures.ProcessPoolExecutor(self.num_processes) as pool:
+            with torch.multiprocessing.get_context("spawn").Pool(
+                self.num_processes
+            ) as pool:
                 returns_offsets_flat = pool.map(
                     functools.partial(
                         eval_parameters,
