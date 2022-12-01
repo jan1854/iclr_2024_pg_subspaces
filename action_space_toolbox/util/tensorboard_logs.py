@@ -1,10 +1,11 @@
+import io
 import logging
 import time
 from pathlib import Path
-from typing import Sequence, Tuple, Optional, Union, Any, Dict
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-import PIL.Image
 import numpy as np
+import PIL.Image
 from tensorboard.backend.event_processing import event_accumulator
 from torch.utils.tensorboard import SummaryWriter
 
@@ -152,7 +153,9 @@ def add_mean_std_scalars(
         )
 
 
-def create_event_accumulators(tb_dirs: Sequence[Path]):
+def create_event_accumulators(
+    tb_dirs: Sequence[Path],
+) -> List[Tuple[Path, event_accumulator.EventAccumulator]]:
     event_accumulators = []
     for tb_dir in tb_dirs:
         ea = event_accumulator.EventAccumulator(str(tb_dir))
@@ -160,7 +163,7 @@ def create_event_accumulators(tb_dirs: Sequence[Path]):
         assert (
             len(ea.Tags()["scalars"]) > 0
         ), f"Log files in directory {tb_dir} contain no data."
-        event_accumulators.append(ea)
+        event_accumulators.append((tb_dir.parent, ea))
     return event_accumulators
 
 
@@ -183,14 +186,14 @@ def combine_tb_logs(
     out_path.mkdir(exist_ok=existing_dir_ok)
     summary_writer = SummaryWriter(str(out_path), filename_suffix=event_file_suffix)
     add_custom_scalar_layout(
-        summary_writer, event_accumulators[0].Tags()["scalars"], output_key_prefix
+        summary_writer, event_accumulators[0][1].Tags()["scalars"], output_key_prefix
     )
-    tags = set()
-    for ea in event_accumulators:
-        tags.update(ea.Tags()["scalars"])
-    for key in sorted(list(tags)):
+    tags_scalars = set()
+    for _, ea in event_accumulators:
+        tags_scalars.update(ea.Tags()["scalars"])
+    for key in sorted(list(tags_scalars)):
         key_is_in_all_ea = True
-        for ea in event_accumulators:
+        for _, ea in event_accumulators:
             if key not in ea.Tags()["scalars"]:
                 key_is_in_all_ea = False
                 break
@@ -201,4 +204,22 @@ def combine_tb_logs(
             continue
         if key.startswith("zz_confidence"):
             continue
-        add_mean_std_scalars(event_accumulators, summary_writer, key, output_key_prefix)
+        add_mean_std_scalars(
+            [ea for path, ea in event_accumulators],
+            summary_writer,
+            key,
+            output_key_prefix,
+        )
+    for path, ea in event_accumulators:
+        image_tags = ea.Tags()["images"]
+        for tag in image_tags:
+            for image_event in ea.Images(tag):
+                image = PIL.Image.open(io.BytesIO(image_event.encoded_image_string))
+                image_np = np.array(image)
+                summary_writer.add_image(
+                    f"{tag}/run_{path.name}",
+                    image_np,
+                    image_event.step,
+                    image_event.wall_time,
+                    dataformats="HWC",
+                )
