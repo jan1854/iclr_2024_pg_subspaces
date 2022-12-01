@@ -214,8 +214,10 @@ def combine_tb_logs(
         image_tags = ea.Tags()["images"]
         for tag in image_tags:
             for image_event in ea.Images(tag):
-                image = PIL.Image.open(io.BytesIO(image_event.encoded_image_string))
-                image_np = np.array(image)
+                with PIL.Image.open(
+                    io.BytesIO(image_event.encoded_image_string)
+                ) as image:
+                    image_np = np.array(image)
                 summary_writer.add_image(
                     f"{tag}/run_{path.name}",
                     image_np,
