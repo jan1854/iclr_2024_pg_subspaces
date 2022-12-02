@@ -48,6 +48,10 @@ class RewardSurfaceVisualization(Analysis):
         self.out_dir.mkdir(exist_ok=True, parents=True)
         self.data_dir = self.out_dir / "data"
         self.data_dir.mkdir(exist_ok=True)
+        self.linearscale_dir = self.out_dir / "linear"
+        self.linearscale_dir.mkdir(exist_ok=True)
+        self.logscale_dir = self.out_dir / "log"
+        self.logscale_dir.mkdir(exist_ok=True)
 
     def _do_analysis(
         self, env_step: int, overwrite_results: bool, show_progress: bool
@@ -57,7 +61,10 @@ class RewardSurfaceVisualization(Analysis):
             if (
                 not overwrite_results
                 and (
-                    self.out_dir / f"{self._result_filename(env_step, i)}.png"
+                    self.linearscale_dir / f"{self._result_filename(env_step, i)}.png"
+                ).exists()
+                and (
+                    self.logscale_dir / f"{self._result_filename(env_step, i)}.png"
                 ).exists()
             ):
                 continue
@@ -118,17 +125,38 @@ class RewardSurfaceVisualization(Analysis):
             data_file = self.data_dir / self._result_filename(env_step, i)
             np.save(str(data_file), returns_offsets)
             x_coords, y_coords = np.meshgrid(coords, coords)
-            plot_outpath = self.out_dir / f"{self._result_filename(env_step, i)}.png"
+            plot_outpath_linear = (
+                self.linearscale_dir / f"{self._result_filename(env_step, i)}.png"
+            )
+            title_linear = f"{self.env_factory().spec.id} reward surface (linear scale)"
             self._plot_surface(
                 x_coords,
                 y_coords,
                 returns_offsets,
-                plot_outpath,
+                plot_outpath_linear,
+                title_linear,
+                logscale=False,
             )
-            with Image.open(plot_outpath) as im:
+            plot_outpath_log = (
+                self.logscale_dir / f"{self._result_filename(env_step, i)}.png"
+            )
+            title_log = f"{self.env_factory().spec.id} reward surface (log scale)"
+            self._plot_surface(
+                x_coords,
+                y_coords,
+                returns_offsets,
+                plot_outpath_log,
+                title_log,
+                logscale=True,
+            )
+            with Image.open(plot_outpath_linear) as im:
                 # Make the image smaller so that it fits better in tensorboard
                 im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
-                logs.add_image(f"reward_surfaces/{i}", im, env_step)
+                logs.add_image(f"reward_surfaces/linear/{i}", im, env_step)
+            with Image.open(plot_outpath_log) as im:
+                # Make the image smaller so that it fits better in tensorboard
+                im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
+                logs.add_image(f"reward_surfaces/log/{i}", im, env_step)
         return logs
 
     @staticmethod
