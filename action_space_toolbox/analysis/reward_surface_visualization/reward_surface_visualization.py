@@ -1,4 +1,5 @@
 import functools
+import logging
 import math
 from pathlib import Path
 from typing import Callable, Optional
@@ -24,6 +25,8 @@ from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 # https://github.com/pytorch/pytorch/issues/11201#issuecomment-421146936)
 torch.multiprocessing.set_sharing_strategy("file_system")
 plt.switch_backend("agg")  # To avoid "main thread is not in main loop"-problems
+
+logger = logging.getLogger(__name__)
 
 
 class RewardSurfaceVisualization(Analysis):
@@ -68,6 +71,9 @@ class RewardSurfaceVisualization(Analysis):
                 ).exists()
             ):
                 continue
+            if show_progress:
+                logger.info(f"Creating plot {i} for step {env_step}.")
+
             agent = self.agent_factory()
             direction1 = [
                 self.sample_filter_normalized_direction(p.detach())
