@@ -12,6 +12,7 @@ from PIL import Image
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
+from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters import (
@@ -48,7 +49,9 @@ class RewardSurfaceVisualization(Analysis):
         self.data_dir = self.out_dir / "data"
         self.data_dir.mkdir(exist_ok=True)
 
-    def _do_analysis(self, env_step: int, overwrite_results: bool) -> TensorboardLogs:
+    def _do_analysis(
+        self, env_step: int, overwrite_results: bool, show_progress: bool
+    ) -> TensorboardLogs:
         logs = TensorboardLogs()
         for i in range(self.num_plots):
             if (
@@ -91,7 +94,7 @@ class RewardSurfaceVisualization(Analysis):
             with torch.multiprocessing.get_context("spawn").Pool(
                 self.num_processes
             ) as pool:
-                returns_offsets_flat = pool.map(
+                returns_offsets_iter = pool.imap(
                     functools.partial(
                         eval_parameters,
                         env_factory=self.env_factory,
@@ -100,9 +103,17 @@ class RewardSurfaceVisualization(Analysis):
                     ),
                     weights_offsets_flat,
                 )
-            returns_offsets = np.fromiter(
-                returns_offsets_flat, dtype=float, count=self.grid_size**2
-            ).reshape(self.grid_size, self.grid_size)
+                returns_offsets_flat = [
+                    r
+                    for r in tqdm(
+                        returns_offsets_iter,
+                        disable=not show_progress,
+                        total=self.grid_size**2,
+                    )
+                ]
+                returns_offsets = np.array(returns_offsets_flat).reshape(
+                    self.grid_size, self.grid_size
+                )
             data_file = self.data_dir / self._result_filename(env_step, i)
             np.save(str(data_file), returns_offsets)
             x_coords, y_coords = np.meshgrid(coords, coords)

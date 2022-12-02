@@ -67,7 +67,9 @@ class GradientAnalysis(Analysis):
             self.agent.gamma,
         )
 
-    def _do_analysis(self, env_step: int, overwrite_results: bool) -> TensorboardLogs:
+    def _do_analysis(
+        self, env_step: int, overwrite_results: bool, show_progress: bool
+    ) -> TensorboardLogs:
         policy = self.agent.policy
         self._fill_rollout_buffer(
             self.env, self._rollout_buffer_true_gradient, verbose=True

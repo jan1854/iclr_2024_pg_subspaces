@@ -24,6 +24,7 @@ def analysis_worker(
     agent_step: int,
     device: Optional[torch.device],
     overwrite_results: bool,
+    show_progress: bool,
 ) -> TensorboardLogs:
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
     agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
@@ -44,7 +45,7 @@ def analysis_worker(
         run_dir=run_dir,
     )
     return analysis.do_analysis(
-        agent_step * env.base_env_timestep_factor, overwrite_results
+        agent_step * env.base_env_timestep_factor, overwrite_results, show_progress
     )
 
 
@@ -95,7 +96,12 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
     if cfg.num_workers == 1:
         for log_dir, agent_step in jobs:
             logs = analysis_worker(
-                cfg.analysis, log_dir, agent_step, cfg.device, cfg.overwrite_results
+                cfg.analysis,
+                log_dir,
+                agent_step,
+                cfg.device,
+                cfg.overwrite_results,
+                show_progress=True,
             )
             logs.log(summary_writers[log_dir])
     else:
