@@ -151,11 +151,15 @@ class RewardSurfaceVisualization(Analysis):
             )
             with Image.open(plot_outpath_linear) as im:
                 # Make the image smaller so that it fits better in tensorboard
-                im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
+                im = im.resize(
+                    (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
+                )
                 logs.add_image(f"reward_surfaces/linear/{i}", im, env_step)
             with Image.open(plot_outpath_log) as im:
                 # Make the image smaller so that it fits better in tensorboard
-                im = im.resize((im.width // 2, im.height // 2), PIL.Image.LANCZOS)
+                im = im.resize(
+                    (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
+                )
                 logs.add_image(f"reward_surfaces/log/{i}", im, env_step)
         return logs
 
