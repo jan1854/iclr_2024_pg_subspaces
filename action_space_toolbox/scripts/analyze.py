@@ -116,6 +116,7 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
                     agent_step,
                     cfg.device,
                     cfg.overwrite_results,
+                    show_progress=False,
                 )
             )
         try:
