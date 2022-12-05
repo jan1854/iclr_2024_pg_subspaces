@@ -472,7 +472,8 @@ class GradientAnalysis(Analysis):
         self, value_function: ValueFunction
     ) -> RolloutBuffer:
         # stable-baselines3 assumes that the rollout buffer is full. Since the exact number of samples depends on the
-        # number of episodes that are terminated compared to those that are truncated.
+        # number of episodes that are terminated compared to those that are truncated, we cannot pre-allocate the buffer
+        # and instead need to create an adequately-sized buffer for the data at hand.
         episode_length = self._get_episode_length()
 
         (
@@ -490,6 +491,22 @@ class GradientAnalysis(Analysis):
                 states_value = states_ep[: len(states_ep) // 2]
                 actions_value = actions_ep[: len(actions_ep) // 2]
                 rewards_value = rewards_ep[: len(rewards_ep) // 2]
+                # Handle episode truncation by adding the value of the terminal state (as in stable_baselines3's
+                # OnPolicyAlgorithm.collect_rollouts()). We use the value function learned during RL training here
+                # since the analysis is only about what happens if we use the ground truth value function
+                # **as baseline**.
+                with torch.no_grad():  # TODO: This should probably be batched
+                    terminal_value = (
+                        self.agent.policy.predict_values(
+                            torch.tensor(
+                                states_ep[len(states_ep) // 2],
+                                device=self.agent.policy.device,
+                            ).unsqueeze(0)
+                        )[0]
+                        .cpu()
+                        .numpy()
+                    ).squeeze(0)
+                rewards_value[-1] += self.agent.gamma * terminal_value
             else:
                 states_value = states_ep
                 actions_value = actions_ep
