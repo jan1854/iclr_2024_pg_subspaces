@@ -247,7 +247,7 @@ class GradientAnalysis(Analysis):
         episode_length = self._get_episode_length()
         rollout_buffer = self._rollout_buffer_true_gradient
 
-        states_episodes, _, rewards_episodes = self._rollout_buffer_split_episodes(
+        states_episodes, _, rewards_episodes, _ = self._rollout_buffer_split_episodes(
             rollout_buffer
         )
 
@@ -432,7 +432,7 @@ class GradientAnalysis(Analysis):
                 # Reshape in case of discrete action
                 actions = actions.reshape(-1, 1)
 
-            # Handle timeout by bootstraping with value function
+            # Handle timeout by bootstrapping with value function
             # see GitHub issue #633
             for idx, done in enumerate(dones):
                 if (
@@ -480,17 +480,19 @@ class GradientAnalysis(Analysis):
             states_episodes,
             actions_episodes,
             rewards_episodes,
+            log_probs_episodes,
         ) = self._rollout_buffer_split_episodes(self._rollout_buffer_gradient_estimates)
 
         data = []
-        for states_ep, actions_ep, rewards_ep in zip(
-            states_episodes, actions_episodes, rewards_episodes
+        for states_ep, actions_ep, rewards_ep, log_probs_ep in zip(
+            states_episodes, actions_episodes, rewards_episodes, log_probs_episodes
         ):
             episode_truncated = len(states_ep) == episode_length
             if episode_truncated:
                 states_value = states_ep[: len(states_ep) // 2]
                 actions_value = actions_ep[: len(actions_ep) // 2]
                 rewards_value = rewards_ep[: len(rewards_ep) // 2]
+                log_probs_value = log_probs_ep[: len(log_probs_ep) // 2]
                 # Handle episode truncation by adding the value of the terminal state (as in stable_baselines3's
                 # OnPolicyAlgorithm.collect_rollouts()). We use the value function learned during RL training here
                 # since the analysis is only about what happens if we use the ground truth value function
@@ -511,9 +513,10 @@ class GradientAnalysis(Analysis):
                 states_value = states_ep
                 actions_value = actions_ep
                 rewards_value = rewards_ep
+                log_probs_value = log_probs_ep
             episode_start = True
-            for state, action, reward in zip(
-                states_value, actions_value, rewards_value
+            for state, action, reward, log_prob in zip(
+                states_value, actions_value, rewards_value, log_probs_value
             ):
                 with torch.no_grad():
                     value = value_function(
@@ -526,7 +529,7 @@ class GradientAnalysis(Analysis):
                         reward,
                         np.array([episode_start]),
                         value,
-                        torch.zeros(1),
+                        torch.tensor(log_prob),
                     )
                 )
                 episode_start = False
@@ -546,25 +549,24 @@ class GradientAnalysis(Analysis):
 
     def _rollout_buffer_split_episodes(
         self, rollout_buffer: RolloutBuffer
-    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
-        rewards_episodes = []
-        actions_episodes = []
+    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
         states_episodes = []
+        actions_episodes = []
+        rewards_episodes = []
+        log_probs_episodes = []
         start_idx = 0
         for idx in range(1, rollout_buffer.pos):
             if rollout_buffer.episode_starts[idx]:
                 states_episodes.append(rollout_buffer.observations[start_idx:idx])
                 actions_episodes.append(rollout_buffer.actions[start_idx:idx])
                 rewards_episodes.append(rollout_buffer.rewards[start_idx:idx])
+                log_probs_episodes.append(rollout_buffer.log_probs[start_idx:idx])
                 start_idx = idx
         states_episodes.append(rollout_buffer.observations[start_idx : idx + 1])
         actions_episodes.append(rollout_buffer.actions[start_idx : idx + 1])
         rewards_episodes.append(rollout_buffer.rewards[start_idx : idx + 1])
-        return (
-            states_episodes,
-            actions_episodes,
-            rewards_episodes,
-        )
+        log_probs_episodes.append(rollout_buffer.log_probs[start_idx : idx + 1])
+        return states_episodes, actions_episodes, rewards_episodes, log_probs_episodes
 
     @staticmethod
     def _cosine_similarities(
