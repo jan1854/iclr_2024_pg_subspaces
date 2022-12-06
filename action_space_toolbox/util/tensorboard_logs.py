@@ -10,6 +10,9 @@ from tensorboard.backend.event_processing import event_accumulator
 from torch.utils.tensorboard import SummaryWriter
 
 
+logger = logging.getLogger(__name__)
+
+
 class TensorboardLogs:
     """
     Tensorboard SummaryWriters are not serializable which makes it impossible to pass them around to different
@@ -91,31 +94,46 @@ def add_custom_scalar_layout(
 def calculate_mean_std_sequence(
     event_accumulators: Sequence[event_accumulator.EventAccumulator], key: str
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    # Sort event_accumulators and check whether the steps match
-    event_accumulators = sorted(event_accumulators, key=lambda e: len(e.Scalars(key)))
-    steps = [scalar.step for scalar in event_accumulators[0].Scalars(key)]
-    if len(steps) < len(event_accumulators[-1].Scalars(key)):
-        logging.warning(
+    scalars = []
+    warning_multiple_values_issued = False
+    for ea in event_accumulators:
+        scalars_curr_ea = {}
+        for scalar in ea.Scalars(key):
+            if scalar.step in scalars_curr_ea:
+                if not warning_multiple_values_issued:
+                    logger.warning(
+                        f"Found multiple values for the same step for scalar {key}, using the most recent value."
+                    )
+                    warning_multiple_values_issued = True
+                if scalar.wall_time > scalars_curr_ea[scalar.step].wall_time:
+                    scalars_curr_ea[scalar.step] = scalar
+            else:
+                scalars_curr_ea[scalar.step] = scalar
+        scalars.append(scalars_curr_ea)
+    # Sort data and check whether the steps match
+    scalars = sorted([list(s.values()) for s in scalars], key=lambda s: len(s))
+    steps = [scalar.step for scalar in scalars[0]]
+    if len(steps) < len(scalars[-1]):
+        logger.warning(
             f"Found a different number of scalars for the event accumulators (key: {key}, "
-            f"min: {len(steps)}, max: {len(event_accumulators[-1].Scalars(key))}), using the minimum value"
+            f"min: {len(steps)}, max: {len(scalars[-1])}), using the minimum value"
         )
 
-    steps = np.array([scalar.step for scalar in event_accumulators[0].Scalars(key)])
     values = np.array(
         [
-            [ea.Scalars(key)[i].value for i in range(len(steps))]
-            for ea in event_accumulators
+            [scalars_curr_run[i].value for i in range(len(steps))]
+            for scalars_curr_run in scalars
         ]
     )
     wall_time = np.array(
         [
-            [ea.Scalars(key)[i].wall_time for i in range(len(steps))]
-            for ea in event_accumulators
+            [scalars_curr_run[i].wall_time for i in range(len(steps))]
+            for scalars_curr_run in scalars
         ]
     )
 
     return (
-        steps,
+        np.array(steps),
         np.mean(wall_time, axis=0),
         np.mean(values, axis=0),
         np.std(values, axis=0),
@@ -132,7 +150,7 @@ def add_mean_std_scalars(
     event_accumulators = sorted(event_accumulators, key=lambda e: len(e.Scalars(key)))
     steps = [scalar.step for scalar in event_accumulators[0].Scalars(key)]
     if len(steps) < len(event_accumulators[-1].Scalars(key)):
-        logging.warning(
+        logger.warning(
             f"Found a different number of scalars for the event accumulators (key: {key}, "
             f"min: {len(steps)}, max: {len(event_accumulators[-1].Scalars(key))}), using the minimum value"
         )
@@ -198,7 +216,7 @@ def combine_tb_logs(
                 key_is_in_all_ea = False
                 break
         if not key_is_in_all_ea:
-            logging.warning(
+            logger.warning(
                 f"Did not find key {key} in all event accumulators. Skipping."
             )
             continue
