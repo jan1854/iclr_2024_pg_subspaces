@@ -1,6 +1,6 @@
-import concurrent.futures
 import functools
 import logging
+import multiprocessing.pool
 import re
 from pathlib import Path
 from typing import Optional
@@ -105,28 +105,27 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
             )
             logs.log(summary_writers[log_dir])
     else:
-        pool = concurrent.futures.ProcessPoolExecutor(
-            cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
-        )
-        results = []
-        for log_dir, agent_step in jobs:
-            results.append(
-                pool.submit(
-                    analysis_worker,
-                    cfg.analysis,
-                    log_dir,
-                    agent_step,
-                    cfg.device,
-                    cfg.overwrite_results,
-                    show_progress=False,
+        with multiprocessing.pool.ThreadPool(cfg.num_workers) as pool:
+            results = []
+            for log_dir, agent_step in jobs:
+                results.append(
+                    pool.apply_async(
+                        analysis_worker,
+                        args=(
+                            cfg.analysis,
+                            log_dir,
+                            agent_step,
+                            cfg.device,
+                            cfg.overwrite_results,
+                        ),
+                        kwds=dict(
+                            show_progress=False,
+                        ),
+                    )
                 )
-            )
-        try:
             for result, (log_dir, _) in zip(results, jobs):
-                logs = result.result()
+                logs = result.get()
                 logs.log(summary_writers[log_dir])
-        finally:
-            pool.shutdown(cancel_futures=True)
 
 
 if __name__ == "__main__":

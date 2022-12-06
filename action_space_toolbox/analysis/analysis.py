@@ -1,4 +1,5 @@
 import abc
+import torch.multiprocessing
 from pathlib import Path
 from typing import Callable
 
@@ -16,11 +17,13 @@ class Analysis(abc.ABC):
         env_factory: Callable[[], gym.Env],
         agent_factory: Callable[[], stable_baselines3.ppo.PPO],
         run_dir: Path,
+        num_processes: int,
     ):
         self.analysis_name = analysis_name
         self.env_factory = env_factory
         self.agent_factory = agent_factory
         self.run_dir = run_dir
+        self.num_processes = num_processes
         self._analyses_log_file = run_dir / ".analyses.yaml"
         if not self._analyses_log_file.exists():
             self._analyses_log_file.touch()
@@ -39,7 +42,12 @@ class Analysis(abc.ABC):
             analyses_logs = {}
         curr_analysis_logs = analyses_logs.get(self.analysis_name, [])
         if env_step not in curr_analysis_logs or overwrite_results:
-            results = self._do_analysis(env_step, overwrite_results, show_progress)
+            with torch.multiprocessing.get_context("spawn").Pool(
+                self.num_processes
+            ) as pool:
+                results = self._do_analysis(
+                    pool, env_step, overwrite_results, show_progress
+                )
             if env_step not in curr_analysis_logs:
                 # Safe that the analysis was done for this step
                 curr_analysis_logs = sorted(curr_analysis_logs + [env_step])
@@ -53,6 +61,10 @@ class Analysis(abc.ABC):
 
     @abc.abstractmethod
     def _do_analysis(
-        self, env_step: int, overwrite_results: bool, verbose: bool
+        self,
+        process_pool: torch.multiprocessing.Pool,
+        env_step: int,
+        overwrite_results: bool,
+        verbose: bool,
     ) -> TensorboardLogs:
         pass

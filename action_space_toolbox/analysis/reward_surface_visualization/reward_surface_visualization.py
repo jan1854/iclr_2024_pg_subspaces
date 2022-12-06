@@ -21,10 +21,12 @@ from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters 
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
+
 # To avoid too many open files problems when passing tensors between processes (see
 # https://github.com/pytorch/pytorch/issues/11201#issuecomment-421146936)
 torch.multiprocessing.set_sharing_strategy("file_system")
-plt.switch_backend("agg")  # To avoid "main thread is not in main loop"-problems
+# To avoid the warning "Forking a process while a parallel region is active is potentially unsafe."
+torch.set_num_threads(1)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,11 @@ class RewardSurfaceVisualization(Analysis):
         num_processes: int,
     ):
         super().__init__(
-            "reward_surface_visualization", env_factory, agent_factory, run_dir
+            "reward_surface_visualization",
+            env_factory,
+            agent_factory,
+            run_dir,
+            num_processes,
         )
         self.grid_size = grid_size
         self.num_steps = num_steps
@@ -57,7 +63,11 @@ class RewardSurfaceVisualization(Analysis):
         self.logscale_dir.mkdir(exist_ok=True)
 
     def _do_analysis(
-        self, env_step: int, overwrite_results: bool, show_progress: bool
+        self,
+        process_pool: torch.multiprocessing.Pool,
+        env_step: int,
+        overwrite_results: bool,
+        show_progress: bool,
     ) -> TensorboardLogs:
         logs = TensorboardLogs()
         for i in range(self.num_plots):
@@ -104,69 +114,86 @@ class RewardSurfaceVisualization(Analysis):
                 item for sublist in weights_offsets for item in sublist
             ]
 
-            with torch.multiprocessing.get_context("spawn").Pool(
-                self.num_processes
-            ) as pool:
-                returns_offsets_iter = pool.imap(
-                    functools.partial(
-                        eval_parameters,
-                        env_factory=self.env_factory,
-                        agent_factory=self.agent_factory,
-                        num_steps=self.num_steps,
-                    ),
-                    weights_offsets_flat,
+            returns_offsets_iter = process_pool.imap(
+                functools.partial(
+                    eval_parameters,
+                    env_factory=self.env_factory,
+                    agent_factory=self.agent_factory,
+                    num_steps=self.num_steps,
+                ),
+                weights_offsets_flat,
+            )
+            returns_offsets_flat = [
+                r
+                for r in tqdm(
+                    returns_offsets_iter,
+                    disable=not show_progress,
+                    mininterval=120,
+                    total=self.grid_size**2,
                 )
-                returns_offsets_flat = [
-                    r
-                    for r in tqdm(
-                        returns_offsets_iter,
-                        disable=not show_progress,
-                        mininterval=120,
-                        total=self.grid_size**2,
-                    )
-                ]
-                returns_offsets = np.array(returns_offsets_flat).reshape(
-                    self.grid_size, self.grid_size
-                )
+            ]
+            returns_offsets = np.array(returns_offsets_flat).reshape(
+                self.grid_size, self.grid_size
+            )
             data_file = self.data_dir / self._result_filename(env_step, i)
             np.save(str(data_file), returns_offsets)
-            x_coords, y_coords = np.meshgrid(coords, coords)
-            plot_outpath_linear = (
-                self.linearscale_dir / f"{self._result_filename(env_step, i)}.png"
-            )
-            title_linear = f"{self.env_factory().spec.id} reward surface (linear scale)"
-            self._plot_surface(
-                x_coords,
-                y_coords,
-                returns_offsets,
-                plot_outpath_linear,
-                title_linear,
-                logscale=False,
-            )
-            plot_outpath_log = (
-                self.logscale_dir / f"{self._result_filename(env_step, i)}.png"
-            )
-            title_log = f"{self.env_factory().spec.id} reward surface (log scale)"
-            self._plot_surface(
-                x_coords,
-                y_coords,
-                returns_offsets,
-                plot_outpath_log,
-                title_log,
-                logscale=True,
-            )
-            with Image.open(plot_outpath_linear) as im:
-                # Make the image smaller so that it fits better in tensorboard
-                im = im.resize(
-                    (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
+
+            # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
+            # https://matplotlib.org/3.1.0/faq/howto_faq.html#working-with-threads)
+            logs.update(
+                process_pool.apply(
+                    functools.partial(
+                        self.plot_worker, coords, returns_offsets, env_step, i
+                    )
                 )
-                logs.add_image(f"reward_surfaces/linear/{i}", im, env_step)
-            with Image.open(plot_outpath_log) as im:
-                # Make the image smaller so that it fits better in tensorboard
-                im = im.resize(
-                    (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
-                )
-                logs.add_image(f"reward_surfaces/log/{i}", im, env_step)
+            )
+        return logs
+
+    def plot_worker(
+        self,
+        coords: np.ndarray,
+        returns_offsets: np.ndarray,
+        env_step: int,
+        plot_nr: int,
+    ):
+        logs = TensorboardLogs()
+        x_coords, y_coords = np.meshgrid(coords, coords)
+        plot_outpath_linear = (
+            self.linearscale_dir / f"{self._result_filename(env_step, plot_nr)}.png"
+        )
+        title_linear = f"{self.env_factory().spec.id} reward surface (linear scale)"
+        self._plot_surface(
+            x_coords,
+            y_coords,
+            returns_offsets,
+            plot_outpath_linear,
+            title_linear,
+            logscale=False,
+        )
+        plot_outpath_log = (
+            self.logscale_dir / f"{self._result_filename(env_step, plot_nr)}.png"
+        )
+        title_log = f"{self.env_factory().spec.id} reward surface (log scale)"
+        self._plot_surface(
+            x_coords,
+            y_coords,
+            returns_offsets,
+            plot_outpath_log,
+            title_log,
+            logscale=True,
+        )
+        with Image.open(plot_outpath_linear) as im:
+            # Make the image smaller so that it fits better in tensorboard
+            im = im.resize(
+                (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
+            )
+            logs.add_image(f"reward_surfaces/linear/{plot_nr}", im, env_step)
+        with Image.open(plot_outpath_log) as im:
+            # Make the image smaller so that it fits better in tensorboard
+            im = im.resize(
+                (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
+            )
+            logs.add_image(f"reward_surfaces/log/{plot_nr}", im, env_step)
         return logs
 
     @staticmethod
@@ -323,7 +350,7 @@ class RewardSurfaceVisualization(Analysis):
             fig.colorbar(surf, shrink=0.5, aspect=5, pad=0.05)
 
         fig.savefig(outpath, dpi=300, bbox_inches="tight")
-        plt.close()
+        plt.close(fig)
 
     @staticmethod
     def _result_filename(env_step: int, plot_idx: int) -> str:

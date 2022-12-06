@@ -1,3 +1,4 @@
+import functools
 import logging
 import pickle
 from pathlib import Path
@@ -10,7 +11,7 @@ import torch
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
 from stable_baselines3.common.utils import obs_as_tensor
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
 from torch.nn import functional as F
 from tqdm import tqdm
 
@@ -20,13 +21,15 @@ from action_space_toolbox.analysis.gradient_analysis.value_function import (
     ValueFunction,
 )
 from action_space_toolbox.util import metrics
+from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from action_space_toolbox.util.tensors import weighted_mean
-from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 
 logger = logging.getLogger(__name__)
 
 
+# TODO: This class is quite a mess, split up the functionality into multiple classes, and reduce the number of arguments
+#   passed around everywhere
 class GradientAnalysis(Analysis):
     def __init__(
         self,
@@ -38,58 +41,72 @@ class GradientAnalysis(Analysis):
         epochs_gt_value_function_training: int = 1,
         dump_gt_value_function_dataset: bool = False,
     ):
-        super().__init__("gradient_analysis", env_factory, agent_factory, run_dir)
+        super().__init__(
+            "gradient_analysis", env_factory, agent_factory, run_dir, num_processes=1
+        )
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
         self.epochs_gt_value_function_training = epochs_gt_value_function_training
         self._dump_gt_value_function_dataset = dump_gt_value_function_dataset
 
-        self.agent = agent_factory()
-        self.env = DummyVecEnv([env_factory])
-
-        assert isinstance(self.agent, stable_baselines3.ppo.PPO)
-        self.value_function_trainer = ValueFunctionTrainer(self.agent.batch_size)
-
-        self._rollout_buffer_true_gradient = RolloutBuffer(
-            self.samples_true_gradient,
-            self.agent.observation_space,
-            self.agent.action_space,
-            self.agent.device,
-            self.agent.gae_lambda,
-            self.agent.gamma,
-        )
-        self._rollout_buffer_gradient_estimates = RolloutBuffer(
-            self.agent.batch_size * self.num_gradient_estimates,
-            self.agent.observation_space,
-            self.agent.action_space,
-            self.agent.device,
-            self.agent.gae_lambda,
-            self.agent.gamma,
-        )
-
     def _do_analysis(
-        self, env_step: int, overwrite_results: bool, show_progress: bool
+        self,
+        process_pool: torch.multiprocessing.Pool,
+        env_step: int,
+        overwrite_results: bool,
+        show_progress: bool,
     ) -> TensorboardLogs:
-        policy = self.agent.policy
+        return process_pool.apply(functools.partial(self.analysis_worker, env_step))
+
+    def analysis_worker(self, env_step: int) -> TensorboardLogs:
+        agent = self.agent_factory()
+        env = DummyVecEnv([self.env_factory])
+        value_function_trainer = ValueFunctionTrainer(agent.batch_size)
+
+        rollout_buffer_true_gradient = RolloutBuffer(
+            self.samples_true_gradient,
+            agent.observation_space,
+            agent.action_space,
+            agent.device,
+            agent.gae_lambda,
+            agent.gamma,
+        )
+        rollout_buffer_gradient_estimates = RolloutBuffer(
+            agent.batch_size * self.num_gradient_estimates,
+            agent.observation_space,
+            agent.action_space,
+            agent.device,
+            agent.gae_lambda,
+            agent.gamma,
+        )
+
+        policy = agent.policy
         self._fill_rollout_buffer(
-            self.env, self._rollout_buffer_true_gradient, verbose=True
+            agent, env, rollout_buffer_true_gradient, verbose=True
         )
         self._fill_rollout_buffer(
-            self.env,
-            self._rollout_buffer_gradient_estimates,
+            agent,
+            env,
+            rollout_buffer_gradient_estimates,
         )
         gradient_similarity_true = self.compute_similarity_true_gradient(
-            self._rollout_buffer_gradient_estimates
+            agent, rollout_buffer_gradient_estimates, rollout_buffer_true_gradient
         )
         gradient_similarity_estimates = self.compute_gradient_estimates_similarity(
-            self._rollout_buffer_gradient_estimates
+            agent, env, rollout_buffer_gradient_estimates
         )
         # Measure how well the value function predicts the "true" value
-        value_function_gae_mre = self.compute_value_function_gae_mre()
+        value_function_gae_mre = self.compute_value_function_gae_mre(
+            agent, rollout_buffer_true_gradient
+        )
 
         logs = TensorboardLogs()
 
-        states_gt, values_gt = self._compute_gt_values()
+        states_gt, values_gt = self._compute_gt_values(
+            rollout_buffer_true_gradient, get_episode_length(env.envs[0])
+        )
+        states_gt = torch.tensor(states_gt, device=agent.device)
+        values_gt = torch.tensor(values_gt, device=agent.device)
         if self._dump_gt_value_function_dataset:
             gt_value_function_dataset_dir = Path("gt_value_function_datasets")
             gt_value_function_dataset_dir.mkdir(exist_ok=True)
@@ -115,7 +132,7 @@ class GradientAnalysis(Analysis):
             lr=policy.optimizer.param_groups[0]["lr"],
             **policy.optimizer_kwargs,
         )
-        fit_value_function_logs = self.value_function_trainer.fit_value_function(
+        fit_value_function_logs = value_function_trainer.fit_value_function(
             gt_value_function,
             value_function_optimizer,
             states_gt,
@@ -125,14 +142,18 @@ class GradientAnalysis(Analysis):
         )
         logs.update(fit_value_function_logs)
         rollout_buffer_gradient_estimates_gt_values = (
-            self._create_and_fill_gt_rollout_buffer(gt_value_function)
+            self._create_and_fill_gt_rollout_buffer(
+                agent, rollout_buffer_gradient_estimates, gt_value_function
+            )
         )
         gradient_similarity_true_gt_value = self.compute_similarity_true_gradient(
-            rollout_buffer_gradient_estimates_gt_values
+            agent,
+            rollout_buffer_gradient_estimates_gt_values,
+            rollout_buffer_true_gradient,
         )
         gradient_similarity_estimates_gt_value = (
             self.compute_gradient_estimates_similarity(
-                rollout_buffer_gradient_estimates_gt_values
+                agent, env, rollout_buffer_gradient_estimates_gt_values
             )
         )
 
@@ -188,20 +209,26 @@ class GradientAnalysis(Analysis):
         logs.add_custom_scalars(layout)
         return logs
 
-    def compute_similarity_true_gradient(self, rollout_buffer: RolloutBuffer) -> float:
-        assert isinstance(self.agent, stable_baselines3.ppo.PPO)
+    def compute_similarity_true_gradient(
+        self,
+        agent: stable_baselines3.ppo.PPO,
+        rollout_buffer: RolloutBuffer,
+        rollout_buffer_true_gradient: RolloutBuffer,
+    ) -> float:
 
         # Compute the gradients in batches to avoid running out of memory on the GPU
-        batches = list(self._rollout_buffer_true_gradient.get(100_000))
-        gradients_batches = [self._compute_policy_gradient(batch) for batch in batches]
+        batches = list(rollout_buffer_true_gradient.get(100_000))
+        gradients_batches = [
+            self._compute_policy_gradient(agent, batch) for batch in batches
+        ]
         true_gradient = weighted_mean(
             gradients_batches, [len(batch.observations) for batch in batches]
         )
 
         estimated_gradients = torch.stack(
             [
-                self._compute_policy_gradient(rollout_data)
-                for rollout_data in rollout_buffer.get(self.agent.batch_size)
+                self._compute_policy_gradient(agent, rollout_data)
+                for rollout_data in rollout_buffer.get(agent.batch_size)
             ]
         )
         cos_similarities = self._cosine_similarities(
@@ -210,14 +237,17 @@ class GradientAnalysis(Analysis):
         return cos_similarities.mean().item()
 
     def compute_gradient_estimates_similarity(
-        self, rollout_buffer: RolloutBuffer
+        self,
+        agent: stable_baselines3.ppo.PPO,
+        env: VecEnv,
+        rollout_buffer: RolloutBuffer,
     ) -> float:
-        assert isinstance(self.agent, stable_baselines3.ppo.PPO)
-        self.env.reset()
+        assert isinstance(agent, stable_baselines3.ppo.PPO)
+        env.reset()
         gradients = torch.stack(
             [
-                self._compute_policy_gradient(rollout_data)
-                for rollout_data in rollout_buffer.get(self.agent.batch_size)
+                self._compute_policy_gradient(agent, rollout_data)
+                for rollout_data in rollout_buffer.get(agent.batch_size)
             ]
         )
         dist_matrix = self._cosine_similarities(gradients, gradients)
@@ -227,28 +257,30 @@ class GradientAnalysis(Analysis):
         n = dist_matrix.shape[0]
         return (dist_sum / (n * (n - 1) / 2)).item()
 
-    def compute_value_function_gae_mre(self) -> float:
+    def compute_value_function_gae_mre(
+        self,
+        agent: stable_baselines3.ppo.PPO,
+        rollout_buffer_true_gradient: RolloutBuffer,
+    ) -> float:
         # Measure how well the value function predicts the values estimated with GAE (the criterion for which the value
         # function was trained)
         states_gae = torch.tensor(
-            self._rollout_buffer_true_gradient.observations, device=self.agent.device
+            rollout_buffer_true_gradient.observations, device=agent.device
         )
         values_gae = torch.tensor(
-            self._rollout_buffer_true_gradient.returns, device=self.agent.device
+            rollout_buffer_true_gradient.returns, device=agent.device
         )
         return metrics.mean_relative_error(
-            self.agent.policy.predict_values(states_gae), values_gae
+            agent.policy.predict_values(states_gae), values_gae
         )
 
     def _compute_gt_values(
-        self,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, rollout_buffer_true_gradient: RolloutBuffer, episode_length
+    ) -> Tuple[np.ndarray, np.ndarray]:
         short_episodes_warning_issued = False
-        episode_length = self._get_episode_length()
-        rollout_buffer = self._rollout_buffer_true_gradient
 
         states_episodes, _, rewards_episodes, _ = self._rollout_buffer_split_episodes(
-            rollout_buffer
+            rollout_buffer_true_gradient
         )
 
         states = []
@@ -269,7 +301,9 @@ class GradientAnalysis(Analysis):
                 rewards_value = rewards_ep[: len(rewards_ep) // 2]
                 rewards_no_value = rewards_ep[len(rewards_ep) // 2 :]
 
-                gamma_truncated = rollout_buffer.gamma ** (len(rewards_no_value) + 1)
+                gamma_truncated = rollout_buffer_true_gradient.gamma ** (
+                    len(rewards_no_value) + 1
+                )
                 if not short_episodes_warning_issued and gamma_truncated >= 0.05:
                     logger.warning(
                         f"Truncated rewards might have a non-negligible influence on the quality of the true "
@@ -282,7 +316,8 @@ class GradientAnalysis(Analysis):
                 # OnPolicyAlgorithm.collect_rollouts()), so we estimate the quality of the value function with an
                 # estimate of itself (but the influence of the estimate should be small due to the discount).
                 curr_value = np.sum(
-                    rollout_buffer.gamma ** np.arange(rewards_no_value.shape[0])
+                    rollout_buffer_true_gradient.gamma
+                    ** np.arange(rewards_no_value.shape[0])
                     * rewards_no_value[:, 0]
                 )
             else:
@@ -294,15 +329,17 @@ class GradientAnalysis(Analysis):
             if i < len(states_episodes) - 1 or len(states_ep) == episode_length:
                 values_curr_episode_reversed = []
                 for reward in reversed(rewards_value):
-                    curr_value = reward + rollout_buffer.gamma * curr_value
+                    curr_value = (
+                        reward + rollout_buffer_true_gradient.gamma * curr_value
+                    )
                     values_curr_episode_reversed.append(curr_value)
                 states.extend(states_value)
                 values.extend(reversed(values_curr_episode_reversed))
-        states_torch = torch.tensor(np.stack(states, axis=0), device=self.agent.device)
-        values_torch = torch.tensor(np.stack(values, axis=0), device=self.agent.device)
-        return states_torch, values_torch
+        return np.stack(states, axis=0), np.stack(values, axis=0)
 
-    def _ppo_loss(self, rollout_data: RolloutBufferSamples) -> torch.Tensor:
+    def _ppo_loss(
+        self, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
+    ) -> torch.Tensor:
         """
         Calculates PPO's policy loss. This code is copied from stables-baselines3.PPO.train(). Needs to be copied since
         in the PPO implementation, the loss is not extracted to a separate method.
@@ -310,32 +347,30 @@ class GradientAnalysis(Analysis):
         :param rollout_data:
         :return:
         """
-        assert isinstance(self.agent, stable_baselines3.ppo.PPO)
+        assert isinstance(agent, stable_baselines3.ppo.PPO)
 
         # Compute current clip range
-        clip_range = self.agent.clip_range(self.agent._current_progress_remaining)
+        clip_range = agent.clip_range(agent._current_progress_remaining)
         # Optional: clip range for the value function
-        if self.agent.clip_range_vf is not None:
-            clip_range_vf = self.agent.clip_range_vf(
-                self.agent._current_progress_remaining
-            )
+        if agent.clip_range_vf is not None:
+            clip_range_vf = agent.clip_range_vf(agent._current_progress_remaining)
 
         actions = rollout_data.actions
-        if isinstance(self.agent.action_space, gym.spaces.Discrete):
+        if isinstance(agent.action_space, gym.spaces.Discrete):
             # Convert discrete action from float to long
             actions = rollout_data.actions.long().flatten()
 
         # Re-sample the noise matrix because the log_std has changed
-        if self.agent.use_sde:
-            self.agent.policy.reset_noise(self.agent.batch_size)
+        if agent.use_sde:
+            agent.policy.reset_noise(agent.batch_size)
 
-        values, log_prob, entropy = self.agent.policy.evaluate_actions(
+        values, log_prob, entropy = agent.policy.evaluate_actions(
             rollout_data.observations, actions
         )
         values = values.flatten()
         # Normalize advantage
         advantages = rollout_data.advantages
-        if self.agent.normalize_advantage:
+        if agent.normalize_advantage:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         # ratio between old and new policy, should be one at the first iteration
@@ -346,7 +381,7 @@ class GradientAnalysis(Analysis):
         policy_loss_2 = advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
         policy_loss = -torch.min(policy_loss_1, policy_loss_2).mean()
 
-        if self.agent.clip_range_vf is None:
+        if agent.clip_range_vf is None:
             # No clipping
             values_pred = values
         else:
@@ -365,15 +400,12 @@ class GradientAnalysis(Analysis):
         else:
             entropy_loss = -torch.mean(entropy)
 
-        loss = (
-            policy_loss
-            + self.agent.ent_coef * entropy_loss
-            + self.agent.vf_coef * value_loss
-        )
+        loss = policy_loss + agent.ent_coef * entropy_loss + agent.vf_coef * value_loss
         return loss
 
     def _fill_rollout_buffer(
         self,
+        agent: stable_baselines3.ppo.PPO,
         env: stable_baselines3.common.vec_env.VecEnv,
         rollout_buffer: RolloutBuffer,
         verbose: bool = False,
@@ -390,12 +422,12 @@ class GradientAnalysis(Analysis):
         last_episode_starts = np.ones(env.num_envs)
 
         # Switch to eval mode (this affects batch norm / dropout)
-        self.agent.policy.set_training_mode(False)
+        agent.policy.set_training_mode(False)
 
         rollout_buffer.reset()
         # Sample new weights for the state dependent exploration
-        if self.agent.use_sde:
-            self.agent.policy.reset_noise(env.num_envs)
+        if agent.use_sde:
+            agent.policy.reset_noise(env.num_envs)
 
         for n_steps in tqdm(
             range(rollout_buffer.buffer_size),
@@ -405,30 +437,30 @@ class GradientAnalysis(Analysis):
             unit="samples",
         ):
             if (
-                self.agent.use_sde
-                and self.agent.sde_sample_freq > 0
-                and (n_steps - 1) % self.agent.sde_sample_freq == 0
+                agent.use_sde
+                and agent.sde_sample_freq > 0
+                and (n_steps - 1) % agent.sde_sample_freq == 0
             ):
                 # Sample a new noise matrix
-                self.agent.policy.reset_noise(env.num_envs)
+                agent.policy.reset_noise(env.num_envs)
 
             with torch.no_grad():
                 # Convert to pytorch tensor or to TensorDict
-                obs_tensor = obs_as_tensor(last_obs, self.agent.device)
-                actions, values, log_probs = self.agent.policy(obs_tensor)
+                obs_tensor = obs_as_tensor(last_obs, agent.device)
+                actions, values, log_probs = agent.policy(obs_tensor)
             actions = actions.cpu().numpy()
 
             # Rescale and perform action
             clipped_actions = actions
             # Clip the actions to avoid out of bounds error
-            if isinstance(self.agent.action_space, gym.spaces.Box):
+            if isinstance(agent.action_space, gym.spaces.Box):
                 clipped_actions = np.clip(
-                    actions, self.agent.action_space.low, self.agent.action_space.high
+                    actions, agent.action_space.low, agent.action_space.high
                 )
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            if isinstance(self.agent.action_space, gym.spaces.Discrete):
+            if isinstance(agent.action_space, gym.spaces.Discrete):
                 # Reshape in case of discrete action
                 actions = actions.reshape(-1, 1)
 
@@ -440,14 +472,12 @@ class GradientAnalysis(Analysis):
                     and infos[idx].get("terminal_observation") is not None
                     and infos[idx].get("TimeLimit.truncated", False)
                 ):
-                    terminal_obs = self.agent.policy.obs_to_tensor(
+                    terminal_obs = agent.policy.obs_to_tensor(
                         infos[idx]["terminal_observation"]
                     )[0]
                     with torch.no_grad():
-                        terminal_value = self.agent.policy.predict_values(terminal_obs)[
-                            0
-                        ]
-                    rewards[idx] += self.agent.gamma * terminal_value
+                        terminal_value = agent.policy.predict_values(terminal_obs)[0]
+                    rewards[idx] += agent.gamma * terminal_value
 
             rollout_buffer.add(
                 last_obs,
@@ -462,26 +492,27 @@ class GradientAnalysis(Analysis):
 
         with torch.no_grad():
             # Compute value for the last timestep
-            values = self.agent.policy.predict_values(
-                obs_as_tensor(new_obs, self.agent.device)
-            )
+            values = agent.policy.predict_values(obs_as_tensor(new_obs, agent.device))
 
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
 
     def _create_and_fill_gt_rollout_buffer(
-        self, value_function: ValueFunction
+        self,
+        agent: stable_baselines3.ppo.PPO,
+        rollout_buffer_gradient_estimates: RolloutBuffer,
+        value_function: ValueFunction,
     ) -> RolloutBuffer:
         # stable-baselines3 assumes that the rollout buffer is full. Since the exact number of samples depends on the
         # number of episodes that are terminated compared to those that are truncated, we cannot pre-allocate the buffer
         # and instead need to create an adequately-sized buffer for the data at hand.
-        episode_length = self._get_episode_length()
+        episode_length = get_episode_length(agent.env.envs[0])
 
         (
             states_episodes,
             actions_episodes,
             rewards_episodes,
             log_probs_episodes,
-        ) = self._rollout_buffer_split_episodes(self._rollout_buffer_gradient_estimates)
+        ) = self._rollout_buffer_split_episodes(rollout_buffer_gradient_estimates)
 
         data = []
         for states_ep, actions_ep, rewards_ep, log_probs_ep in zip(
@@ -499,16 +530,16 @@ class GradientAnalysis(Analysis):
                 # **as baseline**.
                 with torch.no_grad():  # TODO: This should probably be batched
                     terminal_value = (
-                        self.agent.policy.predict_values(
+                        agent.policy.predict_values(
                             torch.tensor(
                                 states_ep[len(states_ep) // 2],
-                                device=self.agent.policy.device,
+                                device=agent.policy.device,
                             ).unsqueeze(0)
                         )[0]
                         .cpu()
                         .numpy()
                     ).squeeze(0)
-                rewards_value[-1] += self.agent.gamma * terminal_value
+                rewards_value[-1] += agent.gamma * terminal_value
             else:
                 states_value = states_ep
                 actions_value = actions_ep
@@ -519,9 +550,7 @@ class GradientAnalysis(Analysis):
                 states_value, actions_value, rewards_value, log_probs_value
             ):
                 with torch.no_grad():
-                    value = value_function(
-                        torch.tensor(state, device=self.agent.device)
-                    )
+                    value = value_function(torch.tensor(state, device=agent.device))
                 data.append(
                     (
                         state,
@@ -534,14 +563,14 @@ class GradientAnalysis(Analysis):
                 )
                 episode_start = False
 
-        assert isinstance(self.agent, stable_baselines3.ppo.PPO)
+        assert isinstance(agent, stable_baselines3.ppo.PPO)
         rollout_buffer = RolloutBuffer(
             len(data),
-            self.agent.observation_space,
-            self.agent.action_space,
-            self.agent.device,
-            self.agent.gae_lambda,
-            self.agent.gamma,
+            agent.observation_space,
+            agent.action_space,
+            agent.device,
+            agent.gae_lambda,
+            agent.gamma,
         )
         for d in data:
             rollout_buffer.add(*d)
@@ -580,17 +609,9 @@ class GradientAnalysis(Analysis):
         return sim_mt
 
     def _compute_policy_gradient(
-        self, rollout_data: RolloutBufferSamples
+        self, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
     ) -> torch.Tensor:
-        loss = self._ppo_loss(rollout_data)
-        self.agent.policy.zero_grad()
+        loss = self._ppo_loss(agent, rollout_data)
+        agent.policy.zero_grad()
         loss.backward()
-        return torch.cat([p.grad.flatten() for p in self.agent.policy.parameters()])
-
-    def _get_episode_length(self) -> int:
-        # This is quite an ugly hack but there is no elegant way to get the environment's time limit at the moment
-        env = self.agent.env.envs[0]
-        assert check_wrapped(env, gym.wrappers.TimeLimit)
-        while not hasattr(env, "_max_episode_steps"):
-            env = env.env
-        return env._max_episode_steps
+        return torch.cat([p.grad.flatten() for p in agent.policy.parameters()])
