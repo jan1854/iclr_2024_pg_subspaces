@@ -56,9 +56,11 @@ class GradientAnalysis(Analysis):
         overwrite_results: bool,
         show_progress: bool,
     ) -> TensorboardLogs:
-        return process_pool.apply(functools.partial(self.analysis_worker, env_step))
+        return process_pool.apply(
+            functools.partial(self.analysis_worker, env_step, show_progress)
+        )
 
-    def analysis_worker(self, env_step: int) -> TensorboardLogs:
+    def analysis_worker(self, env_step: int, show_progress: bool) -> TensorboardLogs:
         agent = self.agent_factory()
         env = DummyVecEnv([self.env_factory])
         value_function_trainer = ValueFunctionTrainer(agent.batch_size)
@@ -82,12 +84,10 @@ class GradientAnalysis(Analysis):
 
         policy = agent.policy
         self._fill_rollout_buffer(
-            agent, env, rollout_buffer_true_gradient, verbose=True
+            agent, env, rollout_buffer_true_gradient, show_progress=show_progress
         )
         self._fill_rollout_buffer(
-            agent,
-            env,
-            rollout_buffer_gradient_estimates,
+            agent, env, rollout_buffer_gradient_estimates, show_progress=False
         )
         gradient_similarity_true = self.compute_similarity_true_gradient(
             agent, rollout_buffer_gradient_estimates, rollout_buffer_true_gradient
@@ -139,6 +139,7 @@ class GradientAnalysis(Analysis):
             values_gt,
             self.epochs_gt_value_function_training,
             env_step,
+            show_progress=show_progress,
         )
         logs.update(fit_value_function_logs)
         rollout_buffer_gradient_estimates_gt_values = (
@@ -408,7 +409,7 @@ class GradientAnalysis(Analysis):
         agent: stable_baselines3.ppo.PPO,
         env: stable_baselines3.common.vec_env.VecEnv,
         rollout_buffer: RolloutBuffer,
-        verbose: bool = False,
+        show_progress: bool = False,
     ) -> None:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``. The code is adapted from
@@ -431,7 +432,7 @@ class GradientAnalysis(Analysis):
 
         for n_steps in tqdm(
             range(rollout_buffer.buffer_size),
-            disable=not verbose,
+            disable=not show_progress,
             mininterval=300,
             desc="Collecting samples",
             unit="samples",

@@ -1,4 +1,6 @@
 import abc
+import logging
+
 import torch.multiprocessing
 from pathlib import Path
 from typing import Callable
@@ -8,6 +10,9 @@ import stable_baselines3
 import yaml
 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+
+
+logger = logging.getLogger(__name__)
 
 
 class Analysis(abc.ABC):

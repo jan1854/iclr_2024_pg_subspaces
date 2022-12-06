@@ -11,6 +11,7 @@ import omegaconf
 import torch
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 import action_space_toolbox
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -80,7 +81,8 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         checkpoint_steps.sort()
         if cfg.checkpoints_to_analyze is not None:
             checkpoints_to_analyze = [
-                (log_dir, checkpoint) for checkpoint in cfg.checkpoints_to_analyze
+                (log_dir, checkpoint // base_env_timestep_factor)
+                for checkpoint in cfg.checkpoints_to_analyze
             ]
         else:
             checkpoints_to_analyze = []
@@ -94,7 +96,7 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
     jobs.sort(key=lambda j: (j[1], j[0]))
 
     if cfg.num_workers == 1:
-        for log_dir, agent_step in jobs:
+        for log_dir, agent_step in tqdm(jobs, desc="Analyzing logs", mininterval=300):
             logs = analysis_worker(
                 cfg.analysis,
                 log_dir,
@@ -123,7 +125,12 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
                         ),
                     )
                 )
-            for result, (log_dir, _) in zip(results, jobs):
+            for result, (log_dir, agent_step) in tqdm(
+                zip(results, jobs),
+                total=len(jobs),
+                desc="Analyzing logs",
+                mininterval=300,
+            ):
                 logs = result.get()
                 logs.log(summary_writers[log_dir])
 

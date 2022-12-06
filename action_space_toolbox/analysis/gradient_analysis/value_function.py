@@ -69,6 +69,7 @@ class ValueFunctionTrainer:
         epochs: int,
         env_step: int,
         val_data_ratio: float = 0.05,
+        show_progress: bool = False,
     ) -> TensorboardLogs:
 
         train_dataset_size = round((1.0 - val_data_ratio) * states.size(0))
@@ -95,6 +96,7 @@ class ValueFunctionTrainer:
             desc="Training the ground truth value function.",
             unit="epoch",
             mininterval=300,
+            disable=not show_progress,
         )
         for epoch in train_pbar:
             for states, values in dataloader_train:
