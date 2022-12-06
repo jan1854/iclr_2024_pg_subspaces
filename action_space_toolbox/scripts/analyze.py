@@ -105,7 +105,9 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
             )
             logs.log(summary_writers[log_dir])
     else:
-        pool = concurrent.futures.ProcessPoolExecutor(cfg.num_workers)
+        pool = concurrent.futures.ProcessPoolExecutor(
+            cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
+        )
         results = []
         for log_dir, agent_step in jobs:
             results.append(
