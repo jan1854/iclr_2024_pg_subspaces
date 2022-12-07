@@ -81,7 +81,7 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
         checkpoint_steps.sort()
         if cfg.checkpoints_to_analyze is not None:
             checkpoints_to_analyze = [
-                (log_dir, checkpoint // base_env_timestep_factor)
+                (log_dir, int(checkpoint) // base_env_timestep_factor)
                 for checkpoint in cfg.checkpoints_to_analyze
             ]
         else:
