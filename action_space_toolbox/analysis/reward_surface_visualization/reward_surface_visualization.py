@@ -1,13 +1,16 @@
 import functools
 import logging
 import math
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence, Dict
 
 import PIL
 import gym
 import numpy as np
 import stable_baselines3.common.base_class
+import stable_baselines3.common.buffers
+import stable_baselines3.common.vec_env
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -19,6 +22,8 @@ from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters import (
     eval_parameters,
 )
+from action_space_toolbox.util.get_episode_length import get_episode_length
+from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_loss
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
@@ -29,6 +34,13 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 torch.set_num_threads(1)
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AnalysisResult:
+    reward_undiscounted: float
+    reward_discounted: float
+    ppo_loss: float
 
 
 class RewardSurfaceVisualization(Analysis):
@@ -74,10 +86,12 @@ class RewardSurfaceVisualization(Analysis):
             if (
                 not overwrite_results
                 and (
-                    self.linearscale_dir / f"{self._result_filename(env_step, i)}.png"
+                    self.linearscale_dir
+                    / f"{self._result_filename('loss_surface', env_step, i)}.png"
                 ).exists()
                 and (
-                    self.logscale_dir / f"{self._result_filename(env_step, i)}.png"
+                    self.logscale_dir
+                    / f"{self._result_filename('loss_surface', env_step, i)}.png"
                 ).exists()
             ):
                 continue
@@ -114,70 +128,183 @@ class RewardSurfaceVisualization(Analysis):
                 item for sublist in weights_offsets for item in sublist
             ]
 
-            returns_offsets_iter = process_pool.imap(
+            analysis_results_iter = process_pool.imap(
                 functools.partial(
-                    eval_parameters,
+                    self.analysis_worker,
                     env_factory=self.env_factory,
                     agent_factory=self.agent_factory,
                     num_steps=self.num_steps,
                 ),
                 weights_offsets_flat,
             )
-            returns_offsets_flat = [
+            analysis_results_flat = [
                 r
                 for r in tqdm(
-                    returns_offsets_iter,
+                    analysis_results_iter,
                     disable=not show_progress,
                     mininterval=120,
                     total=self.grid_size**2,
                 )
             ]
-            returns_offsets = np.array(returns_offsets_flat).reshape(
-                self.grid_size, self.grid_size
+
+            rewards_undiscounted = np.array(
+                [result.reward_undiscounted for result in analysis_results_flat]
+            ).reshape(self.grid_size, self.grid_size)
+            rewards_undiscounted_file = self.data_dir / self._result_filename(
+                "reward_surface_undiscounted", env_step, i
             )
-            data_file = self.data_dir / self._result_filename(env_step, i)
-            np.save(str(data_file), returns_offsets)
+            np.save(str(rewards_undiscounted_file), rewards_undiscounted)
+
+            rewards_discounted = np.array(
+                [result.reward_discounted for result in analysis_results_flat]
+            ).reshape(self.grid_size, self.grid_size)
+            rewards_discounted_file = self.data_dir / self._result_filename(
+                "rewards_discounted", env_step, i
+            )
+            np.save(str(rewards_discounted_file), rewards_discounted)
+
+            loss = np.array(
+                [result.ppo_loss for result in analysis_results_flat]
+            ).reshape(self.grid_size, self.grid_size)
+            loss_file = self.data_dir / self._result_filename("loss", env_step, i)
+            np.save(str(loss_file), loss)
 
             # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
             # https://matplotlib.org/3.1.0/faq/howto_faq.html#working-with-threads)
             logs.update(
                 process_pool.apply(
                     functools.partial(
-                        self.plot_worker, coords, returns_offsets, env_step, i
+                        self.plot_worker,
+                        coords,
+                        rewards_undiscounted,
+                        rewards_discounted,
+                        loss,
+                        env_step,
+                        i,
                     )
                 )
             )
         return logs
 
+    @staticmethod
+    def analysis_worker(
+        agent_weights: Sequence[torch.Tensor],
+        env_factory: Callable[[], gym.Env],
+        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
+        num_steps: int,
+    ) -> AnalysisResult:
+        env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
+        agent = agent_factory()
+        rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
+            num_steps,
+            agent.observation_space,
+            agent.action_space,
+            "cpu",
+            agent.gae_lambda,
+            agent.gamma,
+        )
+        with torch.no_grad():
+            for parameters, weights in zip(agent.policy.parameters(), agent_weights):
+                parameters.data[:] = weights
+        fill_rollout_buffer(agent, env, rollout_buffer, show_progress=False)
+        episode_rewards_undiscounted = []
+        episode_rewards_discounted = []
+        curr_reward_undiscounted = None
+        curr_reward_discounted = None
+        curr_episode_length = 0
+        for episode_start, reward in zip(
+            rollout_buffer.episode_starts, rollout_buffer.rewards
+        ):
+            if episode_start:
+                if curr_episode_length > 0:
+                    episode_rewards_undiscounted.append(curr_reward_undiscounted)
+                    episode_rewards_discounted.append(curr_reward_discounted)
+                curr_episode_length = 0
+                curr_reward_discounted = 0.0
+                curr_reward_undiscounted = 0.0
+            curr_episode_length += 1
+            curr_reward_undiscounted += reward
+            curr_reward_discounted += agent.gamma ** (curr_episode_length - 1) * reward
+        # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
+        # the episode if it has the maximum episode length.
+        if curr_episode_length == get_episode_length(env.envs[0]):
+            episode_rewards_undiscounted.append(curr_reward_undiscounted)
+            episode_rewards_discounted.append(curr_reward_discounted)
+        mean_episode_reward_undiscounted = np.mean(episode_rewards_undiscounted)
+        mean_episode_reward_discounted = np.mean(episode_rewards_discounted)
+        loss = ppo_loss(agent, next(rollout_buffer.get()))
+        return AnalysisResult(
+            mean_episode_reward_undiscounted,
+            mean_episode_reward_discounted,
+            loss.item(),
+        )
+
     def plot_worker(
         self,
         coords: np.ndarray,
-        returns_offsets: np.ndarray,
+        rewards_undiscounted: np.ndarray,
+        rewards_discounted: np.ndarray,
+        loss: np.ndarray,
         env_step: int,
         plot_nr: int,
-    ):
+    ) -> TensorboardLogs:
         logs = TensorboardLogs()
+        self.plot_results(
+            coords,
+            rewards_undiscounted,
+            "reward_surface_undiscounted",
+            env_step,
+            plot_nr,
+            "reward surface (undiscounted)",
+            logs,
+        )
+        self.plot_results(
+            coords,
+            rewards_discounted,
+            "reward_surface_discounted",
+            env_step,
+            plot_nr,
+            "reward surface (discounted)",
+            logs,
+        )
+        self.plot_results(
+            coords, loss, "loss_surface", env_step, plot_nr, "loss surface", logs
+        )
+        return logs
+
+    def plot_results(
+        self,
+        coords: np.ndarray,
+        results: np.ndarray,
+        plot_name: str,
+        env_step: int,
+        plot_nr: int,
+        title_descr: str,
+        logs: TensorboardLogs,
+    ) -> None:
         x_coords, y_coords = np.meshgrid(coords, coords)
         plot_outpath_linear = (
-            self.linearscale_dir / f"{self._result_filename(env_step, plot_nr)}.png"
+            self.linearscale_dir
+            / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
         )
-        title_linear = f"{self.env_factory().spec.id} reward surface (linear scale)"
+        title_linear = f"{self.env_factory().spec.id} {title_descr}"
         self._plot_surface(
             x_coords,
             y_coords,
-            returns_offsets,
+            results,
             plot_outpath_linear,
             title_linear,
             logscale=False,
         )
         plot_outpath_log = (
-            self.logscale_dir / f"{self._result_filename(env_step, plot_nr)}.png"
+            self.logscale_dir
+            / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
         )
-        title_log = f"{self.env_factory().spec.id} reward surface (log scale)"
+        title_log = f"{self.env_factory().spec.id} {title_descr}"
         self._plot_surface(
             x_coords,
             y_coords,
-            returns_offsets,
+            results,
             plot_outpath_log,
             title_log,
             logscale=True,
@@ -187,14 +314,13 @@ class RewardSurfaceVisualization(Analysis):
             im = im.resize(
                 (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
             )
-            logs.add_image(f"reward_surfaces/linear/{plot_nr}", im, env_step)
+            logs.add_image(f"{plot_name}/linear/{plot_nr}", im, env_step)
         with Image.open(plot_outpath_log) as im:
             # Make the image smaller so that it fits better in tensorboard
             im = im.resize(
                 (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
             )
-            logs.add_image(f"reward_surfaces/log/{plot_nr}", im, env_step)
-        return logs
+            logs.add_image(f"{plot_name}/log/{plot_nr}", im, env_step)
 
     @staticmethod
     def sample_filter_normalized_direction(param: torch.Tensor) -> torch.Tensor:
@@ -353,5 +479,5 @@ class RewardSurfaceVisualization(Analysis):
         plt.close(fig)
 
     @staticmethod
-    def _result_filename(env_step: int, plot_idx: int) -> str:
-        return f"{env_step:07d}_{plot_idx:02d}"
+    def _result_filename(plot_name: str, env_step: int, plot_idx: int) -> str:
+        return f"{plot_name}_{env_step:07d}_{plot_idx:02d}"

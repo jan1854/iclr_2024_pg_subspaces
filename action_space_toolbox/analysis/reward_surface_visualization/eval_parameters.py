@@ -7,7 +7,7 @@ import numpy as np
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-
+# TODO: This file can be removed
 def sample_episode_rewards(
     env: stable_baselines3.common.vec_env.VecEnv,
     agent: stable_baselines3.common.base_class.BaseAlgorithm,
