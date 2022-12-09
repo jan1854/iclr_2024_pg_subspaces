@@ -67,12 +67,12 @@ class RewardSurfaceVisualization(Analysis):
         self.num_processes = num_processes
         self.out_dir = run_dir / "analyses" / "reward_surface_visualization"
         self.out_dir.mkdir(exist_ok=True, parents=True)
-        self.data_dir = self.out_dir / "data"
-        self.data_dir.mkdir(exist_ok=True)
-        self.linearscale_dir = self.out_dir / "linear"
-        self.linearscale_dir.mkdir(exist_ok=True)
-        self.logscale_dir = self.out_dir / "log"
-        self.logscale_dir.mkdir(exist_ok=True)
+        self.reward_undiscounted_dir = self.out_dir / "reward_undiscounted"
+        self.reward_discounted_dir = self.out_dir / "reward_discounted"
+        self.loss_dir = self.out_dir / "loss"
+        self.reward_undiscounted_data_dir = self.reward_undiscounted_dir / "data"
+        self.reward_discounted_data_dir = self.reward_discounted_dir / "data"
+        self.loss_data_dir = self.loss_dir / "data"
 
     def _do_analysis(
         self,
@@ -86,11 +86,13 @@ class RewardSurfaceVisualization(Analysis):
             if (
                 not overwrite_results
                 and (
-                    self.linearscale_dir
+                    self.loss_dir
+                    / "linear"
                     / f"{self._result_filename('loss_surface', env_step, i)}.png"
                 ).exists()
                 and (
-                    self.logscale_dir
+                    self.loss_dir
+                    / "log"
                     / f"{self._result_filename('loss_surface', env_step, i)}.png"
                 ).exists()
             ):
@@ -150,23 +152,28 @@ class RewardSurfaceVisualization(Analysis):
             rewards_undiscounted = np.array(
                 [result.reward_undiscounted for result in analysis_results_flat]
             ).reshape(self.grid_size, self.grid_size)
-            rewards_undiscounted_file = self.data_dir / self._result_filename(
-                "reward_surface_undiscounted", env_step, i
+            self.reward_undiscounted_data_dir.mkdir(parents=True, exist_ok=True)
+            rewards_undiscounted_file = (
+                self.reward_undiscounted_data_dir
+                / self._result_filename("reward_surface_undiscounted", env_step, i)
             )
             np.save(str(rewards_undiscounted_file), rewards_undiscounted)
 
             rewards_discounted = np.array(
                 [result.reward_discounted for result in analysis_results_flat]
             ).reshape(self.grid_size, self.grid_size)
-            rewards_discounted_file = self.data_dir / self._result_filename(
-                "rewards_discounted", env_step, i
+            self.reward_discounted_data_dir.mkdir(parents=True, exist_ok=True)
+            rewards_discounted_file = (
+                self.reward_discounted_data_dir
+                / self._result_filename("rewards_discounted", env_step, i)
             )
             np.save(str(rewards_discounted_file), rewards_discounted)
 
             loss = np.array(
                 [result.ppo_loss for result in analysis_results_flat]
             ).reshape(self.grid_size, self.grid_size)
-            loss_file = self.data_dir / self._result_filename("loss", env_step, i)
+            self.loss_data_dir.mkdir(parents=True, exist_ok=True)
+            loss_file = self.loss_data_dir / self._result_filename("loss", env_step, i)
             np.save(str(loss_file), loss)
 
             # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
@@ -257,6 +264,7 @@ class RewardSurfaceVisualization(Analysis):
             plot_nr,
             "reward surface (undiscounted)",
             logs,
+            self.reward_undiscounted_dir,
         )
         self.plot_results(
             coords,
@@ -266,9 +274,17 @@ class RewardSurfaceVisualization(Analysis):
             plot_nr,
             "reward surface (discounted)",
             logs,
+            self.reward_discounted_dir,
         )
         self.plot_results(
-            coords, loss, "loss_surface", env_step, plot_nr, "loss surface", logs
+            coords,
+            loss,
+            "loss_surface",
+            env_step,
+            plot_nr,
+            "loss surface",
+            logs,
+            self.loss_dir,
         )
         return logs
 
@@ -281,12 +297,15 @@ class RewardSurfaceVisualization(Analysis):
         plot_nr: int,
         title_descr: str,
         logs: TensorboardLogs,
+        out_dir: Path,
     ) -> None:
         x_coords, y_coords = np.meshgrid(coords, coords)
         plot_outpath_linear = (
-            self.linearscale_dir
+            out_dir
+            / "linear"
             / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
         )
+        plot_outpath_linear.parent.mkdir(parents=True, exist_ok=True)
         title_linear = f"{self.env_factory().spec.id} {title_descr}"
         self._plot_surface(
             x_coords,
@@ -297,9 +316,11 @@ class RewardSurfaceVisualization(Analysis):
             logscale=False,
         )
         plot_outpath_log = (
-            self.logscale_dir
+            out_dir
+            / "log"
             / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
         )
+        plot_outpath_log.parent.mkdir(parents=True, exist_ok=True)
         title_log = f"{self.env_factory().spec.id} {title_descr}"
         self._plot_surface(
             x_coords,
