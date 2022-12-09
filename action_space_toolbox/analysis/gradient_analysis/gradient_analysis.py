@@ -220,16 +220,14 @@ class GradientAnalysis(Analysis):
 
         # Compute the gradients in batches to avoid running out of memory on the GPU
         batches = list(rollout_buffer_true_gradient.get(100_000))
-        gradients_batches = [
-            self._compute_policy_gradient(agent, batch) for batch in batches
-        ]
+        gradients_batches = [self._ppo_gradient(agent, batch) for batch in batches]
         true_gradient = weighted_mean(
             gradients_batches, [len(batch.observations) for batch in batches]
         )
 
         estimated_gradients = torch.stack(
             [
-                self._compute_policy_gradient(agent, rollout_data)
+                self._ppo_gradient(agent, rollout_data)
                 for rollout_data in rollout_buffer.get(agent.batch_size)
             ]
         )
@@ -248,7 +246,7 @@ class GradientAnalysis(Analysis):
         env.reset()
         gradients = torch.stack(
             [
-                self._compute_policy_gradient(agent, rollout_data)
+                self._ppo_gradient(agent, rollout_data)
                 for rollout_data in rollout_buffer.get(agent.batch_size)
             ]
         )
@@ -451,7 +449,7 @@ class GradientAnalysis(Analysis):
         sim_mt = torch.mm(t1_normalized, t2_normalized.transpose(0, 1))
         return sim_mt
 
-    def _compute_policy_gradient(
+    def _ppo_gradient(
         self, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
     ) -> torch.Tensor:
         loss = ppo_loss(agent, rollout_data)
