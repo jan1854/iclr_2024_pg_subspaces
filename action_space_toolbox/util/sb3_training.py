@@ -22,10 +22,14 @@ def fill_rollout_buffer(
     """
     Collect experiences using the current policy and fill a ``RolloutBuffer``. The code is adapted from
     stable-baselines3's OnPolicyAlgorithm.collect_rollouts() (we cannot use that function since it modifies the
-    state of the agent (e.g. the number of timesteps).
+    state of the agent (e.g. the number of timesteps)).
 
-    :param env: The training environment
-    :param rollout_buffer: Buffer to fill with rollouts
+    :param agent:                               The RL agent
+    :param env:                                 The training environment
+    :param rollout_buffer:                      Buffer to fill with rollouts
+    :param rollout_buffer_no_value_bootstrap:   A separate buffer for without the value bootstrap (i.e, the last reward
+                                                of truncated episodes is not modified to reward + gamma * next_value)
+    :param show_progress:                       Shows a progress bar if true
     """
     assert (
         rollout_buffer_no_value_bootstrap is None
