@@ -1,9 +1,8 @@
 import functools
 import logging
-import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Dict
+from typing import Callable, Optional, Sequence
 
 import PIL
 import gym
@@ -19,9 +18,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
-from action_space_toolbox.analysis.reward_surface_visualization.eval_parameters import (
-    eval_parameters,
-)
 from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_loss
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -88,12 +84,6 @@ class RewardSurfaceVisualization(Analysis):
                 not overwrite_results
                 and (
                     self.loss_dir
-                    / "linear"
-                    / f"{self._result_filename('loss_surface', env_step, i)}.png"
-                ).exists()
-                and (
-                    self.loss_dir
-                    / "log"
                     / f"{self._result_filename('loss_surface', env_step, i)}.png"
                 ).exists()
             ):
@@ -335,48 +325,24 @@ class RewardSurfaceVisualization(Analysis):
         out_dir: Path,
     ) -> None:
         x_coords, y_coords = np.meshgrid(coords, coords)
-        plot_outpath_linear = (
-            out_dir
-            / "linear"
-            / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
+        plot_outpath = (
+            out_dir / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
         )
-        plot_outpath_linear.parent.mkdir(parents=True, exist_ok=True)
-        title_linear = f"{self.env_factory().spec.id} {title_descr}"
+        plot_outpath.parent.mkdir(parents=True, exist_ok=True)
+        title = f"{self.env_factory().spec.id} {title_descr}"
         self._plot_surface(
             x_coords,
             y_coords,
             results,
-            plot_outpath_linear,
-            title_linear,
-            logscale=False,
+            plot_outpath,
+            title,
         )
-        plot_outpath_log = (
-            out_dir
-            / "log"
-            / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
-        )
-        plot_outpath_log.parent.mkdir(parents=True, exist_ok=True)
-        title_log = f"{self.env_factory().spec.id} {title_descr}"
-        self._plot_surface(
-            x_coords,
-            y_coords,
-            results,
-            plot_outpath_log,
-            title_log,
-            logscale=True,
-        )
-        with Image.open(plot_outpath_linear) as im:
+        with Image.open(plot_outpath) as im:
             # Make the image smaller so that it fits better in tensorboard
             im = im.resize(
                 (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
             )
-            logs.add_image(f"{plot_name}/linear/{plot_nr}", im, env_step)
-        with Image.open(plot_outpath_log) as im:
-            # Make the image smaller so that it fits better in tensorboard
-            im = im.resize(
-                (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
-            )
-            logs.add_image(f"{plot_name}/log/{plot_nr}", im, env_step)
+            logs.add_image(f"{plot_name}/{plot_nr}", im, env_step)
 
     @staticmethod
     def sample_filter_normalized_direction(param: torch.Tensor) -> torch.Tensor:
@@ -412,37 +378,17 @@ class RewardSurfaceVisualization(Analysis):
         values: np.ndarray,
         outpath: Path,
         title: Optional[str] = None,
-        logscale: bool = False,
         magnitude: float = 1.0,
     ) -> None:
-        values = values.copy()
         fig = plt.figure()
         ax = Axes3D(fig)
 
         if title is not None:
             fig.suptitle(title)
 
-        if np.min(values) < -1e9 and not logscale:
-            print(
-                "Warning: Data includes extremely large negative rewards ({:3E}).\
-                          Consider setting logscale=True".format(
-                    np.min(values)
-                )
-            )
-
         # Scale X and Y values by the step size magnitude
         x_coords = magnitude * x_coords
         y_coords = magnitude * y_coords
-
-        real_values = values.copy()
-        # Take numerically stable log of data
-        if logscale:
-            values_neg = values[values < 0]
-            values_pos = values[values >= 0]
-            values_neg = -np.log10(1 - values_neg)
-            values_pos = np.log10(1 + values_pos)
-            values[values < 0] = values_neg
-            values[values >= 0] = values_pos
 
         # Plot surface
         surf = ax.plot_surface(
@@ -476,61 +422,7 @@ class RewardSurfaceVisualization(Analysis):
         yline_below = 0 * zline_below
         ax.plot3D(xline_below, yline_below, zline_below, "black", zorder=0)
 
-        # Fix colorbar labeling for log scale
-        if logscale:
-            # Find the highest order of magnitude
-            max_Z = np.max(real_values)
-            if max_Z < 0:
-                max_magnitude = -math.floor(math.log10(-max_Z))
-            else:
-                max_magnitude = math.floor(math.log10(max_Z))
-
-            # Find the lowest order of magnitude
-            min_Z = np.min(real_values)
-            if min_Z < 0:
-                min_magnitude = -math.floor(math.log10(-min_Z))
-            else:
-                if min_Z == 0:
-                    min_Z += 0.0000001
-                min_magnitude = math.floor(math.log10(min_Z))
-
-            # Create colorbar
-            continuous_labels = np.round(
-                np.linspace(min_magnitude, max_magnitude, 8, endpoint=True)
-            )
-            cbar = fig.colorbar(
-                surf, shrink=0.5, aspect=5, ticks=continuous_labels, pad=0.1
-            )
-            cbar.set_ticks(list())
-
-            # Manually set colorbar and z axis tick text
-            zticks = []
-            ztick_labels = []
-            bounds = cbar.ax.get_ybound()
-            for index, label in enumerate(continuous_labels):
-                x = 6.0
-                y = bounds[0] + (bounds[1] - bounds[0]) * index / 8
-
-                # Format label
-                zticks.append(label)
-                if label > 2 or label < -2:
-                    label = (
-                        "$-10^{" + str(int(-label)) + "}$"
-                        if label < 0
-                        else "$10^{" + str(int(label)) + "}$"
-                    )
-                else:
-                    label = (
-                        "${}$".format(-(10.0 ** (-label)))
-                        if label < 0
-                        else "${}$".format(10.0**label)
-                    )
-                cbar.ax.text(x, y, label)
-                ztick_labels.append("    " + label)
-            ax.set_zticks(zticks)
-            ax.set_zticklabels(ztick_labels)
-        else:
-            fig.colorbar(surf, shrink=0.5, aspect=5, pad=0.05)
+        fig.colorbar(surf, shrink=0.5, aspect=5, pad=0.05)
 
         fig.savefig(outpath, dpi=300, bbox_inches="tight")
         plt.close(fig)
