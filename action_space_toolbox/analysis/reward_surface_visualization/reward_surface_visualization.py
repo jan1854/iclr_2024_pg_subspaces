@@ -73,6 +73,7 @@ class RewardSurfaceVisualization(Analysis):
         self.reward_undiscounted_data_dir = self.reward_undiscounted_dir / "data"
         self.reward_discounted_data_dir = self.reward_discounted_dir / "data"
         self.loss_data_dir = self.loss_dir / "data"
+        self.directions_dir = self.out_dir / "directions"
 
     def _do_analysis(
         self,
@@ -109,6 +110,13 @@ class RewardSurfaceVisualization(Analysis):
                 self.sample_filter_normalized_direction(p.detach())
                 for p in agent.policy.parameters()
             ]
+
+            self.directions_dir.mkdir(exist_ok=True)
+            torch.save(
+                (direction1, direction2),
+                self.directions_dir
+                / f"{self._result_filename('directions', env_step, i)}.pt",
+            )
 
             agent_weights = [p.data.detach() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
