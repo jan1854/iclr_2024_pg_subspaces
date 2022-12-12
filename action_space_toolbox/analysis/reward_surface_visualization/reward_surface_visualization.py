@@ -311,6 +311,16 @@ class RewardSurfaceVisualization(Analysis):
             logs,
             self.loss_dir,
         )
+        self.plot_results(
+            coords,
+            -loss,
+            "negative_loss_surface",
+            env_step,
+            plot_nr,
+            "negative loss surface",
+            logs,
+            self.loss_dir,
+        )
         return logs
 
     def plot_results(
@@ -405,6 +415,7 @@ class RewardSurfaceVisualization(Analysis):
         logscale: bool = False,
         magnitude: float = 1.0,
     ) -> None:
+        values = values.copy()
         fig = plt.figure()
         ax = Axes3D(fig)
 
