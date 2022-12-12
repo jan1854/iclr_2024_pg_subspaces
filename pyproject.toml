@@ -21,6 +21,7 @@ dependencies = [
     "omegaconf",
     "Pillow",
     "stable-baselines3",
+    "tensorboard",
     "torch"
 ]
 
