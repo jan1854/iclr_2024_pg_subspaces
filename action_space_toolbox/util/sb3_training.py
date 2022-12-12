@@ -1,3 +1,5 @@
+from typing import Optional
+
 import gym
 import numpy as np
 import stable_baselines3.common.vec_env
@@ -12,6 +14,9 @@ def fill_rollout_buffer(
     agent: stable_baselines3.ppo.PPO,
     env: stable_baselines3.common.vec_env.VecEnv,
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
+    rollout_buffer_no_value_bootstrap: Optional[
+        stable_baselines3.common.buffers.RolloutBuffer
+    ] = None,
     show_progress: bool = False,
 ) -> None:
     """
@@ -22,6 +27,11 @@ def fill_rollout_buffer(
     :param env: The training environment
     :param rollout_buffer: Buffer to fill with rollouts
     """
+    assert (
+        rollout_buffer_no_value_bootstrap is None
+        or rollout_buffer.buffer_size == rollout_buffer_no_value_bootstrap.buffer_size
+    )
+
     last_obs = env.reset()
     last_episode_starts = np.ones(env.num_envs)
 
@@ -29,6 +39,8 @@ def fill_rollout_buffer(
     agent.policy.set_training_mode(False)
 
     rollout_buffer.reset()
+    if rollout_buffer_no_value_bootstrap is not None:
+        rollout_buffer_no_value_bootstrap.reset()
     # Sample new weights for the state dependent exploration
     if agent.use_sde:
         agent.policy.reset_noise(env.num_envs)
@@ -70,6 +82,7 @@ def fill_rollout_buffer(
 
         # Handle timeout by bootstrapping with value function
         # see GitHub issue #633
+        rewards_no_bootstrap = rewards.copy()
         for idx, done in enumerate(dones):
             if (
                 done
@@ -91,6 +104,16 @@ def fill_rollout_buffer(
             values,
             log_probs,
         )
+        if rollout_buffer_no_value_bootstrap is not None:
+            rollout_buffer_no_value_bootstrap.add(
+                last_obs,
+                actions,
+                rewards_no_bootstrap,
+                last_episode_starts,
+                values,
+                log_probs,
+            )
+
         last_obs = new_obs
         last_episode_starts = dones
 
@@ -99,6 +122,10 @@ def fill_rollout_buffer(
         values = agent.policy.predict_values(obs_as_tensor(new_obs, agent.device))
 
     rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
+    if rollout_buffer_no_value_bootstrap is not None:
+        rollout_buffer_no_value_bootstrap.compute_returns_and_advantage(
+            last_values=values, dones=dones
+        )
 
 
 def ppo_loss(

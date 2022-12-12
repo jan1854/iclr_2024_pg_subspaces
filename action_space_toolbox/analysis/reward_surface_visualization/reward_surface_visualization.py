@@ -210,17 +210,34 @@ class RewardSurfaceVisualization(Analysis):
             agent.gae_lambda,
             agent.gamma,
         )
+        rollout_buffer_no_value_bootstrap = (
+            stable_baselines3.common.buffers.RolloutBuffer(
+                num_steps,
+                agent.observation_space,
+                agent.action_space,
+                "cpu",
+                agent.gae_lambda,
+                agent.gamma,
+            )
+        )
         with torch.no_grad():
             for parameters, weights in zip(agent.policy.parameters(), agent_weights):
                 parameters.data[:] = weights
-        fill_rollout_buffer(agent, env, rollout_buffer, show_progress=False)
+        fill_rollout_buffer(
+            agent,
+            env,
+            rollout_buffer,
+            rollout_buffer_no_value_bootstrap,
+            show_progress=False,
+        )
         episode_rewards_undiscounted = []
         episode_rewards_discounted = []
         curr_reward_undiscounted = None
         curr_reward_discounted = None
         curr_episode_length = 0
         for episode_start, reward in zip(
-            rollout_buffer.episode_starts, rollout_buffer.rewards
+            rollout_buffer_no_value_bootstrap.episode_starts,
+            rollout_buffer_no_value_bootstrap.rewards,
         ):
             if episode_start:
                 if curr_episode_length > 0:
