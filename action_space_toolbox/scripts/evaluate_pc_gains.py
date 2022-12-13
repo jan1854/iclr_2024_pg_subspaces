@@ -5,19 +5,46 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import List, Sequence, Optional
 
+import dm_control.suite.cheetah
+import dmc2gym.wrappers
 import gym
 import gym.envs.mujoco
 import numpy as np
+from dm_control import mjcf
 
 from action_space_toolbox import FixedGainsPositionControlWrapper
 from action_space_toolbox.control_modes.check_wrapped import check_wrapped
+from action_space_toolbox.scripts.render import Renderer
 from action_space_toolbox.util.angles import normalize_angle
+
+
+def prepare_env(env: gym.Env) -> None:
+    if env.spec.id == "Pendulum_PC-v1" or env.spec.id == "Reacher_PC-v2":
+        pass
+    elif env.spec.id == "dmc_Cheetah-run_PC-v1":
+        model, assets = dm_control.suite.cheetah.get_model_and_assets()
+        model = mjcf.from_xml_string(model, assets=assets)
+        model.find("body", "torso").pos = np.array([0.0, 0.0, 0.9])
+        # Increase stiffness and damping for the root joints to make them quasi static
+        for joint_name in ["rootx", "rootz", "rooty"]:
+            joint = model.find("joint", joint_name)
+            joint.stiffness = 10000000.0
+            joint.damping = 10000000.0
+
+        physics = dm_control.suite.cheetah.Physics.from_xml_string(
+            model.to_xml_string()
+        )
+        env.unwrapped._env._physics = physics
+        pass
+    else:
+        raise ValueError(f"Unsupported environment: {env.unwrapped.spec.id}")
 
 
 def sample_targets(env_id: str, num_targets: int) -> List[np.ndarray]:
     # Unwrap the env to get back the original action space
-    env = gym.make(env_id)
+    env = gym.make(env_id, normalize=False)
     env.seed(42)
+    prepare_env(env)
     tmp_env = env
     while not isinstance(tmp_env.env, FixedGainsPositionControlWrapper):
         tmp_env = tmp_env.env
@@ -36,15 +63,21 @@ def sample_targets(env_id: str, num_targets: int) -> List[np.ndarray]:
 
 
 def visualize_targets(env, targets: Sequence[np.ndarray]) -> None:
+    renderer = Renderer()
     for pos in targets:
         env.reset()
         if isinstance(env.unwrapped, gym.envs.mujoco.MujocoEnv):
             full_pos = env.sim.data.qpos
             full_pos[env.actuated_joints] = pos
             env.set_state(full_pos, np.zeros_like(full_pos))
+        elif isinstance(env.unwrapped, dmc2gym.wrappers.DMCWrapper):
+            full_pos = env.physics.data.qpos
+            full_pos[env.actuated_joints] = pos
+            env.physics.set_state(np.concatenate((full_pos, np.zeros_like(full_pos))))
+            env.step(np.zeros(env.action_space.shape))
         else:
             env.unwrapped.state = (pos, np.zeros_like(pos))
-        env.render()
+        renderer.render_frame(env)
         time.sleep(1)
 
 
@@ -57,8 +90,9 @@ def evaluate_pc_gains(
 ) -> float:
     assert check_wrapped(env, FixedGainsPositionControlWrapper)
     joint_errors = []
+    renderer = Renderer()
     for target_actuator_position in target_actuator_positions:
-        for _ in range(repetitions_per_target):
+        for repetition in range(repetitions_per_target):
             done = False
             env.reset()
             joint_errors.append(0.0)
@@ -66,7 +100,7 @@ def evaluate_pc_gains(
             while not done:
                 _, _, done, _ = env.step(target_actuator_position)
                 if render:
-                    env.render()
+                    renderer.render_frame(env)
                 diff = env.actuator_positions - target_actuator_position
                 joint_diff = diff * ~np.array(env.actuators_revolute) + normalize_angle(
                     diff
@@ -75,6 +109,7 @@ def evaluate_pc_gains(
                 i += 1
                 if max_steps_per_episode is not None and i >= max_steps_per_episode:
                     break
+            joint_errors[-1] /= i
 
     return np.mean(joint_errors)  # type: ignore
 
@@ -95,7 +130,13 @@ if __name__ == "__main__":
         targets = np.array(fixed_targets[args.env_id])
     else:
         targets = sample_targets(args.env_id, args.num_targets)
-    env = gym.make(args.env_id, p_gains=args.p_gains, d_gains=args.d_gains)
+    p_gains = args.p_gains[0] if len(args.p_gains) == 1 else args.p_gains
+    d_gains = args.d_gains[0] if len(args.d_gains) == 1 else args.d_gains
+    env = gym.make("dmc_Cheetah-run_PC-v1")
+    prepare_env(env)
+    env.reset()
+    env = gym.make(args.env_id, p_gains=p_gains, d_gains=d_gains, normalize=False)
+    prepare_env(env)
     if args.visualize_targets:
         visualize_targets(env, targets)
     loss = evaluate_pc_gains(env, targets, render=True)
