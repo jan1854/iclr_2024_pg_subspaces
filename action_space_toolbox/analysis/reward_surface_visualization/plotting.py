@@ -63,7 +63,8 @@ def plot_surface(
     title = f"{env_name} {title_descr}"
 
     fig = plt.figure()
-    ax = Axes3D(fig)
+    ax = Axes3D(fig, auto_add_to_figure=False)
+    fig.add_axes(ax)
 
     if title is not None:
         fig.suptitle(title)
