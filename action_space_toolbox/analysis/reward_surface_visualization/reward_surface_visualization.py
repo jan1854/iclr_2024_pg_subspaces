@@ -1,23 +1,22 @@
 import functools
 import logging
+import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, Sequence
 
-import PIL
 import gym
 import numpy as np
 import stable_baselines3.common.base_class
 import stable_baselines3.common.buffers
 import stable_baselines3.common.vec_env
 import torch
-from PIL import Image
-from matplotlib import pyplot as plt
-from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
+from action_space_toolbox.analysis.reward_surface_visualization.plotting import (
+    plot_all_results,
+)
 from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_loss
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -46,6 +45,7 @@ class RewardSurfaceVisualization(Analysis):
         agent_factory: Callable[[], stable_baselines3.ppo.PPO],
         run_dir: Path,
         grid_size: int,
+        magnitude: float,
         num_steps: int,
         num_plots: int,
         num_processes: int,
@@ -58,18 +58,20 @@ class RewardSurfaceVisualization(Analysis):
             num_processes,
         )
         self.grid_size = grid_size
+        self.magnitude = magnitude
         self.num_steps = num_steps
         self.num_plots = num_plots
         self.num_processes = num_processes
         self.out_dir = run_dir / "analyses" / "reward_surface_visualization"
         self.out_dir.mkdir(exist_ok=True, parents=True)
-        self.reward_undiscounted_dir = self.out_dir / "reward_undiscounted"
-        self.reward_discounted_dir = self.out_dir / "reward_discounted"
-        self.loss_dir = self.out_dir / "loss"
-        self.reward_undiscounted_data_dir = self.reward_undiscounted_dir / "data"
-        self.reward_discounted_data_dir = self.reward_discounted_dir / "data"
-        self.loss_data_dir = self.loss_dir / "data"
-        self.directions_dir = self.out_dir / "directions"
+        self.reward_undiscounted_data_dir = (
+            self.out_dir / "reward_surface_undiscounted" / "data"
+        )
+        self.reward_discounted_data_dir = (
+            self.out_dir / "reward_surface_discounted" / "data"
+        )
+        self.loss_data_dir = self.out_dir / "loss_surface" / "data"
+        self.negative_loss_data_dir = self.out_dir / "negative_loss_surface" / "data"
 
     def _do_analysis(
         self,
@@ -79,17 +81,18 @@ class RewardSurfaceVisualization(Analysis):
         show_progress: bool,
     ) -> TensorboardLogs:
         logs = TensorboardLogs()
-        for i in range(self.num_plots):
+        for plot_num in range(self.num_plots):
             if (
                 not overwrite_results
                 and (
-                    self.loss_dir
-                    / f"{self._result_filename('loss_surface', env_step, i)}.png"
+                    self.out_dir
+                    / "loss"
+                    / f"{self._result_filename('loss_surface', env_step, plot_num)}.png"
                 ).exists()
             ):
                 continue
             if show_progress:
-                logger.info(f"Creating plot {i} for step {env_step}.")
+                logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
             agent = self.agent_factory()
             direction1 = [
@@ -100,13 +103,6 @@ class RewardSurfaceVisualization(Analysis):
                 self.sample_filter_normalized_direction(p.detach())
                 for p in agent.policy.parameters()
             ]
-
-            self.directions_dir.mkdir(exist_ok=True)
-            torch.save(
-                (direction1, direction2),
-                self.directions_dir
-                / f"{self._result_filename('directions', env_step, i)}.pt",
-            )
 
             agent_weights = [p.data.detach() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
@@ -147,15 +143,27 @@ class RewardSurfaceVisualization(Analysis):
                 )
             ]
 
+            plot_info = {
+                "env_name": agent.env.envs[0].spec.id,
+                "env_step": env_step,
+                "plot_num": plot_num,
+                "magnitude": self.magnitude,
+                "directions": (
+                    [d.cpu().numpy() for d in direction1],
+                    [d.cpu().numpy() for d in direction2],
+                ),
+            }
+
             rewards_undiscounted = np.array(
                 [result.reward_undiscounted for result in analysis_results_flat]
             ).reshape(self.grid_size, self.grid_size)
             self.reward_undiscounted_data_dir.mkdir(parents=True, exist_ok=True)
             rewards_undiscounted_file = (
                 self.reward_undiscounted_data_dir
-                / self._result_filename("reward_surface_undiscounted", env_step, i)
+                / f"{self._result_filename('reward_surface_undiscounted', env_step, plot_num)}.pkl"
             )
-            np.save(str(rewards_undiscounted_file), rewards_undiscounted)
+            with rewards_undiscounted_file.open("wb") as f:
+                pickle.dump(plot_info | {"data": rewards_undiscounted}, f)
 
             rewards_discounted = np.array(
                 [result.reward_discounted for result in analysis_results_flat]
@@ -163,29 +171,38 @@ class RewardSurfaceVisualization(Analysis):
             self.reward_discounted_data_dir.mkdir(parents=True, exist_ok=True)
             rewards_discounted_file = (
                 self.reward_discounted_data_dir
-                / self._result_filename("rewards_discounted", env_step, i)
+                / f"{self._result_filename('rewards_discounted', env_step, plot_num)}.pkl"
             )
-            np.save(str(rewards_discounted_file), rewards_discounted)
+            with rewards_discounted_file.open("wb") as f:
+                pickle.dump(plot_info | {"data": rewards_discounted}, f)
 
             loss = np.array(
                 [result.ppo_loss for result in analysis_results_flat]
             ).reshape(self.grid_size, self.grid_size)
             self.loss_data_dir.mkdir(parents=True, exist_ok=True)
-            loss_file = self.loss_data_dir / self._result_filename("loss", env_step, i)
-            np.save(str(loss_file), loss)
+            loss_file = (
+                self.loss_data_dir
+                / f"{self._result_filename('loss', env_step, plot_num)}.pkl"
+            )
+            with loss_file.open("wb") as f:
+                pickle.dump(plot_info | {"data": loss}, f)
+
+            self.negative_loss_data_dir.mkdir(parents=True, exist_ok=True)
+            negative_loss_file = (
+                self.negative_loss_data_dir
+                / f"{self._result_filename('negative_loss', env_step, plot_num)}.pkl"
+            )
+            with negative_loss_file.open("wb") as f:
+                pickle.dump(plot_info | {"data": -loss}, f)
 
             # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
             # https://matplotlib.org/3.1.0/faq/howto_faq.html#working-with-threads)
             logs.update(
                 process_pool.apply(
                     functools.partial(
-                        self.plot_worker,
-                        coords,
-                        rewards_undiscounted,
-                        rewards_discounted,
-                        loss,
-                        env_step,
-                        i,
+                        plot_all_results,
+                        self.out_dir,
+                        overwrite=overwrite_results,
                     )
                 )
             )
@@ -261,89 +278,6 @@ class RewardSurfaceVisualization(Analysis):
             loss.item(),
         )
 
-    def plot_worker(
-        self,
-        coords: np.ndarray,
-        rewards_undiscounted: np.ndarray,
-        rewards_discounted: np.ndarray,
-        loss: np.ndarray,
-        env_step: int,
-        plot_nr: int,
-    ) -> TensorboardLogs:
-        logs = TensorboardLogs()
-        self.plot_results(
-            coords,
-            rewards_undiscounted,
-            "reward_surface_undiscounted",
-            env_step,
-            plot_nr,
-            "reward surface (undiscounted)",
-            logs,
-            self.reward_undiscounted_dir,
-        )
-        self.plot_results(
-            coords,
-            rewards_discounted,
-            "reward_surface_discounted",
-            env_step,
-            plot_nr,
-            "reward surface (discounted)",
-            logs,
-            self.reward_discounted_dir,
-        )
-        self.plot_results(
-            coords,
-            loss,
-            "loss_surface",
-            env_step,
-            plot_nr,
-            "loss surface",
-            logs,
-            self.loss_dir,
-        )
-        self.plot_results(
-            coords,
-            -loss,
-            "negative_loss_surface",
-            env_step,
-            plot_nr,
-            "negative loss surface",
-            logs,
-            self.loss_dir,
-        )
-        return logs
-
-    def plot_results(
-        self,
-        coords: np.ndarray,
-        results: np.ndarray,
-        plot_name: str,
-        env_step: int,
-        plot_nr: int,
-        title_descr: str,
-        logs: TensorboardLogs,
-        out_dir: Path,
-    ) -> None:
-        x_coords, y_coords = np.meshgrid(coords, coords)
-        plot_outpath = (
-            out_dir / f"{self._result_filename(plot_name, env_step, plot_nr)}.png"
-        )
-        plot_outpath.parent.mkdir(parents=True, exist_ok=True)
-        title = f"{self.env_factory().spec.id} {title_descr}"
-        self._plot_surface(
-            x_coords,
-            y_coords,
-            results,
-            plot_outpath,
-            title,
-        )
-        with Image.open(plot_outpath) as im:
-            # Make the image smaller so that it fits better in tensorboard
-            im = im.resize(
-                (im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS
-            )
-            logs.add_image(f"{plot_name}/{plot_nr}", im, env_step)
-
     @staticmethod
     def sample_filter_normalized_direction(param: torch.Tensor) -> torch.Tensor:
         ndims = len(param.shape)
@@ -370,62 +304,6 @@ class RewardSurfaceVisualization(Analysis):
             raise ValueError(
                 f"Only 1, 2, 4 dimensional filters allowed, got {param.shape}."
             )
-
-    @staticmethod
-    def _plot_surface(
-        x_coords: np.ndarray,
-        y_coords: np.ndarray,
-        values: np.ndarray,
-        outpath: Path,
-        title: Optional[str] = None,
-        magnitude: float = 1.0,
-    ) -> None:
-        fig = plt.figure()
-        ax = Axes3D(fig)
-
-        if title is not None:
-            fig.suptitle(title)
-
-        # Scale X and Y values by the step size magnitude
-        x_coords = magnitude * x_coords
-        y_coords = magnitude * y_coords
-
-        # Plot surface
-        surf = ax.plot_surface(
-            x_coords,
-            y_coords,
-            values,
-            cmap=cm.coolwarm,
-            linewidth=0,
-            antialiased=False,
-            zorder=5,
-        )
-
-        # Plot center line above surface
-        Z_range = abs(np.max(values) - np.min(values))
-        zline_above = np.linspace(
-            values[len(values) // 2][len(values[0]) // 2],
-            np.max(values) + (Z_range * 0.1),
-            4,
-        )
-        xline_above = 0 * zline_above
-        yline_above = 0 * zline_above
-        ax.plot3D(xline_above, yline_above, zline_above, "black", zorder=10)
-
-        # Plot center line below surface
-        zline_below = np.linspace(
-            values[len(values) // 2][len(values[0]) // 2],
-            np.min(values) - (Z_range * 0.1),
-            4,
-        )
-        xline_below = 0 * zline_below
-        yline_below = 0 * zline_below
-        ax.plot3D(xline_below, yline_below, zline_below, "black", zorder=0)
-
-        fig.colorbar(surf, shrink=0.5, aspect=5, pad=0.05)
-
-        fig.savefig(outpath, dpi=300, bbox_inches="tight")
-        plt.close(fig)
 
     @staticmethod
     def _result_filename(plot_name: str, env_step: int, plot_idx: int) -> str:
