@@ -21,6 +21,7 @@ class Renderer:
         frame = env.render("rgb_array")
         if self.img is None:
             self.img = plt.imshow(frame)
+            plt.axis("off")
         else:
             self.img.set_array(frame)
         plt.pause(0.01)
