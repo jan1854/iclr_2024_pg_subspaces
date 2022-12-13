@@ -35,7 +35,6 @@ def prepare_env(env: gym.Env) -> None:
             model.to_xml_string()
         )
         env.unwrapped._env._physics = physics
-        pass
     else:
         raise ValueError(f"Unsupported environment: {env.unwrapped.spec.id}")
 
