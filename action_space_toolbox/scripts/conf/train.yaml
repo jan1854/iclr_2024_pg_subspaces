@@ -3,7 +3,7 @@ defaults:
   - action_transformation: null
   - algorithm: ppo_default
 
-env: Pendulum-v1
+env: Pendulum_TC-v1
 env_args: {}
 seed: null
 
