@@ -9,6 +9,9 @@ from action_space_toolbox.controller_base.controller_base_wrapper import (
 class DMCControllerBaseWrapper(ControllerBaseWrapper):
     def __init__(self, env: dmc2gym.wrappers.DMCWrapper):
         assert isinstance(env.unwrapped, dmc2gym.wrappers.DMCWrapper)
+        assert np.all(
+            env.physics.model.actuator_trntype == 0
+        ), "Only actuators acting on joints are supported at the moment."
         self.actuated_joints = env.physics.model.actuator_trnid[:, 0]
         actuators_revolute = env.physics.model.jnt_type == 3
         actuator_pos_bounds = []
