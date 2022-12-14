@@ -1,6 +1,7 @@
 import json
 import random
 from argparse import ArgumentParser
+from datetime import datetime
 from pathlib import Path
 from typing import Tuple, Sequence
 
@@ -56,6 +57,17 @@ def tune_pc_gains(
             f"Tuning gains. Best gains: p: {best_gains[0]}, d: {best_gains[1]}, "
             f"loss: {best_loss:.4f}, average_loss: {np.mean(losses):.4f}."
         )
+    log_dir = Path(__file__).parents[2] / "logs" / "tuning_results" / "pc"
+    log_dir.mkdir(exist_ok=True, parents=True)
+    log_path = log_dir / f"{env_id}_{datetime.now().strftime('%y-%m-%d_%H-%M-%S')}.json"
+    with log_path.open("w") as log_file:
+        json.dump(
+            {
+                "gains": {"p": best_gains[0].tolist(), "d": best_gains[1].tolist()},
+                "loss": np.around(best_loss, decimals=2),
+            },
+            log_file,
+        )
 
     return best_gains
 
@@ -95,12 +107,4 @@ if __name__ == "__main__":
         args.d_gains_exp_low,
         args.d_gains_exp_high,
         args.repetitions_per_target,
-    )
-
-    env = gym.make(
-        args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1], normalize=False
-    )
-    input("Press any key to visualize the optimized controllers.")
-    evaluate_pc_gains(
-        env, target_actuator_positions, repetitions_per_target=1, render=True
     )
