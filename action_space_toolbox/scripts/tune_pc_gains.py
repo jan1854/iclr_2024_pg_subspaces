@@ -7,6 +7,7 @@ from typing import Tuple, Sequence
 import gym
 import gym.envs.mujoco
 import numpy as np
+from tqdm import trange
 
 from action_space_toolbox.scripts.evaluate_pc_gains import (
     evaluate_pc_gains,
@@ -29,28 +30,33 @@ def tune_pc_gains(
     action_shape = temp_env.action_space.shape
     best_loss = float("inf")
     best_gains = None
-    for i in range(num_iterations):
-        p_gains = 10 ** np.random.uniform(
-            p_gains_exp_low, p_gains_exp_high, size=action_shape
+    progress_bar = trange(num_iterations)
+    losses = []
+    for i in progress_bar:
+        p_gains = np.around(
+            10
+            ** np.random.uniform(p_gains_exp_low, p_gains_exp_high, size=action_shape),
+            decimals=2,
         )
-        d_gains = 10 ** np.random.uniform(
-            d_gains_exp_low, d_gains_exp_high, size=action_shape
+        d_gains = np.around(
+            10
+            ** np.random.uniform(d_gains_exp_low, d_gains_exp_high, size=action_shape),
+            decimals=2,
         )
         env = gym.make(env_id, p_gains=p_gains, d_gains=d_gains, normalize=False)
         env.seed(42)
         loss = evaluate_pc_gains(
             env, actuator_positions, repetitions_per_target, max_steps_per_episode=200
         )
-        print(
-            f"Iteration: {i + 1}/{num_iterations}, p_gains: {p_gains}, d_gains: {d_gains}, loss: {loss}"
-        )
+        losses.append(loss)
         if loss < best_loss:
             best_gains = (p_gains, d_gains)
             best_loss = loss
+        progress_bar.set_description(
+            f"Tuning gains. Best gains: p: {best_gains[0]}, d: {best_gains[1]}, "
+            f"loss: {best_loss:.4f}, average_loss: {np.mean(losses):.4f}."
+        )
 
-    print(
-        f"best: p_gains: {best_gains[0]}, d_gains: {best_gains[1]}, loss: {best_loss}"
-    )
     return best_gains
 
 
@@ -91,7 +97,9 @@ if __name__ == "__main__":
         args.repetitions_per_target,
     )
 
-    env = gym.make(args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1], normalize=False)
+    env = gym.make(
+        args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1], normalize=False
+    )
     input("Press any key to visualize the optimized controllers.")
     evaluate_pc_gains(
         env, target_actuator_positions, repetitions_per_target=1, render=True
