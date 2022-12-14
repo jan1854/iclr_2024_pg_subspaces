@@ -36,7 +36,7 @@ def tune_pc_gains(
         d_gains = 10 ** np.random.uniform(
             d_gains_exp_low, d_gains_exp_high, size=action_shape
         )
-        env = gym.make(env_id, p_gains=p_gains, d_gains=d_gains)
+        env = gym.make(env_id, p_gains=p_gains, d_gains=d_gains, normalize=False)
         env.seed(42)
         loss = evaluate_pc_gains(
             env, actuator_positions, repetitions_per_target, max_steps_per_episode=200
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         args.repetitions_per_target,
     )
 
-    env = gym.make(args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1])
+    env = gym.make(args.env_id, p_gains=tuned_gains[0], d_gains=tuned_gains[1], normalize=False)
     input("Press any key to visualize the optimized controllers.")
     evaluate_pc_gains(
         env, target_actuator_positions, repetitions_per_target=1, render=True

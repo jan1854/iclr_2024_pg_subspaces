@@ -62,6 +62,7 @@ def sample_targets(env_id: str, num_targets: int) -> List[np.ndarray]:
 
 
 def visualize_targets(env, targets: Sequence[np.ndarray]) -> None:
+    prepare_env(env)
     renderer = Renderer()
     for pos in targets:
         env.reset()
@@ -87,6 +88,7 @@ def evaluate_pc_gains(
     render: bool = False,
     max_steps_per_episode: Optional[int] = None,
 ) -> float:
+    prepare_env(env)
     assert check_wrapped(env, FixedGainsPositionControlWrapper)
     joint_errors = []
     renderer = Renderer()
@@ -131,12 +133,8 @@ if __name__ == "__main__":
         targets = sample_targets(args.env_id, args.num_targets)
     p_gains = args.p_gains[0] if len(args.p_gains) == 1 else args.p_gains
     d_gains = args.d_gains[0] if len(args.d_gains) == 1 else args.d_gains
-    env = gym.make("dmc_Cheetah-run_PC-v1")
-    prepare_env(env)
-    env.reset()
     env = gym.make(args.env_id, p_gains=p_gains, d_gains=d_gains, normalize=False)
-    prepare_env(env)
     if args.visualize_targets:
         visualize_targets(env, targets)
-    loss = evaluate_pc_gains(env, targets, render=True)
+    loss = evaluate_pc_gains(env, targets, render=False)
     print(f"Average joint error: {loss}")
