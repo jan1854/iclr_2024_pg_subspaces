@@ -45,8 +45,8 @@ def prepare_env(env: gym.Env) -> None:
         # Increase stiffness and damping for the root joints to make them quasi static
         for joint_name in ["rootx", "rootz", "rooty"]:
             joint = model.find("joint", joint_name)
-            joint.stiffness = 100000.0
-            joint.damping = 1000000.0
+            joint.stiffness = 10000.0
+            joint.damping = 100000.0
 
         physics = task_module.Physics.from_xml_string(model.to_xml_string())
         env.unwrapped._env._physics = physics
