@@ -19,21 +19,36 @@ from action_space_toolbox.util.angles import normalize_angle
 
 
 def prepare_env(env: gym.Env) -> None:
-    if env.spec.id == "Pendulum_PC-v1" or env.spec.id == "Reacher_PC-v2":
+    if (
+        env.spec.id == "Pendulum_PC-v1"
+        or env.spec.id == "Reacher_PC-v2"
+        or env.spec.id.startswith("dmc_Finger")
+        or env.spec.id.startswith("dmc_Reacher")
+    ):
         pass
-    elif env.spec.id == "dmc_Cheetah-run_PC-v1":
-        model, assets = dm_control.suite.cheetah.get_model_and_assets()
+    elif (
+        env.spec.id.startswith("dmc_Cheetah")
+        or env.spec.id.startswith("dmc_Hopper")
+        or env.spec.id.startswith("dmc_Walker")
+    ):
+        if env.spec.id.startswith("dmc_Cheetah"):
+            import dm_control.suite.cheetah as task_module
+        elif env.spec.id.startswith("dmc_Hopper"):
+            import dm_control.suite.hopper as task_module
+        elif env.spec.id.startswith("dmc_Walker"):
+            import dm_control.suite.walker as task_module
+        else:
+            raise ValueError()
+        model, assets = task_module.get_model_and_assets()
         model = mjcf.from_xml_string(model, assets=assets)
-        model.find("body", "torso").pos = np.array([0.0, 0.0, 0.9])
+        model.find("body", "torso").pos = np.array([0.0, 0.0, 2.0])
         # Increase stiffness and damping for the root joints to make them quasi static
         for joint_name in ["rootx", "rootz", "rooty"]:
             joint = model.find("joint", joint_name)
-            joint.stiffness = 10000000.0
-            joint.damping = 10000000.0
+            joint.stiffness = 100000.0
+            joint.damping = 1000000.0
 
-        physics = dm_control.suite.cheetah.Physics.from_xml_string(
-            model.to_xml_string()
-        )
+        physics = task_module.Physics.from_xml_string(model.to_xml_string())
         env.unwrapped._env._physics = physics
     else:
         raise ValueError(f"Unsupported environment: {env.unwrapped.spec.id}")
