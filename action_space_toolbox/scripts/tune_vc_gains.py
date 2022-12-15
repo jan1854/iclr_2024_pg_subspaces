@@ -17,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("gains_exp_low", type=float)
     parser.add_argument("gains_exp_high", type=float)
     parser.add_argument("--visualize-targets", action="store_true")
-    parser.add_argument("--targets-to-sample", type=int, default=25)
+    parser.add_argument("--targets-to-sample", type=int, default=1000)
     parser.add_argument("--repetitions-per-target", type=int, default=1)
     args = parser.parse_args()
 

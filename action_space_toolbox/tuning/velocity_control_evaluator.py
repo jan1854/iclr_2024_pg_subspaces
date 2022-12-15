@@ -24,7 +24,7 @@ class VelocityControlEvaluator(ControllerEvaluator):
         env_id: str,
         num_targets: int,
         repetitions_per_target: int,
-        num_episodes_to_sample_targets_from: int = 50,
+        num_episodes_to_sample_targets_from: int = 500,
     ):
         self.num_episodes_to_sample_targets_from = num_episodes_to_sample_targets_from
         super().__init__(
