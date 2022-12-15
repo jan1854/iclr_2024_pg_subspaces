@@ -7,11 +7,13 @@ import gym
 import gym.envs.mujoco
 import numpy as np
 
+import action_space_toolbox
 from action_space_toolbox.control_modes.velocity_control.fixed_gains_velocity_control_wrapper import (
     FixedGainsVelocityControlWrapper,
 )
 from action_space_toolbox.control_modes.check_wrapped import check_wrapped
 from action_space_toolbox.tuning.controller_evaluator import ControllerEvaluator
+
 
 State = Tuple[np.ndarray, np.ndarray]
 
@@ -34,6 +36,7 @@ class VelocityControlEvaluator(ControllerEvaluator):
     def _sample_targets(self, num_targets: int) -> List[Tuple[State, np.ndarray]]:
         # Unwrap the env to get back the original action space
         env = gym.make(self.env_id, normalize=False)
+        self._prepare_env(env)
         env.seed(42)
         tmp_env = env
         while not isinstance(tmp_env.env, FixedGainsVelocityControlWrapper):
@@ -62,6 +65,7 @@ class VelocityControlEvaluator(ControllerEvaluator):
 
     def visualize_targets(self) -> None:
         env = gym.make(self.env_id)
+        self._prepare_env(env)
         env.reset()
         for target in self.targets:
             self._set_state(env, target[0])
@@ -74,6 +78,7 @@ class VelocityControlEvaluator(ControllerEvaluator):
         render: bool = False,
     ) -> float:
         env = gym.make(self.env_id, gains=gains["gains"], normalize=False)
+        self._prepare_env(env)
         env.seed(23)
         assert check_wrapped(env, FixedGainsVelocityControlWrapper)
         joint_vel_errors = []
@@ -81,7 +86,7 @@ class VelocityControlEvaluator(ControllerEvaluator):
             for _ in range(self.repetitions_per_target):
                 env.reset()
                 self._set_state(env, target[0])
-                _, _, _, _ = env.step(target[1])
+                env.step(target[1])
                 if render:
                     env.render()
                 diff = env.actuator_velocities - target[1]
