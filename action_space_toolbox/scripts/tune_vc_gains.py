@@ -1,46 +1,14 @@
-import random
 from argparse import ArgumentParser
-from typing import Tuple, Sequence
+from datetime import datetime
+from pathlib import Path
 
-import gym
 import gym.envs.mujoco
 import numpy as np
 
-from action_space_toolbox.scripts.evaluate_vc_gains import (
-    evaluate_vc_gains,
-    sample_targets,
-    State,
-    visualize_targets,
+from action_space_toolbox.tuning.tune_controller_gains import tune_controller_gains
+from action_space_toolbox.tuning.velocity_control_evaluator import (
+    VelocityControlEvaluator,
 )
-
-
-def tune_vc_gains(
-    env_id: str,
-    targets: Sequence[Tuple[State, np.ndarray]],
-    num_iterations: int,
-    gains_exp_low: float,
-    gains_exp_high: float,
-    repetitions_per_target: int,
-) -> Tuple[np.ndarray, np.ndarray]:
-    temp_env = gym.make(env_id)
-    action_shape = temp_env.action_space.shape
-    best_loss = float("inf")
-    best_gains = None
-    for i in range(num_iterations):
-        gains = 10 ** np.random.uniform(
-            gains_exp_low, gains_exp_high, size=action_shape
-        )
-        env = gym.make(env_id, gains=gains)
-        env.seed(42)
-        loss = evaluate_vc_gains(env, targets, repetitions_per_target)
-        print(f"Iteration: {i + 1}/{num_iterations}, gains: {gains}, loss: {loss}")
-        if loss < best_loss:
-            best_gains = gains
-            best_loss = loss
-
-    print(f"best: gains: {best_gains}, loss: {best_loss}")
-    return best_gains
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -53,22 +21,28 @@ if __name__ == "__main__":
     parser.add_argument("--repetitions-per-target", type=int, default=1)
     args = parser.parse_args()
 
-    random.seed(42)
-    targets = sample_targets(args.env_id, args.targets_to_sample)
-
-    if args.visualize_targets:
-        env = gym.make(args.env_id)
-        visualize_targets(env, targets)
-
-    tuned_gains = tune_vc_gains(
-        args.env_id,
-        targets,
-        args.num_iterations,
-        args.gains_exp_low,
-        args.gains_exp_high,
-        args.repetitions_per_target,
+    evaluator = VelocityControlEvaluator(
+        args.env_id, args.targets_to_sample, args.repetitions_per_target
     )
 
-    env = gym.make(args.env_id, gains=tuned_gains)
-    input("Press any key to visualize the optimized controllers.")
-    evaluate_vc_gains(env, targets, repetitions_per_target=1, render=True)
+    if args.visualize_targets:
+        evaluator.visualize_targets()
+
+    tmp_env = gym.make(args.env_id)
+    assert len(tmp_env.action_space.shape) == 1
+    action_size = tmp_env.action_space.shape[0]
+    gain_limits = {
+        "gains": np.array(
+            [[args.gains_exp_low, args.gains_exp_high] for _ in range(action_size)]
+        )
+    }
+    log_path = (
+        Path(__file__).parents[2]
+        / "logs"
+        / "tuning_results"
+        / "vc"
+        / f"{args.env_id}_{datetime.now().strftime('%y-%m-%d_%H-%M-%S')}.json"
+    )
+    tuned_gains = tune_controller_gains(
+        evaluator, args.num_iterations, gain_limits, log_path
+    )
