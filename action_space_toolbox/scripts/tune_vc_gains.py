@@ -19,10 +19,11 @@ if __name__ == "__main__":
     parser.add_argument("--visualize-targets", action="store_true")
     parser.add_argument("--targets-to-sample", type=int, default=1000)
     parser.add_argument("--repetitions-per-target", type=int, default=1)
+    parser.add_argument("--num-episodes-to-sample-targets-from", type=int, default=500)
     args = parser.parse_args()
 
     evaluator = VelocityControlEvaluator(
-        args.env_id, args.targets_to_sample, args.repetitions_per_target
+        args.env_id, args.targets_to_sample, args.repetitions_per_target, args.num_episodes_to_sample_targets_from
     )
 
     if args.visualize_targets:
