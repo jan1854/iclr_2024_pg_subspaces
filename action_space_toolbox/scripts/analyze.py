@@ -41,7 +41,7 @@ def analysis_worker(
         analysis_cfg,
         env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
         agent_factory=functools.partial(
-            agent_class.load, agent_checkpoint, env, device=device
+            agent_class.load, agent_checkpoint, device=device
         ),
         run_dir=run_dir,
     )
@@ -56,7 +56,7 @@ def get_step_from_checkpoint(file_name: str) -> int:
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="analyze")
-def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
+def analyze(cfg: omegaconf.DictConfig) -> None:
     logger.info(f"Analyzing results in {cfg.train_logs}")
     train_logs = Path(cfg.train_logs)
     if (train_logs / "checkpoints").exists():
@@ -136,4 +136,4 @@ def gradient_analysis(cfg: omegaconf.DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    gradient_analysis()
+    analyze()

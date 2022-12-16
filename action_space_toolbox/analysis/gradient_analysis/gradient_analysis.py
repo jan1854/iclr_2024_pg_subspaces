@@ -2,7 +2,7 @@ import functools
 import logging
 import pickle
 from pathlib import Path
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Union
 
 import gym
 import numpy as np
@@ -10,10 +10,7 @@ import stable_baselines3.common.callbacks
 import torch
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
-from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
-from torch.nn import functional as F
-from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.gradient_analysis.value_function import (
@@ -35,10 +32,11 @@ class GradientAnalysis(Analysis):
     def __init__(
         self,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[[Union[gym.Env, VecEnv]], stable_baselines3.ppo.PPO],
         run_dir: Path,
         num_gradient_estimates: int = 500,
         samples_true_gradient: int = 10**7,
+        gt_value_function_analysis: bool = False,
         epochs_gt_value_function_training: int = 1,
         dump_gt_value_function_dataset: bool = False,
     ):
@@ -47,6 +45,7 @@ class GradientAnalysis(Analysis):
         )
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
+        self.gt_value_function_analysis = gt_value_function_analysis
         self.epochs_gt_value_function_training = epochs_gt_value_function_training
         self._dump_gt_value_function_dataset = dump_gt_value_function_dataset
 
@@ -62,7 +61,7 @@ class GradientAnalysis(Analysis):
         )
 
     def analysis_worker(self, env_step: int, show_progress: bool) -> TensorboardLogs:
-        agent = self.agent_factory()
+        agent = self.agent_factory(self.env_factory())
         env = DummyVecEnv([self.env_factory])
         value_function_trainer = ValueFunctionTrainer(agent.batch_size)
 
@@ -102,63 +101,6 @@ class GradientAnalysis(Analysis):
         )
 
         logs = TensorboardLogs()
-
-        states_gt, values_gt = self._compute_gt_values(
-            rollout_buffer_true_gradient, get_episode_length(env.envs[0])
-        )
-        states_gt = torch.tensor(states_gt, device=agent.device)
-        values_gt = torch.tensor(values_gt, device=agent.device)
-        if self._dump_gt_value_function_dataset:
-            gt_value_function_dataset_dir = Path("gt_value_function_datasets")
-            gt_value_function_dataset_dir.mkdir(exist_ok=True)
-            dump_path = gt_value_function_dataset_dir / f"step_{env_step:07d}.pkl"
-            with dump_path.open("wb") as file:
-                pickle.dump({"states": states_gt, "values": values_gt}, file)
-        value_function_gt_mre = metrics.mean_relative_error(
-            policy.predict_values(states_gt), values_gt
-        )
-
-        gt_value_function = ValueFunction(
-            policy.features_dim,
-            policy.net_arch,
-            policy.activation_fn,
-            policy.ortho_init,
-            policy.init_weights,
-            policy.device,
-        )
-        # TODO: stable-baselines3 supports learning rate schedules, this could make using simply the current learning
-        #  rate sub-optimal
-        value_function_optimizer = policy.optimizer_class(
-            gt_value_function.parameters(),
-            lr=policy.optimizer.param_groups[0]["lr"],
-            **policy.optimizer_kwargs,
-        )
-        fit_value_function_logs = value_function_trainer.fit_value_function(
-            gt_value_function,
-            value_function_optimizer,
-            states_gt,
-            values_gt,
-            self.epochs_gt_value_function_training,
-            env_step,
-            show_progress=show_progress,
-        )
-        logs.update(fit_value_function_logs)
-        rollout_buffer_gradient_estimates_gt_values = (
-            self._create_and_fill_gt_rollout_buffer(
-                agent, rollout_buffer_gradient_estimates, gt_value_function
-            )
-        )
-        gradient_similarity_true_gt_value = self.compute_similarity_true_gradient(
-            agent,
-            rollout_buffer_gradient_estimates_gt_values,
-            rollout_buffer_true_gradient,
-        )
-        gradient_similarity_estimates_gt_value = (
-            self.compute_gradient_estimates_similarity(
-                agent, env, rollout_buffer_gradient_estimates_gt_values
-            )
-        )
-
         logs.add_scalar(
             "gradient_analysis/similarity_estimates_true_gradient",
             gradient_similarity_true,
@@ -174,41 +116,99 @@ class GradientAnalysis(Analysis):
             value_function_gae_mre,
             env_step,
         )
-        logs.add_scalar(
-            "gradient_analysis/value_function_gt_mre",
-            value_function_gt_mre,
-            env_step,
-        )
-        logs.add_scalar(
-            "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
-            gradient_similarity_true_gt_value,
-            env_step,
-        )
-        logs.add_scalar(
-            "gradient_analysis/similarity_gradient_estimates_gt_value_function",
-            gradient_similarity_estimates_gt_value,
-            env_step,
-        )
 
-        layout = {
-            "gradient_analysis": {
-                "similarity_estimates_true_gradient": [
-                    "Multiline",
-                    [
-                        "gradient_analysis/similarity_estimates_true_gradient",
-                        "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
+        if self.gt_value_function_analysis:
+            states_gt, values_gt = self._compute_gt_values(
+                rollout_buffer_true_gradient, get_episode_length(env.envs[0])
+            )
+            states_gt = torch.tensor(states_gt, device=agent.device)
+            values_gt = torch.tensor(values_gt, device=agent.device)
+            if self._dump_gt_value_function_dataset:
+                gt_value_function_dataset_dir = Path("gt_value_function_datasets")
+                gt_value_function_dataset_dir.mkdir(exist_ok=True)
+                dump_path = gt_value_function_dataset_dir / f"step_{env_step:07d}.pkl"
+                with dump_path.open("wb") as file:
+                    pickle.dump({"states": states_gt, "values": values_gt}, file)
+            value_function_gt_mre = metrics.mean_relative_error(
+                policy.predict_values(states_gt), values_gt
+            )
+
+            gt_value_function = ValueFunction(
+                policy.features_dim,
+                policy.net_arch,
+                policy.activation_fn,
+                policy.ortho_init,
+                policy.init_weights,
+                policy.device,
+            )
+            # TODO: stable-baselines3 supports learning rate schedules, this could make using simply the current learning
+            #  rate sub-optimal
+            value_function_optimizer = policy.optimizer_class(
+                gt_value_function.parameters(),
+                lr=policy.optimizer.param_groups[0]["lr"],
+                **policy.optimizer_kwargs,
+            )
+            fit_value_function_logs = value_function_trainer.fit_value_function(
+                gt_value_function,
+                value_function_optimizer,
+                states_gt,
+                values_gt,
+                self.epochs_gt_value_function_training,
+                env_step,
+                show_progress=show_progress,
+            )
+            logs.update(fit_value_function_logs)
+            rollout_buffer_gradient_estimates_gt_values = (
+                self._create_and_fill_gt_rollout_buffer(
+                    agent, rollout_buffer_gradient_estimates, gt_value_function
+                )
+            )
+            gradient_similarity_true_gt_value = self.compute_similarity_true_gradient(
+                agent,
+                rollout_buffer_gradient_estimates_gt_values,
+                rollout_buffer_true_gradient,
+            )
+            gradient_similarity_estimates_gt_value = (
+                self.compute_gradient_estimates_similarity(
+                    agent, env, rollout_buffer_gradient_estimates_gt_values
+                )
+            )
+
+            logs.add_scalar(
+                "gradient_analysis/value_function_gt_mre",
+                value_function_gt_mre,
+                env_step,
+            )
+            logs.add_scalar(
+                "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
+                gradient_similarity_true_gt_value,
+                env_step,
+            )
+            logs.add_scalar(
+                "gradient_analysis/similarity_gradient_estimates_gt_value_function",
+                gradient_similarity_estimates_gt_value,
+                env_step,
+            )
+
+            layout = {
+                "gradient_analysis": {
+                    "similarity_estimates_true_gradient": [
+                        "Multiline",
+                        [
+                            "gradient_analysis/similarity_estimates_true_gradient",
+                            "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
+                        ],
                     ],
-                ],
-                "similarity_gradient_estimates": [
-                    "Multiline",
-                    [
-                        "gradient_analysis/similarity_gradient_estimates",
-                        "gradient_analysis/similarity_gradient_estimates_gt_value_function",
+                    "similarity_gradient_estimates": [
+                        "Multiline",
+                        [
+                            "gradient_analysis/similarity_gradient_estimates",
+                            "gradient_analysis/similarity_gradient_estimates_gt_value_function",
+                        ],
                     ],
-                ],
+                }
             }
-        }
-        logs.add_custom_scalars(layout)
+            logs.add_custom_scalars(layout)
         return logs
 
     def compute_similarity_true_gradient(

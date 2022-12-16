@@ -3,10 +3,11 @@ import logging
 
 import torch.multiprocessing
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Union
 
 import gym
 import stable_baselines3
+import stable_baselines3.common.vec_env
 import yaml
 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -20,7 +21,7 @@ class Analysis(abc.ABC):
         self,
         analysis_name: str,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]], stable_baselines3.ppo.PPO],
         run_dir: Path,
         num_processes: int,
     ):

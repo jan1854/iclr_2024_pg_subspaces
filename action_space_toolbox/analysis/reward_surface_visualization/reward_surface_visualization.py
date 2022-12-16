@@ -3,7 +3,7 @@ import logging
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Union
 
 import gym
 import numpy as np
@@ -42,7 +42,7 @@ class RewardSurfaceVisualization(Analysis):
     def __init__(
         self,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]], stable_baselines3.ppo.PPO],
         run_dir: Path,
         grid_size: int,
         magnitude: float,
@@ -94,7 +94,7 @@ class RewardSurfaceVisualization(Analysis):
             if show_progress:
                 logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
-            agent = self.agent_factory()
+            agent = self.agent_factory(self.env_factory())
             direction1 = [
                 self.sample_filter_normalized_direction(p.detach())
                 for p in agent.policy.parameters()
@@ -212,11 +212,11 @@ class RewardSurfaceVisualization(Analysis):
     def analysis_worker(
         agent_weights: Sequence[torch.Tensor],
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]], stable_baselines3.ppo.PPO],
         num_steps: int,
     ) -> AnalysisResult:
         env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
-        agent = agent_factory()
+        agent = agent_factory(env)
         rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
             num_steps,
             agent.observation_space,
