@@ -6,10 +6,50 @@ Reacher-v2:
   p_gains: 20
   d_gains: 1
 
+dmc_Cheetah-run-v1:
+  p_gains: [3.94, 56.79, 13.44, 46.08, 15.84, 50.08]
+  d_gains: [1.11, 1.06, 1.55, 2.04, 1.07, 7.08]
+
+dmc_Finger-spin-v1:
+  p_gains: [78.19, 99.4]
+  d_gains: [1.29, 1.06]
+
+dmc_Finger-turn_easy-v1:
+  p_gains: [78.19, 99.4]
+  d_gains: [1.29, 1.06]
+
+dmc_Finger-turn_hard-v1:
+  p_gains: [78.19, 99.4]
+  d_gains: [1.29, 1.06]
+
+dmc_Hopper-hop-v1:
+  p_gains: [93.17, 30.4, 89.74, 24.94]
+  d_gains: [2.88, 1.1, 4.6, 2.65]
+
+dmc_Hopper-stand-v1:
+  p_gains: [93.17, 30.4, 89.74, 24.94]
+  d_gains: [2.88, 1.1, 4.6, 2.65]
+
 dmc_Pendulum-swingup-v1:
-  p_gains: 51
-  d_gains: 26
+  p_gains: [51]
+  d_gains: [26]
 
 dmc_Reacher-easy-v1:
-  p_gains: [87, 32]
-  d_gains: [1.6, 1.4]
+  p_gains: [87.27, 75.76]
+  d_gains: [2.02, 1.03]
+
+dmc_Reacher-hard-v1:
+  p_gains: [87.27, 75.76]
+  d_gains: [2.02, 1.03]
+
+dmc_Walker-run-v1:
+  p_gains: [6.92, 76.54, 71.71, 72.36, 79.63, 62.02]
+  d_gains: [1.0, 3.19, 3.04, 2.16, 6.02, 2.0]
+
+dmc_Walker-stand-v1:
+  p_gains: [6.92, 76.54, 71.71, 72.36, 79.63, 62.02]
+  d_gains: [1.0, 3.19, 3.04, 2.16, 6.02, 2.0]
+
+dmc_Walker-walk-v1:
+  p_gains: [6.92, 76.54, 71.71, 72.36, 79.63, 62.02]
+  d_gains: [1.0, 3.19, 3.04, 2.16, 6.02, 2.0]
