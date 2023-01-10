@@ -39,7 +39,7 @@ def create_plots(
     for log_path, name in zip(log_paths, legend):
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-        event_accumulators = create_event_accumulators(tb_dirs)
+        event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
         (
             steps,
             _,
