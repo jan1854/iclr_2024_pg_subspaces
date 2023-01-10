@@ -1,0 +1,16 @@
+ppo_torque_control: Reacher_TC-v2/2022-11-14/13-55-59
+ppo_velocity_control: Reacher_VC-v2/2022-11-14/13-58-20
+ppo_position_control: Reacher_PC-v2/2022-11-14/13-57-50
+ppo_variable_gains_position_control_fixed_d_gains: Reacher_VarPC-v2/2022-11-22/17-31-39
+ppo_variable_gains_position_control_variable_d_gains: Reacher_VarPC-v2/2022-11-22/17-45-46
+ppo_variable_gains_velocity_control: Reacher_VarVC-v2/2022-12-05/17-21-10
+ppo_ideal_position_control: Reacher_OptPC-v2/2022-11-08/12-39-45
+ppo_ideal_ik_position_control: Reacher_OPT_IK_PC-v2/2022-11-08/17-30-26
+ppo_torque_control_joint_space_reward: Reacher_JointSpace_TC-v2/2022-11-11/15-34-27
+ppo_velocity_control_joint_space_reward: Reacher_JointSpace_VC-v2/2022-11-15/12-36-00
+ppo_position_control_joint_space_reward: Reacher_JointSpace_PC-v2/2022-11-11/15-34-31
+ppo_ideal_position_control_joint_space_reward: Reacher_JointSpace_OptPC-v2/2022-11-11/15-34-35
+ppo_ik_ideal_position_control_joint_space_reward: Reacher_JointSpace_OptIKPC-v2/2022-11-11/15-34-40
+sac_torque_control: Reacher_TC-v2/2022-11-16/17-53-16
+sac_velocity_control: Reacher_VC-v2/2022-11-16/17-56-36
+sac_position_control: Reacher_PC-v2/2022-11-16/17-57-34

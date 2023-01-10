@@ -1,0 +1,9 @@
+ppo_torque_control: Pendulum_TC-v1/2022-10-28/10-13-16
+ppo_position_control: Pendulum_PC-v1/2022-10-28/10-17-39
+ppo_variable_gains_position_control_fixed_d_gains: Pendulum_VarPC-v1/2022-11-22/17-37-36
+ppo_variable_gains_position_control_variable_d_gains: Pendulum_VarPC-v1/2022-11-22/17-46-51
+ppo_velocity_control: Pendulum_VC-v1/2022-11-02/12-05-17
+ppo_variable_gains_velocity_control: Pendulum_VarVC-v1/2022-12-05/17-25-26
+sac_torque_control: Pendulum_TC-v1/2022-12-01/09-04-40
+sac_position_control: Pendulum_PC-v1/2022-12-01/09-09-04
+sac_velocity_control: Pendulum_VC-v1/2022-12-01/09-10-34
