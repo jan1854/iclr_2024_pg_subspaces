@@ -30,19 +30,16 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
                 with results_path.open("rb") as results_file:
                     results = pickle.load(results_file)
                 data = results["data"]
-                coords = (
-                    np.linspace(-1.0, 1.0, num=data.shape[0]) * results["magnitude"]
-                )
 
                 plot_surface(
-                    coords,
+                    results["magnitude"],
                     data,
                     results["env_name"],
                     plot_name,
                     results["env_step"],
                     results["plot_num"],
                     plot_title,
-                    results["sampled_projected_gradient_steps"],
+                    results.get("sampled_projected_gradient_steps", []),
                     logs,
                     plot_path,
                 )
@@ -50,7 +47,7 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
 
 
 def plot_surface(
-    coords: np.ndarray,
+    magnitude: float,
     results: np.ndarray,
     env_name: str,
     plot_name: str,
@@ -62,7 +59,9 @@ def plot_surface(
     outpath: Path,
 ) -> None:
     outpath.parent.mkdir(parents=True, exist_ok=True)
-    title = f"{env_name} {title_descr}"
+    title = f"{env_name} | {title_descr} | magnitude: {magnitude}"
+
+    coords = np.linspace(-magnitude, magnitude, num=results.shape[0])
 
     fig = plotly.graph_objects.Figure(
         layout=plotly.graph_objects.Layout(
