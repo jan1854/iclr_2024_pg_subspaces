@@ -42,7 +42,10 @@ class RewardSurfaceVisualization(Analysis):
     def __init__(
         self,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[
+            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+            stable_baselines3.ppo.PPO,
+        ],
         run_dir: Path,
         grid_size: int,
         magnitude: float,
@@ -143,6 +146,10 @@ class RewardSurfaceVisualization(Analysis):
                 )
             ]
 
+            sampled_projected_gradient_steps = self.sample_projected_gradient_steps(
+                direction1, direction2, 10
+            )
+
             plot_info = {
                 "env_name": agent.env.envs[0].spec.id,
                 "env_step": env_step,
@@ -152,6 +159,7 @@ class RewardSurfaceVisualization(Analysis):
                     [d.cpu().numpy() for d in direction1],
                     [d.cpu().numpy() for d in direction2],
                 ),
+                "sampled_projected_gradient_steps": sampled_projected_gradient_steps,
             }
 
             rewards_undiscounted = np.array(
@@ -212,7 +220,10 @@ class RewardSurfaceVisualization(Analysis):
     def analysis_worker(
         agent_weights: Sequence[torch.Tensor],
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[
+            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+            stable_baselines3.ppo.PPO,
+        ],
         num_steps: int,
     ) -> AnalysisResult:
         env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
@@ -304,6 +315,45 @@ class RewardSurfaceVisualization(Analysis):
             raise ValueError(
                 f"Only 1, 2, 4 dimensional filters allowed, got {param.shape}."
             )
+
+    def sample_projected_gradient_steps(
+        self,
+        direction1: Sequence[torch.Tensor],
+        direction2: Sequence[torch.Tensor],
+        num_samples: int,
+    ) -> np.ndarray:
+        projected_parameters = []
+        for _ in range(num_samples):
+            agent = self.agent_factory(self.env_factory())
+            rollout_buffer_gradient_step = (
+                stable_baselines3.common.buffers.RolloutBuffer(
+                    agent.n_steps,
+                    agent.observation_space,
+                    agent.action_space,
+                    agent.device,
+                    agent.gae_lambda,
+                    agent.gamma,
+                )
+            )
+            fill_rollout_buffer(agent, agent.env, rollout_buffer_gradient_step)
+            loss = ppo_loss(
+                agent, next(rollout_buffer_gradient_step.get(agent.batch_size))
+            )
+            agent.policy.zero_grad()
+            loss.backward()
+            agent.policy.optimizer.step()
+            direction1_vec = torch.cat([d.flatten() for d in direction1])
+            direction2_vec = torch.cat([d.flatten() for d in direction2])
+            directions = torch.stack((direction1_vec, direction2_vec), dim=1)
+            new_parameters = torch.cat([p.flatten() for p in agent.policy.parameters()])
+            # Projection matrix: (directions^T @ directions)^(-1) @ directions^T
+            curr_projected_parameters = torch.linalg.solve(
+                directions.T @ directions, directions.T @ new_parameters
+            )
+            projected_parameters.append(
+                curr_projected_parameters.detach().cpu().numpy()
+            )
+        return np.stack(projected_parameters)
 
     @staticmethod
     def _result_filename(plot_name: str, env_step: int, plot_idx: int) -> str:

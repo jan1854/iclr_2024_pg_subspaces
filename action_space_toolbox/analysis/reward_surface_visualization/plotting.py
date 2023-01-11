@@ -3,9 +3,10 @@ from pathlib import Path
 
 import PIL.Image
 import numpy as np
+import plotly.graph_objects
+
 from PIL import Image
-from matplotlib import pyplot as plt, cm
-from mpl_toolkits.mplot3d import Axes3D
+from scipy.interpolate import RegularGridInterpolator
 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
@@ -23,7 +24,7 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
 
     for plot_name, plot_title in PLOT_NAME_TO_TITLE_DESCR.items():
         for results_path in (analysis_dir / plot_name / "data").iterdir():
-            plot_path = results_path.parents[1] / results_path.with_suffix(".png").name
+            plot_path = results_path.parents[1] / results_path.with_suffix("").name
 
             if not plot_path.exists() or overwrite:
                 with results_path.open("rb") as results_file:
@@ -41,6 +42,7 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
                     results["env_step"],
                     results["plot_num"],
                     plot_title,
+                    results["sampled_projected_gradient_steps"],
                     logs,
                     plot_path,
                 )
@@ -55,58 +57,63 @@ def plot_surface(
     env_step: int,
     plot_nr: int,
     title_descr: str,
+    projected_gradient_steps: np.ndarray,
     logs: TensorboardLogs,
     outpath: Path,
 ) -> None:
-    x_coords, y_coords = np.meshgrid(coords, coords)
     outpath.parent.mkdir(parents=True, exist_ok=True)
     title = f"{env_name} {title_descr}"
 
-    fig = plt.figure()
-    ax = Axes3D(fig, auto_add_to_figure=False)
-    fig.add_axes(ax)
-
-    if title is not None:
-        fig.suptitle(title)
+    fig = plotly.graph_objects.Figure(
+        layout=plotly.graph_objects.Layout(
+            margin=plotly.graph_objects.layout.Margin(l=20, r=20, t=50, b=25)
+        )
+    )
 
     # Plot surface
-    surf = ax.plot_surface(
-        x_coords,
-        y_coords,
-        results,
-        cmap=cm.coolwarm,
-        linewidth=0,
-        antialiased=False,
-        zorder=5,
+    fig.add_surface(
+        z=results,
+        x=coords,
+        y=coords,
+        colorscale="RdBu",
+        reversescale=True,
     )
 
-    # Plot center line above surface
     Z_range = abs(np.max(results) - np.min(results))
-    zline_above = np.linspace(
-        results[len(results) // 2][len(results[0]) // 2],
-        np.max(results) + (Z_range * 0.1),
-        4,
+    fig.add_scatter3d(
+        x=[0.0, 0.0],
+        y=[0.0, 0.0],
+        z=[np.min(results) - 0.1 * Z_range, np.max(results) + 0.1 * Z_range],
+        mode="lines",
+        line_width=8,
+        line_color="black",
+        showlegend=False,
     )
-    xline_above = 0 * zline_above
-    yline_above = 0 * zline_above
-    ax.plot3D(xline_above, yline_above, zline_above, "black", zorder=10)
+    interpolator = RegularGridInterpolator((coords, coords), results, method="linear")
+    result_curr_policy = interpolator(np.zeros(2))
 
-    # Plot center line below surface
-    zline_below = np.linspace(
-        results[len(results) // 2][len(results[0]) // 2],
-        np.min(results) - (Z_range * 0.1),
-        4,
-    )
-    xline_below = 0 * zline_below
-    yline_below = 0 * zline_below
-    ax.plot3D(xline_below, yline_below, zline_below, "black", zorder=0)
+    for grad_step in projected_gradient_steps:
+        # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
+        fig.add_scatter3d(
+            x=[0.0, grad_step[1]],
+            y=[0.0, grad_step[0]],
+            z=[
+                result_curr_policy.item() + 0.001 * Z_range,
+                interpolator(grad_step).item() + 0.001 * Z_range,
+            ],
+            mode="lines",
+            line_width=6,
+            line_color="black",
+            showlegend=False,
+            opacity=0.2,
+        )
 
-    fig.colorbar(surf, shrink=0.5, aspect=5, pad=0.05)
+    if title is not None:
+        fig.update_layout(title=title)
 
-    fig.savefig(outpath, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-
-    with Image.open(outpath) as im:
+    fig.write_image(outpath.with_suffix(".png"), scale=5)
+    fig.write_html(outpath.with_suffix(".html"))
+    with Image.open(outpath.with_suffix(".png")) as im:
         # Make the image smaller so that it fits better in tensorboard
-        im = im.resize((im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS)
+        im = im.resize((im.width // 5, im.height // 5), PIL.Image.Resampling.LANCZOS)
         logs.add_image(f"{plot_name}/{plot_nr}", im, env_step)
