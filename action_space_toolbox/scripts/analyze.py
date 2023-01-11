@@ -41,7 +41,7 @@ def analysis_worker(
         analysis_cfg,
         env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
         agent_factory=functools.partial(
-            agent_class.load, agent_checkpoint, device=device
+            agent_class.load, agent_checkpoint, device=device, tensorboard_log=None
         ),
         run_dir=run_dir,
     )
