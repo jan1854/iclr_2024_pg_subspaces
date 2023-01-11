@@ -17,9 +17,11 @@ dependencies = [
     "dmc2gym @ git+https://github.com/denisyarats/dmc2gym.git",
     "gym[mujoco]",
     "hydra-core",
+    "kaleido",
     "numpy",
     "omegaconf",
     "Pillow",
+    "plotly",
     "stable-baselines3",
     "tensorboard",
     "torch"
