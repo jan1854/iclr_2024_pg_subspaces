@@ -20,12 +20,17 @@ class Analysis(abc.ABC):
     def __init__(
         self,
         analysis_name: str,
+        analysis_run_id: str,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]], stable_baselines3.ppo.PPO],
+        agent_factory: Callable[
+            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+            stable_baselines3.ppo.PPO,
+        ],
         run_dir: Path,
         num_processes: int,
     ):
         self.analysis_name = analysis_name
+        self.analysis_run_id = analysis_run_id
         self.env_factory = env_factory
         self.agent_factory = agent_factory
         self.run_dir = run_dir
@@ -46,7 +51,11 @@ class Analysis(abc.ABC):
             analyses_logs = yaml.safe_load(analyses_log_file)
         if analyses_logs is None:
             analyses_logs = {}
-        curr_analysis_logs = analyses_logs.get(self.analysis_name, [])
+        if self.analysis_name not in analyses_logs:
+            analyses_logs[self.analysis_name] = {}
+        curr_analysis_logs = analyses_logs[self.analysis_name].get(
+            self.analysis_run_id, []
+        )
         if env_step not in curr_analysis_logs or overwrite_results:
             with torch.multiprocessing.get_context("spawn").Pool(
                 self.num_processes
@@ -57,7 +66,9 @@ class Analysis(abc.ABC):
             if env_step not in curr_analysis_logs:
                 # Safe that the analysis was done for this step
                 curr_analysis_logs = sorted(curr_analysis_logs + [env_step])
-                analyses_logs[self.analysis_name] = curr_analysis_logs
+                analyses_logs[self.analysis_name][
+                    self.analysis_run_id
+                ] = curr_analysis_logs
                 with self._analyses_log_file.open("w") as analyses_log_file:
                     yaml.dump(analyses_logs, analyses_log_file)
             self._new_data_indicator.touch()

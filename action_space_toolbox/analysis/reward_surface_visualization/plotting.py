@@ -41,6 +41,7 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
                     plot_title,
                     results.get("sampled_projected_gradient_steps", []),
                     logs,
+                    analysis_dir.name,
                     plot_path,
                 )
     return logs
@@ -56,6 +57,7 @@ def plot_surface(
     title_descr: str,
     projected_gradient_steps: np.ndarray,
     logs: TensorboardLogs,
+    analysis_run_id: str,
     outpath: Path,
 ) -> None:
     outpath.parent.mkdir(parents=True, exist_ok=True)
@@ -116,4 +118,4 @@ def plot_surface(
     with Image.open(outpath.with_suffix(".png")) as im:
         # Make the image smaller so that it fits better in tensorboard
         im = im.resize((im.width // 5, im.height // 5), PIL.Image.Resampling.LANCZOS)
-        logs.add_image(f"{plot_name}/{plot_nr}", im, env_step)
+        logs.add_image(f"{plot_name}/{analysis_run_id}/{plot_nr}", im, env_step)

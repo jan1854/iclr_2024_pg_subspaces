@@ -41,6 +41,7 @@ class AnalysisResult:
 class RewardSurfaceVisualization(Analysis):
     def __init__(
         self,
+        analysis_run_id: str,
         env_factory: Callable[[], gym.Env],
         agent_factory: Callable[
             [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
@@ -55,6 +56,7 @@ class RewardSurfaceVisualization(Analysis):
     ):
         super().__init__(
             "reward_surface_visualization",
+            analysis_run_id,
             env_factory,
             agent_factory,
             run_dir,
@@ -65,7 +67,9 @@ class RewardSurfaceVisualization(Analysis):
         self.num_steps = num_steps
         self.num_plots = num_plots
         self.num_processes = num_processes
-        self.out_dir = run_dir / "analyses" / "reward_surface_visualization"
+        self.out_dir = (
+            run_dir / "analyses" / "reward_surface_visualization" / analysis_run_id
+        )
         self.out_dir.mkdir(exist_ok=True, parents=True)
         self.reward_undiscounted_data_dir = (
             self.out_dir / "reward_surface_undiscounted" / "data"

@@ -23,5 +23,6 @@ if __name__ == "__main__":
 
     logdir = Path(args.logdir)
     analysis_dir = logdir / "analyses" / "reward_surface_visualization"
-    summary_writer = SummaryWriter(str(logdir / "tensorboard"))
-    create_reward_surface_plots(analysis_dir, summary_writer)
+    for curr_analysis_dir in analysis_dir.iterdir():
+        summary_writer = SummaryWriter(str(logdir / "tensorboard"))
+        create_reward_surface_plots(curr_analysis_dir, summary_writer)

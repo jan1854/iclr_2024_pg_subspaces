@@ -102,17 +102,17 @@ class GradientAnalysis(Analysis):
 
         logs = TensorboardLogs()
         logs.add_scalar(
-            "gradient_analysis/similarity_estimates_true_gradient",
+            f"gradient_analysis/{self.analysis_run_id}/similarity_estimates_true_gradient",
             gradient_similarity_true,
             env_step,
         )
         logs.add_scalar(
-            "gradient_analysis/similarity_gradient_estimates",
+            f"gradient_analysis/{self.analysis_run_id}/similarity_gradient_estimates",
             gradient_similarity_estimates,
             env_step,
         )
         logs.add_scalar(
-            "gradient_analysis/value_function_gae_mre",
+            f"gradient_analysis/{self.analysis_run_id}/value_function_gae_mre",
             value_function_gae_mre,
             env_step,
         )
@@ -175,35 +175,35 @@ class GradientAnalysis(Analysis):
             )
 
             logs.add_scalar(
-                "gradient_analysis/value_function_gt_mre",
+                f"gradient_analysis/{self.analysis_run_id}/value_function_gt_mre",
                 value_function_gt_mre,
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
+                f"gradient_analysis/{self.analysis_run_id}/similarity_estimates_true_gradient_gt_value_function",
                 gradient_similarity_true_gt_value,
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/similarity_gradient_estimates_gt_value_function",
+                f"gradient_analysis/{self.analysis_run_id}/similarity_gradient_estimates_gt_value_function",
                 gradient_similarity_estimates_gt_value,
                 env_step,
             )
 
             layout = {
-                "gradient_analysis": {
+                f"gradient_analysis/{self.analysis_run_id}/": {
                     "similarity_estimates_true_gradient": [
                         "Multiline",
                         [
-                            "gradient_analysis/similarity_estimates_true_gradient",
-                            "gradient_analysis/similarity_estimates_true_gradient_gt_value_function",
+                            f"gradient_analysis/{self.analysis_run_id}/similarity_estimates_true_gradient",
+                            f"gradient_analysis/{self.analysis_run_id}/similarity_estimates_true_gradient_gt_value_function",
                         ],
                     ],
-                    "similarity_gradient_estimates": [
+                    f"similarity_gradient_estimates/{self.analysis_run_id}/": [
                         "Multiline",
                         [
-                            "gradient_analysis/similarity_gradient_estimates",
-                            "gradient_analysis/similarity_gradient_estimates_gt_value_function",
+                            f"gradient_analysis/{self.analysis_run_id}/similarity_gradient_estimates",
+                            f"gradient_analysis/{self.analysis_run_id}/similarity_gradient_estimates_gt_value_function",
                         ],
                     ],
                 }
