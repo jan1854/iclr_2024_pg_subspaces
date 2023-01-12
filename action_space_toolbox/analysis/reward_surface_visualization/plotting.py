@@ -92,6 +92,9 @@ def plot_surface(
     result_curr_policy = interpolator(np.zeros(2))
 
     for grad_step in projected_gradient_steps:
+        # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
+        # error).
+        grad_step = np.clip(grad_step, -magnitude, magnitude)
         # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
         fig.add_scatter3d(
             x=[0.0, grad_step[1]],
