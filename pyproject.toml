@@ -22,6 +22,7 @@ dependencies = [
     "omegaconf",
     "Pillow",
     "plotly",
+    "scipy",
     "stable-baselines3",
     "tensorboard",
     "torch"
