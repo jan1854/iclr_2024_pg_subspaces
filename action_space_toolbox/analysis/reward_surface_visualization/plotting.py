@@ -89,20 +89,17 @@ def plot_surface(
         showlegend=False,
     )
     interpolator = RegularGridInterpolator((coords, coords), results, method="linear")
-    result_curr_policy = interpolator(np.zeros(2))
 
     for grad_step in projected_gradient_steps:
         # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
         # error).
-        grad_step = np.clip(grad_step, -magnitude, magnitude)
+        grad_step = np.clip(grad_step, -magnitude + 1e-6, magnitude - 1e-6)
+        visualization_steps = np.linspace(np.zeros(2), grad_step, 100)
         # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
         fig.add_scatter3d(
-            x=[0.0, grad_step[1]],
-            y=[0.0, grad_step[0]],
-            z=[
-                result_curr_policy.item() + 0.001 * Z_range,
-                interpolator(grad_step).item() + 0.001 * Z_range,
-            ],
+            x=visualization_steps[:, 1],
+            y=visualization_steps[:, 0],
+            z=interpolator(visualization_steps) + 0.001 * Z_range,
             mode="lines",
             line_width=6,
             line_color="black",
