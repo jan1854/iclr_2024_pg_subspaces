@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 class GradientAnalysis(Analysis):
     def __init__(
         self,
+        analysis_run_id: str,
         env_factory: Callable[[], gym.Env],
         agent_factory: Callable[[Union[gym.Env, VecEnv]], stable_baselines3.ppo.PPO],
         run_dir: Path,
@@ -41,7 +42,12 @@ class GradientAnalysis(Analysis):
         dump_gt_value_function_dataset: bool = False,
     ):
         super().__init__(
-            "gradient_analysis", env_factory, agent_factory, run_dir, num_processes=1
+            "gradient_analysis",
+            analysis_run_id,
+            env_factory,
+            agent_factory,
+            run_dir,
+            num_processes=1,
         )
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
@@ -452,7 +458,8 @@ class GradientAnalysis(Analysis):
     def _ppo_gradient(
         self, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
     ) -> torch.Tensor:
-        loss = ppo_loss(agent, rollout_data)
+        # TODO: This current includes both the gradients for the policy and the value function, should it be this way?
+        loss, _ = ppo_loss(agent, rollout_data)
         agent.policy.zero_grad()
         loss.backward()
         return torch.cat([p.grad.flatten() for p in agent.policy.parameters()])

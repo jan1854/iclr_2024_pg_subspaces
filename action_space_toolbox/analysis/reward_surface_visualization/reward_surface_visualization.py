@@ -1,6 +1,7 @@
 import functools
 import logging
 import pickle
+from collections import namedtuple
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence, Union, Tuple
@@ -30,12 +31,12 @@ torch.set_num_threads(1)
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class AnalysisResult:
-    reward_undiscounted: float
-    reward_discounted: float
-    ppo_loss: float
+RewardSurfaceAnalysisResult = namedtuple(
+    "RewardSurfaceAnalysisResult", "reward_undiscounted reward_discounted"
+)
+LossSurfaceAnalysisResult = namedtuple(
+    "LossSurfaceAnalysisResult", "losses policy_ratios"
+)
 
 
 class RewardSurfaceVisualization(Analysis):
@@ -131,19 +132,30 @@ class RewardSurfaceVisualization(Analysis):
                 item for sublist in weights_offsets for item in sublist
             ]
 
-            analysis_results_iter = process_pool.imap(
+            reward_surface_results_iter = process_pool.imap(
                 functools.partial(
-                    self.analysis_worker,
+                    self.reward_surface_analysis_worker,
                     env_factory=self.env_factory,
                     agent_factory=self.agent_factory,
                     num_steps=self.num_steps,
                 ),
                 weights_offsets_flat,
             )
-            analysis_results_flat = [
+
+            loss_surface_results = process_pool.apply_async(
+                self.loss_surface_analysis_worker,
+                args=(
+                    weights_offsets,
+                    self.env_factory,
+                    self.agent_factory,
+                    self.num_steps,
+                ),
+            )
+
+            reward_surface_results_flat = [
                 r
                 for r in tqdm(
-                    analysis_results_iter,
+                    reward_surface_results_iter,
                     disable=not show_progress,
                     mininterval=120,
                     total=self.grid_size**2,
@@ -154,6 +166,8 @@ class RewardSurfaceVisualization(Analysis):
                 projected_optimizer_steps,
                 projected_sgd_steps,
             ) = self.sample_projected_gradient_steps(direction1, direction2, 10)
+
+            loss_surface_results = loss_surface_results.get()
 
             plot_info = {
                 "env_name": agent.env.envs[0].spec.id,
@@ -166,10 +180,11 @@ class RewardSurfaceVisualization(Analysis):
                 ),
                 "sampled_projected_optimizer_steps": projected_optimizer_steps,
                 "sampled_projected_sgd_steps": projected_sgd_steps,
+                "policy_ratio": loss_surface_results.policy_ratios,
             }
 
             rewards_undiscounted = np.array(
-                [result.reward_undiscounted for result in analysis_results_flat]
+                [result.reward_undiscounted for result in reward_surface_results_flat]
             ).reshape(self.grid_size, self.grid_size)
             self.reward_undiscounted_data_dir.mkdir(parents=True, exist_ok=True)
             rewards_undiscounted_file = (
@@ -180,7 +195,7 @@ class RewardSurfaceVisualization(Analysis):
                 pickle.dump(plot_info | {"data": rewards_undiscounted}, f)
 
             rewards_discounted = np.array(
-                [result.reward_discounted for result in analysis_results_flat]
+                [result.reward_discounted for result in reward_surface_results_flat]
             ).reshape(self.grid_size, self.grid_size)
             self.reward_discounted_data_dir.mkdir(parents=True, exist_ok=True)
             rewards_discounted_file = (
@@ -190,16 +205,13 @@ class RewardSurfaceVisualization(Analysis):
             with rewards_discounted_file.open("wb") as f:
                 pickle.dump(plot_info | {"data": rewards_discounted}, f)
 
-            loss = np.array(
-                [result.ppo_loss for result in analysis_results_flat]
-            ).reshape(self.grid_size, self.grid_size)
             self.loss_data_dir.mkdir(parents=True, exist_ok=True)
             loss_file = (
                 self.loss_data_dir
                 / f"{self._result_filename('loss', env_step, plot_num)}.pkl"
             )
             with loss_file.open("wb") as f:
-                pickle.dump(plot_info | {"data": loss}, f)
+                pickle.dump(plot_info | {"data": loss_surface_results.losses}, f)
 
             self.negative_loss_data_dir.mkdir(parents=True, exist_ok=True)
             negative_loss_file = (
@@ -207,7 +219,7 @@ class RewardSurfaceVisualization(Analysis):
                 / f"{self._result_filename('negative_loss', env_step, plot_num)}.pkl"
             )
             with negative_loss_file.open("wb") as f:
-                pickle.dump(plot_info | {"data": -loss}, f)
+                pickle.dump(plot_info | {"data": -loss_surface_results.losses}, f)
 
             # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
             # https://matplotlib.org/3.1.0/faq/howto_faq.html#working-with-threads)
@@ -225,7 +237,7 @@ class RewardSurfaceVisualization(Analysis):
         return logs
 
     @staticmethod
-    def analysis_worker(
+    def reward_surface_analysis_worker(
         agent_weights: Sequence[torch.Tensor],
         env_factory: Callable[[], gym.Env],
         agent_factory: Callable[
@@ -233,17 +245,9 @@ class RewardSurfaceVisualization(Analysis):
             stable_baselines3.ppo.PPO,
         ],
         num_steps: int,
-    ) -> AnalysisResult:
+    ) -> RewardSurfaceAnalysisResult:
         env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
         agent = agent_factory(env)
-        rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
-            num_steps,
-            agent.observation_space,
-            agent.action_space,
-            "cpu",
-            agent.gae_lambda,
-            agent.gamma,
-        )
         rollout_buffer_no_value_bootstrap = (
             stable_baselines3.common.buffers.RolloutBuffer(
                 num_steps,
@@ -260,7 +264,7 @@ class RewardSurfaceVisualization(Analysis):
         fill_rollout_buffer(
             agent,
             env,
-            rollout_buffer,
+            None,
             rollout_buffer_no_value_bootstrap,
             show_progress=False,
         )
@@ -290,11 +294,53 @@ class RewardSurfaceVisualization(Analysis):
             episode_rewards_discounted.append(curr_reward_discounted)
         mean_episode_reward_undiscounted = np.mean(episode_rewards_undiscounted)
         mean_episode_reward_discounted = np.mean(episode_rewards_discounted)
-        loss = ppo_loss(agent, next(rollout_buffer.get()))
-        return AnalysisResult(
-            mean_episode_reward_undiscounted,
-            mean_episode_reward_discounted,
-            loss.item(),
+        return RewardSurfaceAnalysisResult(
+            mean_episode_reward_undiscounted, mean_episode_reward_discounted
+        )
+
+    @staticmethod
+    def loss_surface_analysis_worker(
+        all_agent_weights: Sequence[Sequence[Sequence[torch.Tensor]]],
+        env_factory: Callable[[], gym.Env],
+        agent_factory: Callable[
+            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+            stable_baselines3.ppo.PPO,
+        ],
+        num_steps: int,
+    ) -> LossSurfaceAnalysisResult:
+        grid_size = len(all_agent_weights)
+        env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
+        agent = agent_factory(env)
+        rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
+            num_steps,
+            agent.observation_space,
+            agent.action_space,
+            "cpu",
+            agent.gae_lambda,
+            agent.gamma,
+        )
+        fill_rollout_buffer(
+            agent,
+            env,
+            rollout_buffer,
+            None,
+            show_progress=False,
+        )
+        losses = []
+        policy_ratios = []
+        all_agent_weights_flat = [w for ws in all_agent_weights for w in ws]
+        for agent_weights in all_agent_weights_flat:
+            with torch.no_grad():
+                for parameters, weights in zip(
+                    agent.policy.parameters(), agent_weights
+                ):
+                    parameters.data[:] = weights
+            loss, policy_ratio = ppo_loss(agent, next(rollout_buffer.get()))
+            losses.append(loss.item())
+            policy_ratios.append(policy_ratio.item())
+        return LossSurfaceAnalysisResult(
+            np.array(losses).reshape(grid_size, grid_size),
+            np.array(policy_ratios).reshape(grid_size, grid_size),
         )
 
     @staticmethod
@@ -353,7 +399,7 @@ class RewardSurfaceVisualization(Analysis):
                 )
             )
             fill_rollout_buffer(agent, agent.env, rollout_buffer_gradient_step)
-            loss = ppo_loss(
+            loss, _ = ppo_loss(
                 agent, next(rollout_buffer_gradient_step.get(agent.batch_size))
             )
             agent.policy.zero_grad()

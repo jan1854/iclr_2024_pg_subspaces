@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import gym
 import numpy as np
@@ -13,7 +13,7 @@ from tqdm import tqdm
 def fill_rollout_buffer(
     agent: stable_baselines3.ppo.PPO,
     env: stable_baselines3.common.vec_env.VecEnv,
-    rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
+    rollout_buffer: Optional[stable_baselines3.common.buffers.RolloutBuffer],
     rollout_buffer_no_value_bootstrap: Optional[
         stable_baselines3.common.buffers.RolloutBuffer
     ] = None,
@@ -31,9 +31,16 @@ def fill_rollout_buffer(
                                                 of truncated episodes is not modified to reward + gamma * next_value)
     :param show_progress:                       Shows a progress bar if true
     """
+    assert rollout_buffer is not None or rollout_buffer_no_value_bootstrap is not None
     assert (
         rollout_buffer_no_value_bootstrap is None
+        or rollout_buffer is None
         or rollout_buffer.buffer_size == rollout_buffer_no_value_bootstrap.buffer_size
+    )
+    buffer_size = (
+        rollout_buffer.buffer_size
+        if rollout_buffer is not None
+        else rollout_buffer_no_value_bootstrap.buffer_size
     )
 
     last_obs = env.reset()
@@ -42,7 +49,8 @@ def fill_rollout_buffer(
     # Switch to eval mode (this affects batch norm / dropout)
     agent.policy.set_training_mode(False)
 
-    rollout_buffer.reset()
+    if rollout_buffer is not None:
+        rollout_buffer.reset()
     if rollout_buffer_no_value_bootstrap is not None:
         rollout_buffer_no_value_bootstrap.reset()
     # Sample new weights for the state dependent exploration
@@ -50,7 +58,7 @@ def fill_rollout_buffer(
         agent.policy.reset_noise(env.num_envs)
 
     for n_steps in tqdm(
-        range(rollout_buffer.buffer_size),
+        range(buffer_size),
         disable=not show_progress,
         mininterval=300,
         desc="Collecting samples",
@@ -100,14 +108,15 @@ def fill_rollout_buffer(
                     terminal_value = agent.policy.predict_values(terminal_obs)[0]
                 rewards[idx] += agent.gamma * terminal_value
 
-        rollout_buffer.add(
-            last_obs,
-            actions,
-            rewards,
-            last_episode_starts,
-            values,
-            log_probs,
-        )
+        if rollout_buffer is not None:
+            rollout_buffer.add(
+                last_obs,
+                actions,
+                rewards,
+                last_episode_starts,
+                values,
+                log_probs,
+            )
         if rollout_buffer_no_value_bootstrap is not None:
             rollout_buffer_no_value_bootstrap.add(
                 last_obs,
@@ -124,8 +133,8 @@ def fill_rollout_buffer(
     with torch.no_grad():
         # Compute value for the last timestep
         values = agent.policy.predict_values(obs_as_tensor(new_obs, agent.device))
-
-    rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
+    if rollout_buffer is not None:
+        rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
     if rollout_buffer_no_value_bootstrap is not None:
         rollout_buffer_no_value_bootstrap.compute_returns_and_advantage(
             last_values=values, dones=dones
@@ -135,7 +144,7 @@ def fill_rollout_buffer(
 def ppo_loss(
     agent: stable_baselines3.ppo.PPO,
     rollout_data: stable_baselines3.common.buffers.RolloutBufferSamples,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Calculates PPO's policy loss. This code is copied from stables-baselines3.PPO.train(). Needs to be copied since
     in the PPO implementation, the loss is not extracted to a separate method.
@@ -197,4 +206,4 @@ def ppo_loss(
         entropy_loss = -torch.mean(entropy)
 
     loss = policy_loss + agent.ent_coef * entropy_loss + agent.vf_coef * value_loss
-    return loss
+    return loss, ratio.mean()
