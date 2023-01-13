@@ -3,7 +3,7 @@ import logging
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence, Union
+from typing import Callable, Sequence, Union, Tuple
 
 import gym
 import numpy as np
@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.reward_surface_visualization.plotting import (
-    plot_all_results,
+    plot_results,
 )
 from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_loss
@@ -150,9 +150,10 @@ class RewardSurfaceVisualization(Analysis):
                 )
             ]
 
-            sampled_projected_gradient_steps = self.sample_projected_gradient_steps(
-                direction1, direction2, 10
-            )
+            (
+                projected_optimizer_steps,
+                projected_sgd_steps,
+            ) = self.sample_projected_gradient_steps(direction1, direction2, 10)
 
             plot_info = {
                 "env_name": agent.env.envs[0].spec.id,
@@ -163,7 +164,8 @@ class RewardSurfaceVisualization(Analysis):
                     [d.cpu().numpy() for d in direction1],
                     [d.cpu().numpy() for d in direction2],
                 ),
-                "sampled_projected_gradient_steps": sampled_projected_gradient_steps,
+                "sampled_projected_optimizer_steps": projected_optimizer_steps,
+                "sampled_projected_sgd_steps": projected_sgd_steps,
             }
 
             rewards_undiscounted = np.array(
@@ -212,8 +214,10 @@ class RewardSurfaceVisualization(Analysis):
             logs.update(
                 process_pool.apply(
                     functools.partial(
-                        plot_all_results,
+                        plot_results,
                         self.out_dir,
+                        step=env_step,
+                        plot_num=plot_num,
                         overwrite=overwrite_results,
                     )
                 )
@@ -325,10 +329,19 @@ class RewardSurfaceVisualization(Analysis):
         direction1: Sequence[torch.Tensor],
         direction2: Sequence[torch.Tensor],
         num_samples: int,
-    ) -> np.ndarray:
-        projected_parameters = []
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        projected_optimizer_parameters = []
+        projected_sgd_parameters = []
+
+        direction1_vec = torch.cat([d.flatten() for d in direction1])
+        direction2_vec = torch.cat([d.flatten() for d in direction2])
+        directions = torch.stack((direction1_vec, direction2_vec), dim=1).double()
+
         for _ in range(num_samples):
             agent = self.agent_factory(self.env_factory())
+            old_parameters = torch.cat(
+                [p.flatten().clone() for p in agent.policy.parameters()]
+            )
             rollout_buffer_gradient_step = (
                 stable_baselines3.common.buffers.RolloutBuffer(
                     agent.n_steps,
@@ -345,19 +358,32 @@ class RewardSurfaceVisualization(Analysis):
             )
             agent.policy.zero_grad()
             loss.backward()
+            gradient = torch.cat([p.grad.flatten() for p in agent.policy.parameters()])
+            new_sgd_parameters = (
+                old_parameters - agent.policy.optimizer.param_groups[0]["lr"] * gradient
+            )
             agent.policy.optimizer.step()
-            direction1_vec = torch.cat([d.flatten() for d in direction1])
-            direction2_vec = torch.cat([d.flatten() for d in direction2])
-            directions = torch.stack((direction1_vec, direction2_vec), dim=1)
-            new_parameters = torch.cat([p.flatten() for p in agent.policy.parameters()])
+            new_optimizer_parameters = torch.cat(
+                [p.flatten() for p in agent.policy.parameters()]
+            )
             # Projection matrix: (directions^T @ directions)^(-1) @ directions^T
-            curr_projected_parameters = torch.linalg.solve(
-                directions.T @ directions, directions.T @ new_parameters
+            curr_projected_optimizer_parameters = torch.linalg.solve(
+                directions.T @ directions,
+                directions.T @ (new_optimizer_parameters - old_parameters).double(),
             )
-            projected_parameters.append(
-                curr_projected_parameters.detach().cpu().numpy()
+            curr_projected_sgd_parameters = torch.linalg.solve(
+                directions.T @ directions,
+                directions.T @ (new_sgd_parameters - old_parameters).double(),
             )
-        return np.stack(projected_parameters)
+            projected_optimizer_parameters.append(
+                curr_projected_optimizer_parameters.detach().cpu().numpy()
+            )
+            projected_sgd_parameters.append(
+                curr_projected_sgd_parameters.detach().cpu().numpy()
+            )
+        return np.stack(projected_optimizer_parameters), np.stack(
+            projected_sgd_parameters
+        )
 
     @staticmethod
     def _result_filename(plot_name: str, env_step: int, plot_idx: int) -> str:

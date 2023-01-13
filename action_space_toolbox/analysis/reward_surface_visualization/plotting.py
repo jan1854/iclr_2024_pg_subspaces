@@ -4,7 +4,6 @@ from pathlib import Path
 import PIL.Image
 import numpy as np
 import plotly.graph_objects
-
 from PIL import Image
 from scipy.interpolate import RegularGridInterpolator
 
@@ -19,11 +18,19 @@ PLOT_NAME_TO_TITLE_DESCR = {
 }
 
 
-def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
+def plot_results(
+    analysis_dir: Path,
+    step: int,
+    plot_num: int,
+    overwrite: bool = False,
+    plot_sgd_steps: bool = False,
+) -> TensorboardLogs:
     logs = TensorboardLogs()
 
     for plot_name, plot_title in PLOT_NAME_TO_TITLE_DESCR.items():
-        for results_path in (analysis_dir / plot_name / "data").iterdir():
+        for results_path in (analysis_dir / plot_name / "data").glob(
+            f"*{step:07d}_{plot_num:02d}*"
+        ):
             plot_path = results_path.parents[1] / results_path.with_suffix("").name
 
             if not plot_path.exists() or overwrite:
@@ -31,6 +38,11 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
                     results = pickle.load(results_file)
                 data = results["data"]
 
+                sgd_steps = (
+                    results.get("sampled_projected_sgd_steps", [])
+                    if plot_sgd_steps
+                    else []
+                )
                 plot_surface(
                     results["magnitude"],
                     data,
@@ -39,7 +51,8 @@ def plot_all_results(analysis_dir: Path, overwrite=False) -> TensorboardLogs:
                     results["env_step"],
                     results["plot_num"],
                     plot_title,
-                    results.get("sampled_projected_gradient_steps", []),
+                    results.get("sampled_projected_optimizer_steps", []),
+                    sgd_steps,
                     logs,
                     analysis_dir.name,
                     plot_path,
@@ -55,7 +68,8 @@ def plot_surface(
     env_step: int,
     plot_nr: int,
     title_descr: str,
-    projected_gradient_steps: np.ndarray,
+    projected_optimizer_steps: np.ndarray,
+    projected_sgd_steps: np.ndarray,
     logs: TensorboardLogs,
     analysis_run_id: str,
     outpath: Path,
@@ -86,18 +100,31 @@ def plot_surface(
         y=[0.0, 0.0],
         z=[np.min(results) - 0.1 * Z_range, np.max(results) + 0.1 * Z_range],
         mode="lines",
-        line_width=8,
+        line_width=10,
         line_color="black",
         showlegend=False,
     )
     interpolator = RegularGridInterpolator((coords, coords), results, method="linear")
 
-    for grad_step in projected_gradient_steps:
+    for grad_step in projected_sgd_steps:
+        visualization_steps = np.linspace(np.zeros(2), -3e-4 * grad_step, 20)
+        fig.add_scatter3d(
+            x=visualization_steps[:, 1],
+            y=visualization_steps[:, 0],
+            z=interpolator(visualization_steps) + 0.001 * Z_range,
+            mode="lines",
+            line_width=6,
+            line_color="blue",
+            showlegend=False,
+            opacity=0.1,
+        )
+
+    for grad_step in projected_optimizer_steps:
         # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
         # error). Scale the gradient step to reduce the length but keep the direction the same.
-        if np.max(grad_step) > magnitude:
-            grad_step = grad_step * magnitude / np.max(grad_step) - 1e-6
-        visualization_steps = np.linspace(np.zeros(2), grad_step, 100)
+        if np.max(np.abs(grad_step)) > magnitude:
+            grad_step = grad_step * magnitude / np.max(np.abs(grad_step)) - 1e-8
+        visualization_steps = np.linspace(np.zeros(2), grad_step, 20)
         # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
         fig.add_scatter3d(
             x=visualization_steps[:, 1],
@@ -113,9 +140,9 @@ def plot_surface(
     if title is not None:
         fig.update_layout(title=title)
 
-    fig.write_image(outpath.with_suffix(".png"), scale=5)
+    fig.write_image(outpath.with_suffix(".png"), scale=2)
     fig.write_html(outpath.with_suffix(".html"))
     with Image.open(outpath.with_suffix(".png")) as im:
         # Make the image smaller so that it fits better in tensorboard
-        im = im.resize((im.width // 5, im.height // 5), PIL.Image.Resampling.LANCZOS)
+        im = im.resize((im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS)
         logs.add_image(f"{plot_name}/{analysis_run_id}/{plot_nr}", im, env_step)
