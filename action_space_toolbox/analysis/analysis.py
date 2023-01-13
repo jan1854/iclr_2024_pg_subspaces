@@ -64,7 +64,7 @@ class Analysis(abc.ABC):
                     pool, env_step, overwrite_results, show_progress
                 )
             if env_step not in curr_analysis_logs:
-                # Safe that the analysis was done for this step
+                # Save that the analysis was done for this step
                 curr_analysis_logs = sorted(curr_analysis_logs + [env_step])
                 analyses_logs[self.analysis_name][
                     self.analysis_run_id
