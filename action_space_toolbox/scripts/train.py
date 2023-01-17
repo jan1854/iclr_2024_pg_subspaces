@@ -9,6 +9,8 @@ import numpy as np
 import omegaconf
 
 import stable_baselines3.common.logger
+import stable_baselines3.common.monitor
+import stable_baselines3.common.vec_env
 import torch
 from stable_baselines3.common.callbacks import CheckpointCallback
 
@@ -23,8 +25,23 @@ from action_space_toolbox.util.sb3_custom_logger import SB3CustomLogger
 logger = logging.getLogger(__name__)
 
 
-def make_env(cfg: omegaconf.DictConfig) -> gym.Env:
-    env = gym.make(cfg.env, **cfg.env_args)
+def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
+    if cfg.num_parallel_envs == 1:
+        env = stable_baselines3.common.vec_env.DummyVecEnv(
+            [
+                lambda: stable_baselines3.common.monitor.Monitor(
+                    gym.make(cfg.env, **cfg.env_args)
+                )
+            ]
+        )
+    else:
+        env = stable_baselines3.common.vec_env.SubprocVecEnv(
+            [
+                lambda: gym.make(cfg.env, **cfg.env_args)
+                for _ in range(cfg.num_parallel_envs)
+            ]
+        )
+        env = stable_baselines3.common.vec_env.VecMonitor(env)
     return env
 
 
@@ -57,7 +74,11 @@ def train(cfg: omegaconf.DictConfig) -> None:
         "tensorboard"
     )
     algorithm.set_logger(
-        SB3CustomLogger("tensorboard", [tb_output_format], env.base_env_timestep_factor)
+        SB3CustomLogger(
+            "tensorboard",
+            [tb_output_format],
+            env.get_attr("base_env_timestep_factor")[0],
+        )
     )
     checkpoints_path = Path("checkpoints")
     checkpoints_path.mkdir()
@@ -69,7 +90,9 @@ def train(cfg: omegaconf.DictConfig) -> None:
         FixEpInfoBufferCallback(),
         AdditionalTrainingMetricsCallback(),
     ]
-    training_steps = cfg.algorithm.training.steps // env.base_env_timestep_factor
+    training_steps = (
+        cfg.algorithm.training.steps // env.get_attr("base_env_timestep_factor")[0]
+    )
     try:
         algorithm.learn(total_timesteps=training_steps, callback=callbacks)
     finally:

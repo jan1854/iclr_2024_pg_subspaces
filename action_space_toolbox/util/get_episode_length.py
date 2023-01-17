@@ -10,6 +10,7 @@ def get_episode_length(
     env: Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]
 ) -> int:
     # This is quite an ugly hack but there is no elegant way to get the environment's time limit at the moment
+    # TODO: This does not work with SubprocVecEnvs
     if isinstance(env, stable_baselines3.common.vec_env.VecEnv):
         assert len(env.envs) == 1
         env = env.envs[0]

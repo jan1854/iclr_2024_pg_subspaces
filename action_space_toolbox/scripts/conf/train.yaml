@@ -5,6 +5,7 @@ defaults:
 
 env: Pendulum_TC-v1
 env_args: {}
+num_parallel_envs: 1
 seed: null
 
 log_dir: logs

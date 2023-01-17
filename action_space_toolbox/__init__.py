@@ -63,7 +63,7 @@ def create_base_env(
     # Action repeat is handled by the ActionRepeatWrapper (accessible with the action_repeat argument to gym.make())
     assert "frame_skip" not in kwargs or kwargs["frame_skip"] == 1
     # The step limit of the environment is problematic when using a different controller frequency, therefore we disable
-    # it / set a very large value and handle termination with a TimeLimitWrapper later
+    # it / set a very large value and handle termination with a TimeLimit wrapper later
     if isinstance(base_env_type_or_id, tuple):
         if "seed" not in kwargs:
             kwargs["seed"] = random.randint(0, 2**32 - 1)
@@ -75,7 +75,7 @@ def create_base_env(
             width=640,
             **kwargs,
         )
-        # Remove the TimeLimitWrapper added by dmc2gym (see above)
+        # Remove the TimeLimit wrapper added by dmc2gym (see above)
         return time_limit_wrapped_env.env
     else:
         if base_env_type_or_id is ReacherEnv:

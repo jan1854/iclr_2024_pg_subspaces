@@ -170,7 +170,7 @@ class RewardSurfaceVisualization(Analysis):
             loss_surface_results = loss_surface_results.get()
 
             plot_info = {
-                "env_name": agent.env.envs[0].spec.id,
+                "env_name": agent.env.get_attr("spec").id[0],
                 "env_step": env_step,
                 "plot_num": plot_num,
                 "magnitude": self.magnitude,
@@ -289,7 +289,7 @@ class RewardSurfaceVisualization(Analysis):
             curr_reward_discounted += agent.gamma ** (curr_episode_length - 1) * reward
         # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
         # the episode if it has the maximum episode length.
-        if curr_episode_length == get_episode_length(env.envs[0]):
+        if curr_episode_length == get_episode_length(env):
             episode_rewards_undiscounted.append(curr_reward_undiscounted)
             episode_rewards_discounted.append(curr_reward_discounted)
         mean_episode_reward_undiscounted = np.mean(episode_rewards_undiscounted)

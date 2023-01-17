@@ -125,7 +125,7 @@ class GradientAnalysis(Analysis):
 
         if self.gt_value_function_analysis:
             states_gt, values_gt = self._compute_gt_values(
-                rollout_buffer_true_gradient, get_episode_length(env.envs[0])
+                rollout_buffer_true_gradient, get_episode_length(env)
             )
             states_gt = torch.tensor(states_gt, device=agent.device)
             values_gt = torch.tensor(values_gt, device=agent.device)
@@ -352,7 +352,7 @@ class GradientAnalysis(Analysis):
         # stable-baselines3 assumes that the rollout buffer is full. Since the exact number of samples depends on the
         # number of episodes that are terminated compared to those that are truncated, we cannot pre-allocate the buffer
         # and instead need to create an adequately-sized buffer for the data at hand.
-        episode_length = get_episode_length(agent.env.envs[0])
+        episode_length = get_episode_length(agent.env)
 
         (
             states_episodes,
