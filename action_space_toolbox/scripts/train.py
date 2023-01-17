@@ -12,6 +12,9 @@ import stable_baselines3.common.logger
 import torch
 from stable_baselines3.common.callbacks import CheckpointCallback
 
+from action_space_toolbox.callbacks.additional_training_metrics_callback import (
+    AdditionalTrainingMetricsCallback,
+)
 from action_space_toolbox.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
@@ -22,8 +25,6 @@ logger = logging.getLogger(__name__)
 
 def make_env(cfg: omegaconf.DictConfig) -> gym.Env:
     env = gym.make(cfg.env, **cfg.env_args)
-    if "action_transformation" in cfg:
-        env = hydra.utils.instantiate(cfg.action_transformation, env=env)
     return env
 
 
@@ -66,6 +67,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
     callbacks = [
         CheckpointCallback(10000, str(checkpoints_path), cfg.algorithm.name),
         FixEpInfoBufferCallback(),
+        AdditionalTrainingMetricsCallback(),
     ]
     training_steps = cfg.algorithm.training.steps // env.base_env_timestep_factor
     try:
