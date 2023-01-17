@@ -1,5 +1,6 @@
 import itertools
 import logging
+import random
 from pathlib import Path
 from typing import Type, TypeVar, Union, Sequence, Optional, Tuple
 
@@ -64,6 +65,8 @@ def create_base_env(
     # The step limit of the environment is problematic when using a different controller frequency, therefore we disable
     # it / set a very large value and handle termination with a TimeLimitWrapper later
     if isinstance(base_env_type_or_id, tuple):
+        if "seed" not in kwargs:
+            kwargs["seed"] = random.randint(0, 2**32 - 1)
         time_limit_wrapped_env = dmc2gym.make(
             base_env_type_or_id[0],
             base_env_type_or_id[1],
