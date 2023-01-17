@@ -12,7 +12,7 @@ import stable_baselines3.common.logger
 import torch
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from action_space_toolbox.util.fix_ep_info_buffer_callback import (
+from action_space_toolbox.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
 from action_space_toolbox.util.sb3_custom_logger import SB3CustomLogger
