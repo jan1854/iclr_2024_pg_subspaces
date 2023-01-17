@@ -9,7 +9,7 @@ min_interval: 200_000
 first_checkpoint: 0
 last_checkpoint: null
 checkpoints_to_analyze: null
-num_workers: 4
+num_workers: 1
 device: null
 overwrite_results: false
 
