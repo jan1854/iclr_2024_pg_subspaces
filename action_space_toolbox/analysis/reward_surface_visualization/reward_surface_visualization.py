@@ -2,7 +2,6 @@ import functools
 import logging
 import pickle
 from collections import namedtuple
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence, Union, Tuple
 
