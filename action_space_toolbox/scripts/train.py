@@ -94,7 +94,11 @@ def train(cfg: omegaconf.DictConfig) -> None:
         cfg.algorithm.training.steps // env.get_attr("base_env_timestep_factor")[0]
     )
     try:
-        algorithm.learn(total_timesteps=training_steps, callback=callbacks)
+        algorithm.learn(
+            total_timesteps=training_steps,
+            callback=callbacks,
+            progress_bar=cfg.show_progress,
+        )
     finally:
         (Path.cwd() / "done").touch()
 

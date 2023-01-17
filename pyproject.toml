@@ -22,10 +22,11 @@ dependencies = [
     "omegaconf",
     "Pillow",
     "plotly",
+    "rich",
     "scipy",
-    "stable-baselines3",
     "tensorboard",
-    "torch"
+    "torch",
+    "tqdm"
 ]
 
 [project.optional-dependencies]
