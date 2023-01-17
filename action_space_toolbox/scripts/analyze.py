@@ -87,8 +87,12 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         else:
             checkpoints_to_analyze = []
             for agent_step in checkpoint_steps:
+                env_step = agent_step * base_env_timestep_factor
+
                 if (
-                    agent_step * base_env_timestep_factor
+                    env_step >= cfg.first_checkpoint
+                    and (cfg.last_checkpoint is None or env_step <= cfg.last_checkpoint)
+                    and env_step - cfg.first_checkpoint
                     >= len(checkpoints_to_analyze) * cfg.min_interval
                 ):
                     checkpoints_to_analyze.append((log_dir, agent_step))
