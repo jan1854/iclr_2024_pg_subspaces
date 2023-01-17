@@ -81,7 +81,8 @@ def plot_surface(
 
     fig = plotly.graph_objects.Figure(
         layout=plotly.graph_objects.Layout(
-            margin=plotly.graph_objects.layout.Margin(l=20, r=20, t=50, b=25)
+            margin=plotly.graph_objects.layout.Margin(l=20, r=20, t=50, b=25),
+            scene={"aspectmode": "cube"},
         )
     )
 
