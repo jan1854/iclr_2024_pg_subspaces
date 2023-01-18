@@ -169,7 +169,7 @@ class RewardSurfaceVisualization(Analysis):
             loss_surface_results = loss_surface_results.get()
 
             plot_info = {
-                "env_name": agent.env.get_attr("spec").id[0],
+                "env_name": agent.env.get_attr("spec")[0].id,
                 "env_step": env_step,
                 "plot_num": plot_num,
                 "magnitude": self.magnitude,
