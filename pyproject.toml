@@ -24,6 +24,7 @@ dependencies = [
     "plotly",
     "rich",
     "scipy",
+    "stable-baselines3",
     "tensorboard",
     "torch",
     "tqdm"
