@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import tempfile
 from argparse import ArgumentParser
 from pathlib import Path
@@ -17,7 +18,11 @@ if __name__ == "__main__":
     if args.logdir is not None:
         training_dir = Path(args.logdir) / "training"
     else:
-        training_dir = Path(__file__).parents[2] / "logs" / "training"
+        if "ACTION_SPACE_TOOLBOX_LOG_DIR" in os.environ:
+            log_dir = Path(os.environ["ACTION_SPACE_TOOLBOX_LOG_DIR"])
+        else:
+            log_dir = Path(__file__).parents[2] / "logs"
+        training_dir = log_dir / "training"
 
     rundirs = []
     for config_name in args.config:
