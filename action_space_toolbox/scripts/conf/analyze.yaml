@@ -13,7 +13,7 @@ num_workers: 1
 device: null
 overwrite_results: false
 
-log_dir: ${oc.env:ACTION_SPACE_TOOLBOX_LOG_PATH,logs}
+log_dir: ${oc.env:ACTION_SPACE_TOOLBOX_LOG_DIR,logs}
 
 # Disable the creation of the log directory
 hydra:
