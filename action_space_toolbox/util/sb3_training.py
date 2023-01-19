@@ -60,7 +60,6 @@ def fill_rollout_buffer(
     for n_steps in tqdm(
         range(buffer_size),
         disable=not show_progress,
-        mininterval=300,
         desc="Collecting samples",
         unit="samples",
     ):

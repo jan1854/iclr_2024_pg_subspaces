@@ -95,7 +95,6 @@ class ValueFunctionTrainer:
             epochs,
             desc="Training the ground truth value function.",
             unit="epoch",
-            mininterval=300,
             disable=not show_progress,
         )
         for epoch in train_pbar:

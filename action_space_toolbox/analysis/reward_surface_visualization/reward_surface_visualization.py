@@ -156,7 +156,6 @@ class RewardSurfaceVisualization(Analysis):
                 for r in tqdm(
                     reward_surface_results_iter,
                     disable=not show_progress,
-                    mininterval=120,
                     total=self.grid_size**2,
                 )
             ]

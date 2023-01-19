@@ -100,7 +100,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
     jobs.sort(key=lambda j: (j[1], j[0]))
 
     if cfg.num_workers == 1:
-        for log_dir, agent_step in tqdm(jobs, desc="Analyzing logs", mininterval=300):
+        for log_dir, agent_step in tqdm(jobs, desc="Analyzing logs"):
             logs = analysis_worker(
                 cfg.analysis,
                 log_dir,
@@ -133,7 +133,6 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
                 zip(results, jobs),
                 total=len(jobs),
                 desc="Analyzing logs",
-                mininterval=300,
             ):
                 logs = result.get()
                 logs.log(summary_writers[log_dir])
