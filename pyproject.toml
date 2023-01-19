@@ -15,6 +15,7 @@ authors = [
 dependencies = [
     "dm_control",
     "dmc2gym @ git+https://github.com/denisyarats/dmc2gym.git",
+    "filelock",
     "gym[mujoco]",
     "hydra-core",
     "kaleido",

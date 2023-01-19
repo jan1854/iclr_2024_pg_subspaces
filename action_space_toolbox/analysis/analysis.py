@@ -1,6 +1,7 @@
 import abc
 import logging
 
+import filelock as filelock
 import torch.multiprocessing
 from pathlib import Path
 from typing import Callable, Union
@@ -66,11 +67,20 @@ class Analysis(abc.ABC):
             if env_step not in curr_analysis_logs:
                 # Save that the analysis was done for this step
                 curr_analysis_logs = sorted(curr_analysis_logs + [env_step])
-                analyses_logs[self.analysis_name][
-                    self.analysis_run_id
-                ] = curr_analysis_logs
-                with self._analyses_log_file.open("w") as analyses_log_file:
-                    yaml.dump(analyses_logs, analyses_log_file)
+                # Lock the analysis.yaml file to ensure sequential access
+                with filelock.FileLock(
+                    self._analyses_log_file.with_suffix(
+                        self._analyses_log_file.suffix + ".lock"
+                    )
+                ):
+                    # Re-read the analyses.yaml file in case it was changed by another process in the meantime
+                    with self._analyses_log_file.open("r") as analyses_log_file:
+                        analyses_logs = yaml.safe_load(analyses_log_file)
+                    analyses_logs[self.analysis_name][
+                        self.analysis_run_id
+                    ] = curr_analysis_logs
+                    with self._analyses_log_file.open("w") as analyses_log_file:
+                        yaml.dump(analyses_logs, analyses_log_file)
             self._new_data_indicator.touch()
             return results
         else:
