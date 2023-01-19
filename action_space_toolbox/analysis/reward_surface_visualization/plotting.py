@@ -96,6 +96,7 @@ def plot_surface(
     )
 
     Z_range = abs(np.max(results) - np.min(results))
+    # Add a black line at (0,0) to mark the current policy
     fig.add_scatter3d(
         x=[0.0, 0.0],
         y=[0.0, 0.0],
@@ -108,16 +109,16 @@ def plot_surface(
     interpolator = RegularGridInterpolator((coords, coords), results, method="linear")
 
     for grad_step in projected_sgd_steps:
-        visualization_steps = np.linspace(np.zeros(2), -3e-4 * grad_step, 20)
+        visualization_steps = np.linspace(np.zeros(2), grad_step, 200)
         fig.add_scatter3d(
             x=visualization_steps[:, 1],
             y=visualization_steps[:, 0],
-            z=interpolator(visualization_steps) + 0.001 * Z_range,
+            z=interpolator(visualization_steps) + 0.01 * Z_range,
             mode="lines",
-            line_width=6,
+            line_width=8,
             line_color="blue",
             showlegend=False,
-            opacity=0.1,
+            opacity=0.2,
         )
 
     for grad_step in projected_optimizer_steps:
@@ -125,17 +126,17 @@ def plot_surface(
         # error). Scale the gradient step to reduce the length but keep the direction the same.
         if np.max(np.abs(grad_step)) > magnitude:
             grad_step = grad_step * magnitude / np.max(np.abs(grad_step)) - 1e-8
-        visualization_steps = np.linspace(np.zeros(2), grad_step, 20)
+        visualization_steps = np.linspace(np.zeros(2), grad_step, 200)
         # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
         fig.add_scatter3d(
             x=visualization_steps[:, 1],
             y=visualization_steps[:, 0],
-            z=interpolator(visualization_steps) + 0.001 * Z_range,
+            z=interpolator(visualization_steps) + 0.01 * Z_range,
             mode="lines",
-            line_width=6,
+            line_width=8,
             line_color="black",
             showlegend=False,
-            opacity=0.2,
+            opacity=0.5,
         )
 
     if title is not None:
