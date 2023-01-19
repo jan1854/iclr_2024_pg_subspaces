@@ -4,7 +4,7 @@ import logging
 import filelock as filelock
 import torch.multiprocessing
 from pathlib import Path
-from typing import Callable, Union
+from typing import Callable, Dict, List, Union
 
 import gym
 import stable_baselines3
@@ -48,15 +48,8 @@ class Analysis(abc.ABC):
         show_progress: bool = False,
     ) -> TensorboardLogs:
         # Check whether the analysis was already done for the current step
-        with self._analyses_log_file.open("r") as analyses_log_file:
-            analyses_logs = yaml.safe_load(analyses_log_file)
-        if analyses_logs is None:
-            analyses_logs = {}
-        if self.analysis_name not in analyses_logs:
-            analyses_logs[self.analysis_name] = {}
-        curr_analysis_logs = analyses_logs[self.analysis_name].get(
-            self.analysis_run_id, []
-        )
+        analyses_logs = self._load_analysis_logs()
+        curr_analysis_logs = analyses_logs[self.analysis_name][self.analysis_run_id]
         if env_step not in curr_analysis_logs or overwrite_results:
             with torch.multiprocessing.get_context("spawn").Pool(
                 self.num_processes
@@ -65,26 +58,37 @@ class Analysis(abc.ABC):
                     pool, env_step, overwrite_results, show_progress
                 )
             if env_step not in curr_analysis_logs:
-                # Save that the analysis was done for this step
-                curr_analysis_logs = sorted(curr_analysis_logs + [env_step])
                 # Lock the analysis.yaml file to ensure sequential access
-                with filelock.FileLock(
+                lock = filelock.FileLock(
                     self._analyses_log_file.with_suffix(
                         self._analyses_log_file.suffix + ".lock"
                     )
-                ):
+                )
+                with lock.acquire(timeout=60):
                     # Re-read the analyses.yaml file in case it was changed by another process in the meantime
-                    with self._analyses_log_file.open("r") as analyses_log_file:
-                        analyses_logs = yaml.safe_load(analyses_log_file)
-                    analyses_logs[self.analysis_name][
-                        self.analysis_run_id
-                    ] = curr_analysis_logs
+                    analyses_logs = self._load_analysis_logs()
+                    # Save that the analysis was done for this step
+                    analyses_logs[self.analysis_name][self.analysis_run_id] += [
+                        env_step
+                    ]
+                    analyses_logs[self.analysis_name][self.analysis_run_id].sort()
                     with self._analyses_log_file.open("w") as analyses_log_file:
                         yaml.dump(analyses_logs, analyses_log_file)
             self._new_data_indicator.touch()
             return results
         else:
             return TensorboardLogs()
+
+    def _load_analysis_logs(self) -> Dict[str, Dict[str, List[int]]]:
+        with self._analyses_log_file.open("r") as analyses_log_file:
+            analyses_logs = yaml.safe_load(analyses_log_file)
+        if analyses_logs is None:
+            analyses_logs = {}
+        if self.analysis_name not in analyses_logs:
+            analyses_logs[self.analysis_name] = {}
+        if self.analysis_run_id not in analyses_logs[self.analysis_name]:
+            analyses_logs[self.analysis_name][self.analysis_run_id] = []
+        return analyses_logs
 
     @abc.abstractmethod
     def _do_analysis(
