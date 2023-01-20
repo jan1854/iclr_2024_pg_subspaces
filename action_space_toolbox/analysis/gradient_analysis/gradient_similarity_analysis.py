@@ -1,4 +1,5 @@
-from typing import Optional, Sequence
+import itertools
+from typing import Optional, Sequence, List, Tuple
 
 import numpy as np
 import stable_baselines3
@@ -28,14 +29,22 @@ class GradientSimilarityAnalysis:
         agent: stable_baselines3.ppo.PPO,
         env_step: int,
     ) -> TensorboardLogs:
-        true_gradient = self._gradients_from_buffer(rollout_buffer_true_gradient, agent)
-        gradient_estimates_original_batch_size = self._gradients_from_buffer(
+        (
+            policy_gradient_true,
+            vf_gradient_true,
+            combined_gradient_true,
+        ) = self._gradients_from_buffer(rollout_buffer_true_gradient, agent)
+        (
+            policy_gradient_agent,
+            vf_gradient_agent,
+            combined_gradient_agent,
+        ) = self._gradients_from_buffer(
             rollout_buffer_estimates,
             agent,
             agent.batch_size,
             self.max_num_gradient_estimates,
         )
-        gradient_estimates_different_batch_sizes = [
+        gradient_estimates_other = [
             self._gradients_from_buffer(
                 rollout_buffer_estimates,
                 agent,
@@ -44,46 +53,83 @@ class GradientSimilarityAnalysis:
             )
             for batch_size in self.batch_sizes_gradient_estimates
         ]
+        policy_gradients_other, vf_gradients_other, combined_gradients_other = zip(
+            *gradient_estimates_other
+        )
 
+        logs = TensorboardLogs()
+        self._evaluate_gradient_estimates(
+            policy_gradient_true,
+            policy_gradient_agent,
+            policy_gradients_other,
+            "policy",
+            env_step,
+            logs,
+        )
+        self._evaluate_gradient_estimates(
+            vf_gradient_true,
+            vf_gradient_agent,
+            vf_gradients_other,
+            "value_function",
+            env_step,
+            logs,
+        )
+        self._evaluate_gradient_estimates(
+            combined_gradient_true,
+            combined_gradient_agent,
+            combined_gradients_other,
+            "combined",
+            env_step,
+            logs,
+        )
+        return logs
+
+    def _evaluate_gradient_estimates(
+        self,
+        true_gradient: torch.Tensor,
+        estimated_gradient_agent: torch.Tensor,
+        estimated_gradients_other: torch.Tensor,
+        gradient_name: str,
+        env_step: int,
+        logs: TensorboardLogs,
+    ) -> None:
         similarity_original_true = self.similarity_true_gradient(
-            true_gradient, gradient_estimates_original_batch_size
+            true_gradient, estimated_gradient_agent
         )
         similarity_original_estimates = self.similarity_estimated_gradients(
-            gradient_estimates_original_batch_size
+            estimated_gradient_agent
         )
         similarities_other_true = [
             self.similarity_true_gradient(true_gradient, gradient_estimates)
-            for gradient_estimates in gradient_estimates_different_batch_sizes
+            for gradient_estimates in estimated_gradients_other
         ]
         similarities_other_estimates = [
             self.similarity_estimated_gradients(gradient_estimates)
-            for gradient_estimates in gradient_estimates_different_batch_sizes
+            for gradient_estimates in estimated_gradients_other
         ]
 
-        logs = TensorboardLogs()
         logs.add_scalar(
-            f"gradient_analysis/{self.analysis_run_id}/similarity_estimates_true_gradient",
+            f"gradient_analysis/{self.analysis_run_id}/{gradient_name}/similarity_estimates_true_gradient",
             similarity_original_true,
             env_step,
         )
         logs.add_scalar(
-            f"gradient_analysis/{self.analysis_run_id}/similarity_gradient_estimates",
+            f"gradient_analysis/{self.analysis_run_id}/{gradient_name}/similarity_gradient_estimates",
             similarity_original_estimates,
             env_step,
         )
         logs.add_step_plot(
-            f"gradient_analysis_step_plots/{self.analysis_run_id}/"
+            f"gradient_analysis_step_plots/{self.analysis_run_id}/{gradient_name}"
             f"similarity_estimates_true_gradient_diff_batch_sizes_logx_{env_step:07d}",
             np.log10(self.batch_sizes_gradient_estimates),
             similarities_other_true,
         )
         logs.add_step_plot(
-            f"gradient_analysis_step_plots/{self.analysis_run_id}/"
+            f"gradient_analysis_step_plots/{self.analysis_run_id}/{gradient_name}"
             f"similarity_gradient_estimates_diff_batch_sizes_logx_{env_step:07d}",
             np.log10(self.batch_sizes_gradient_estimates),
             similarities_other_estimates,
         )
-        return logs
 
     @classmethod
     def similarity_true_gradient(
@@ -111,7 +157,7 @@ class GradientSimilarityAnalysis:
         agent: stable_baselines3.ppo.PPO,
         batch_size: Optional[int] = None,
         max_num_gradients: Optional[int] = None,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         gradients = []
         for i, batch in enumerate(rollout_buffer.get(batch_size)):
             # Do not use incomplete batches
@@ -120,7 +166,12 @@ class GradientSimilarityAnalysis:
             ):
                 break
             gradients.append(cls._ppo_gradient(agent, batch))
-        return torch.stack(gradients)
+        policy_gradients, value_function_gradients, combined_gradients = zip(*gradients)
+        return (
+            torch.stack(policy_gradients),
+            torch.stack(value_function_gradients),
+            torch.stack(combined_gradients),
+        )
 
     @classmethod
     def _cosine_similarities(
@@ -136,9 +187,48 @@ class GradientSimilarityAnalysis:
     @classmethod
     def _ppo_gradient(
         cls, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # TODO: This current includes both the gradients for the policy and the value function, should it be this way?
         loss, _ = ppo_loss(agent, rollout_data)
         agent.policy.zero_grad()
         loss.backward()
-        return torch.cat([p.grad.flatten() for p in agent.policy.parameters()])
+        policy_gradient = torch.cat(
+            [p.grad.flatten() for p in cls._get_policy_parameters(agent)]
+        )
+        value_function_gradient = torch.cat(
+            [p.grad.flatten() for p in cls._get_value_function_parameters(agent)]
+        )
+        combined_gradient = torch.cat(
+            [p.grad.flatten() for p in agent.policy.parameters()]
+        )
+        return policy_gradient, value_function_gradient, combined_gradient
+
+    @classmethod
+    def _get_policy_parameters(
+        cls, agent: stable_baselines3.ppo.PPO
+    ) -> List[torch.nn.Parameter]:
+        policy = agent.policy
+        assert policy.share_features_extractor
+        params_feature_extractor = list(policy.features_extractor.parameters()) + list(
+            policy.pi_features_extractor.parameters()
+        )
+        params_mlp_extractor = list(
+            policy.mlp_extractor.shared_net.parameters()
+        ) + list(policy.mlp_extractor.policy_net.parameters())
+        params_action_net = list(policy.action_net.parameters())
+        return params_feature_extractor + params_mlp_extractor + params_action_net
+
+    @classmethod
+    def _get_value_function_parameters(
+        cls, agent: stable_baselines3.ppo.PPO
+    ) -> List[torch.nn.Parameter]:
+        policy = agent.policy
+        assert policy.share_features_extractor
+        params_feature_extractor = list(policy.features_extractor.parameters()) + list(
+            policy.vf_features_extractor.parameters()
+        )
+        params_mlp_extractor = list(
+            policy.mlp_extractor.shared_net.parameters()
+        ) + list(policy.mlp_extractor.value_net.parameters())
+        params_value_net = list(policy.value_net.parameters())
+        return params_feature_extractor + params_mlp_extractor + params_value_net

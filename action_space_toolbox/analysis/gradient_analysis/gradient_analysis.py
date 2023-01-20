@@ -102,38 +102,46 @@ class GradientAnalysis(Analysis):
         fill_rollout_buffer(
             agent, env, rollout_buffer_gradient_estimates, show_progress=False
         )
-        # Measure how well the value function predicts the "true" value
-        value_function_gae_mre = self.compute_value_function_gae_mre(
-            agent, rollout_buffer_true_gradient
-        )
-
         logs = self.gradient_similarity_analysis.analyze(
             rollout_buffer_true_gradient,
             rollout_buffer_gradient_estimates,
             agent,
             env_step,
         )
+
+        states_gt, values_gt = self._compute_gt_values(
+            rollout_buffer_true_gradient, get_episode_length(env)
+        )
+        states_gt = torch.tensor(states_gt, device=agent.device)
+        values_gt = torch.tensor(values_gt, device=agent.device)
+
+        # Measure how well the value function solves the GAE-objective
+        value_function_gae_mre = self.compute_value_function_gae_mre(
+            agent, rollout_buffer_true_gradient
+        )
+        # Measure how well the value function predicts the "true" value
+        value_function_gt_mre = metrics.mean_relative_error(
+            policy.predict_values(states_gt), values_gt
+        )
+
         logs.add_scalar(
             f"gradient_analysis/{self.analysis_run_id}/value_function_gae_mre",
             value_function_gae_mre,
             env_step,
         )
+        logs.add_scalar(
+            f"gradient_analysis/{self.analysis_run_id}/value_function_gt_mre",
+            value_function_gt_mre,
+            env_step,
+        )
 
         if self.gt_value_function_analysis:
-            states_gt, values_gt = self._compute_gt_values(
-                rollout_buffer_true_gradient, get_episode_length(env)
-            )
-            states_gt = torch.tensor(states_gt, device=agent.device)
-            values_gt = torch.tensor(values_gt, device=agent.device)
             if self._dump_gt_value_function_dataset:
                 gt_value_function_dataset_dir = Path("gt_value_function_datasets")
                 gt_value_function_dataset_dir.mkdir(exist_ok=True)
                 dump_path = gt_value_function_dataset_dir / f"step_{env_step:07d}.pkl"
                 with dump_path.open("wb") as file:
                     pickle.dump({"states": states_gt, "values": values_gt}, file)
-            value_function_gt_mre = metrics.mean_relative_error(
-                policy.predict_values(states_gt), values_gt
-            )
 
             gt_value_function = ValueFunction(
                 policy.features_dim,
@@ -160,12 +168,6 @@ class GradientAnalysis(Analysis):
                 show_progress=show_progress,
             )
             logs.update(fit_value_function_logs)
-
-            logs.add_scalar(
-                f"gradient_analysis/{self.analysis_run_id}/value_function_gt_mre",
-                value_function_gt_mre,
-                env_step,
-            )
 
         return logs
 
