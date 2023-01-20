@@ -2,6 +2,7 @@ _target_: action_space_toolbox.analysis.gradient_analysis.gradient_analysis.Grad
 analysis_run_id: default
 num_gradient_estimates: 500
 samples_true_gradient: 10_000_000
+samples_different_gradient_estimates: [10, 100, 1_000, 10_000, 100_000, 1_000_000]
 gt_value_function_analysis: false
 epochs_gt_value_function_training: 1
 dump_gt_value_function_dataset: false

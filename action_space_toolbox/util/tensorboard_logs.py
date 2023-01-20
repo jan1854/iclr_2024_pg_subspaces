@@ -36,6 +36,19 @@ class TensorboardLogs:
         else:
             self.scalars[key] = [(value, step, walltime)]
 
+    def add_step_plot(
+        self,
+        key: str,
+        steps: Sequence[int],
+        values: Sequence[float],
+        walltimes: Optional[Sequence[float]] = None,
+    ):
+        if walltimes is None:
+            walltimes = [time.time()] * len(steps)
+        assert len(steps) == len(values) == len(walltimes)
+        for step, value, walltime in zip(steps, values, walltimes):
+            self.add_scalar(key, value, step, walltime)
+
     def add_image(
         self,
         key: str,
