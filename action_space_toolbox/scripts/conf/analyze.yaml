@@ -4,6 +4,7 @@ defaults:
 
 
 train_logs: ??
+sync_train_logs: true
 
 min_interval: 200_000
 first_checkpoint: 0

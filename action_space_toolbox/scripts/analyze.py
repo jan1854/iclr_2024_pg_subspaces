@@ -2,6 +2,7 @@ import functools
 import logging
 import multiprocessing.pool
 import re
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -59,10 +60,27 @@ def get_step_from_checkpoint(file_name: str) -> int:
 def analyze(cfg: omegaconf.DictConfig) -> None:
     logger.info(f"Analyzing results in {cfg.train_logs}")
     train_logs = Path(cfg.train_logs)
-    if (train_logs / "checkpoints").exists():
-        run_logs = [train_logs]
+
+    experiment_dir = train_logs.parent if train_logs.name.isnumeric() else train_logs
+    assert re.match("[0-9]{2}-[0-9]{2}-[0-9]{2}", experiment_dir.name)
+    train_logs_relative = train_logs.relative_to(experiment_dir.parents[3])
+    train_logs_local = cfg.log_dir / train_logs_relative
+    if cfg.sync_train_logs:
+        train_logs_local.mkdir(exist_ok=True, parents=True)
+        rsync_result = subprocess.run(
+            ["rsync", "-ua", str(train_logs) + "/", str(train_logs_local)],
+            stderr=subprocess.STDOUT,
+        )
+        rsync_result.check_returncode()
     else:
-        run_logs = [d for d in train_logs.iterdir() if d.is_dir() and d.name.isdigit()]
+        train_logs_local = train_logs
+
+    if (train_logs_local / "checkpoints").exists():
+        run_logs = [train_logs_local]
+    else:
+        run_logs = [
+            d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
+        ]
 
     # Determine the base_env_timestep_factor to load the correct checkpoints
     train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
@@ -136,6 +154,13 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             ):
                 logs = result.get()
                 logs.log(summary_writers[log_dir])
+
+    if cfg.sync_train_logs:
+        rsync_result = subprocess.run(
+            ["rsync", "-ua", str(train_logs_local) + "/", str(train_logs)],
+            stderr=subprocess.STDOUT,
+        )
+        rsync_result.check_returncode()
 
 
 if __name__ == "__main__":
