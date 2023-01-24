@@ -51,6 +51,21 @@ class GradientAnalysis(Analysis):
             run_dir,
             num_processes=1,
         )
+        samples_different_gradient_estimates = np.asarray(
+            samples_different_gradient_estimates
+        )
+        if np.any(
+            np.array(samples_different_gradient_estimates > samples_true_gradient / 5)
+        ):
+            logger.warning(
+                f"samples_different_gradient_estimates ({samples_different_gradient_estimates.tolist()}) contains "
+                f"elements that are large given the value for samples_true_gradient ({samples_true_gradient}), "
+                f"these elements will be removed."
+            )
+            samples_different_gradient_estimates = samples_different_gradient_estimates[
+                samples_different_gradient_estimates <= samples_true_gradient / 5
+            ]
+
         self.num_gradient_estimates = num_gradient_estimates
         self.samples_true_gradient = samples_true_gradient
         self.gt_value_function_analysis = gt_value_function_analysis

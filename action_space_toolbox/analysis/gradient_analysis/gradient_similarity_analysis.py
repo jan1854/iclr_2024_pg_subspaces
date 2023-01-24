@@ -19,7 +19,7 @@ class GradientSimilarityAnalysis:
         analysis_run_id: str,
     ):
         self.max_num_gradient_estimates = max_num_gradient_estimates
-        self.batch_sizes_gradient_estimates = np.array(batch_sizes_gradient_estimates)
+        self.batch_sizes_gradient_estimates = np.asarray(batch_sizes_gradient_estimates)
         self.analysis_run_id = analysis_run_id
 
     def analyze(
