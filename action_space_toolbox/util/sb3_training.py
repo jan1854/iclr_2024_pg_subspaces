@@ -143,7 +143,7 @@ def fill_rollout_buffer(
 def ppo_loss(
     agent: stable_baselines3.ppo.PPO,
     rollout_data: stable_baselines3.common.buffers.RolloutBufferSamples,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Calculates PPO's policy loss. This code is copied from stables-baselines3.PPO.train(). Needs to be copied since
     in the PPO implementation, the loss is not extracted to a separate method.
@@ -205,4 +205,9 @@ def ppo_loss(
         entropy_loss = -torch.mean(entropy)
 
     loss = policy_loss + agent.ent_coef * entropy_loss + agent.vf_coef * value_loss
-    return loss, ratio.mean()
+    return (
+        loss,
+        policy_loss + agent.ent_coef * entropy_loss,
+        agent.vf_coef * value_loss,
+        ratio.mean(),
+    )

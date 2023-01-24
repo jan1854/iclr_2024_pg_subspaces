@@ -34,7 +34,8 @@ RewardSurfaceAnalysisResult = namedtuple(
     "RewardSurfaceAnalysisResult", "reward_undiscounted reward_discounted"
 )
 LossSurfaceAnalysisResult = namedtuple(
-    "LossSurfaceAnalysisResult", "losses policy_ratios"
+    "LossSurfaceAnalysisResult",
+    "policy_losses value_function_losses combined_losses policy_ratios",
 )
 
 
@@ -77,6 +78,14 @@ class RewardSurfaceVisualization(Analysis):
         self.reward_discounted_data_dir = (
             self.out_dir / "reward_surface_discounted" / "data"
         )
+        self.policy_loss_data_dir = self.out_dir / "policy_loss_surface" / "data"
+        self.negative_policy_loss_data_dir = (
+            self.out_dir / "negative_policy_loss_surface" / "data"
+        )
+        self.vf_loss_data_dir = self.out_dir / "value_function_loss_surface" / "data"
+        self.negative_vf_loss_data_dir = (
+            self.out_dir / "negative_value_function_loss_surface" / "data"
+        )
         self.loss_data_dir = self.out_dir / "loss_surface" / "data"
         self.negative_loss_data_dir = self.out_dir / "negative_loss_surface" / "data"
 
@@ -93,7 +102,7 @@ class RewardSurfaceVisualization(Analysis):
                 not overwrite_results
                 and (
                     self.out_dir
-                    / "loss"
+                    / "loss_surface"
                     / f"{self._result_filename('loss_surface', env_step, plot_num)}.png"
                 ).exists()
             ):
@@ -203,13 +212,53 @@ class RewardSurfaceVisualization(Analysis):
             with rewards_discounted_file.open("wb") as f:
                 pickle.dump(plot_info | {"data": rewards_discounted}, f)
 
+            self.policy_loss_data_dir.mkdir(parents=True, exist_ok=True)
+            policy_loss_file = (
+                self.policy_loss_data_dir
+                / f"{self._result_filename('policy_loss', env_step, plot_num)}.pkl"
+            )
+            with policy_loss_file.open("wb") as f:
+                pickle.dump(plot_info | {"data": loss_surface_results.policy_losses}, f)
+
+            self.negative_policy_loss_data_dir.mkdir(parents=True, exist_ok=True)
+            negative_policy_loss_file = (
+                self.negative_policy_loss_data_dir
+                / f"{self._result_filename('negative_policy_loss', env_step, plot_num)}.pkl"
+            )
+            with negative_policy_loss_file.open("wb") as f:
+                pickle.dump(
+                    plot_info | {"data": -loss_surface_results.policy_losses}, f
+                )
+
+            self.vf_loss_data_dir.mkdir(parents=True, exist_ok=True)
+            vf_loss_file = (
+                self.vf_loss_data_dir
+                / f"{self._result_filename('value_function_loss', env_step, plot_num)}.pkl"
+            )
+            with vf_loss_file.open("wb") as f:
+                pickle.dump(
+                    plot_info | {"data": loss_surface_results.value_function_losses}, f
+                )
+
+            self.negative_vf_loss_data_dir.mkdir(parents=True, exist_ok=True)
+            negative_vf_loss_file = (
+                self.negative_vf_loss_data_dir
+                / f"{self._result_filename('negative_value_function_loss', env_step, plot_num)}.pkl"
+            )
+            with negative_vf_loss_file.open("wb") as f:
+                pickle.dump(
+                    plot_info | {"data": -loss_surface_results.value_function_losses}, f
+                )
+
             self.loss_data_dir.mkdir(parents=True, exist_ok=True)
             loss_file = (
                 self.loss_data_dir
                 / f"{self._result_filename('loss', env_step, plot_num)}.pkl"
             )
             with loss_file.open("wb") as f:
-                pickle.dump(plot_info | {"data": loss_surface_results.losses}, f)
+                pickle.dump(
+                    plot_info | {"data": loss_surface_results.combined_losses}, f
+                )
 
             self.negative_loss_data_dir.mkdir(parents=True, exist_ok=True)
             negative_loss_file = (
@@ -217,7 +266,9 @@ class RewardSurfaceVisualization(Analysis):
                 / f"{self._result_filename('negative_loss', env_step, plot_num)}.pkl"
             )
             with negative_loss_file.open("wb") as f:
-                pickle.dump(plot_info | {"data": -loss_surface_results.losses}, f)
+                pickle.dump(
+                    plot_info | {"data": -loss_surface_results.combined_losses}, f
+                )
 
             # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
             # https://matplotlib.org/3.1.0/faq/howto_faq.html#working-with-threads)
@@ -324,7 +375,9 @@ class RewardSurfaceVisualization(Analysis):
             None,
             show_progress=False,
         )
-        losses = []
+        combined_losses = []
+        policy_losses = []
+        value_function_losses = []
         policy_ratios = []
         all_agent_weights_flat = [w for ws in all_agent_weights for w in ws]
         for agent_weights in all_agent_weights_flat:
@@ -333,11 +386,17 @@ class RewardSurfaceVisualization(Analysis):
                     agent.policy.parameters(), agent_weights
                 ):
                     parameters.data[:] = weights
-            loss, policy_ratio = ppo_loss(agent, next(rollout_buffer.get()))
-            losses.append(loss.item())
+            combined_loss, policy_loss, value_function_loss, policy_ratio = ppo_loss(
+                agent, next(rollout_buffer.get())
+            )
+            combined_losses.append(combined_loss.item())
+            policy_losses.append(policy_loss.item())
+            value_function_losses.append(value_function_loss.item())
             policy_ratios.append(policy_ratio.item())
         return LossSurfaceAnalysisResult(
-            np.array(losses).reshape(grid_size, grid_size),
+            np.array(policy_losses).reshape(grid_size, grid_size),
+            np.array(value_function_losses).reshape(grid_size, grid_size),
+            np.array(combined_losses).reshape(grid_size, grid_size),
             np.array(policy_ratios).reshape(grid_size, grid_size),
         )
 
@@ -397,7 +456,7 @@ class RewardSurfaceVisualization(Analysis):
                 )
             )
             fill_rollout_buffer(agent, agent.env, rollout_buffer_gradient_step)
-            loss, _ = ppo_loss(
+            loss, _, _, _ = ppo_loss(
                 agent, next(rollout_buffer_gradient_step.get(agent.batch_size))
             )
             agent.policy.zero_grad()

@@ -189,7 +189,7 @@ class GradientSimilarityAnalysis:
         cls, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # TODO: This current includes both the gradients for the policy and the value function, should it be this way?
-        loss, _ = ppo_loss(agent, rollout_data)
+        loss, _, _, _ = ppo_loss(agent, rollout_data)
         agent.policy.zero_grad()
         loss.backward()
         policy_gradient = torch.cat(
