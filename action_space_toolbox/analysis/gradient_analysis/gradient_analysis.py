@@ -151,8 +151,8 @@ class GradientAnalysis(Analysis):
                 policy.init_weights,
                 policy.device,
             )
-            # TODO: stable-baselines3 supports learning rate schedules, this could make using simply the current learning
-            #  rate sub-optimal
+            # TODO: stable-baselines3 supports learning rate schedules, this could make using simply the current
+            #  learning rate suboptimal
             value_function_optimizer = policy.optimizer_class(
                 gt_value_function.parameters(),
                 lr=policy.optimizer.param_groups[0]["lr"],
