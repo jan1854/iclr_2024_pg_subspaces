@@ -104,24 +104,33 @@ def add_custom_scalar_layout(
     summary_writer.add_custom_scalars(layout)
 
 
+def read_scalar(
+    event_accumulator: event_accumulator.EventAccumulator, key: str
+) -> Dict[int, event_accumulator.ScalarEvent]:
+    warning_multiple_values_issued = False
+    scalars = {}
+    for scalar in event_accumulator.Scalars(key):
+        if scalar.step in scalars:
+            if not warning_multiple_values_issued:
+                logger.warning(
+                    f"Found multiple values for the same step for scalar {key}, using the most recent value."
+                )
+                warning_multiple_values_issued = True
+            if scalar.wall_time > scalars[scalar.step].wall_time:
+                scalars[scalar.step] = scalar
+        else:
+            scalars[scalar.step] = scalar
+    return scalars
+
+
 def calculate_mean_std_sequence(
     event_accumulators: Sequence[event_accumulator.EventAccumulator], key: str
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    assert len(event_accumulators) > 0
     scalars = []
     warning_multiple_values_issued = False
     for ea in event_accumulators:
-        scalars_curr_ea = {}
-        for scalar in ea.Scalars(key):
-            if scalar.step in scalars_curr_ea:
-                if not warning_multiple_values_issued:
-                    logger.warning(
-                        f"Found multiple values for the same step for scalar {key}, using the most recent value."
-                    )
-                    warning_multiple_values_issued = True
-                if scalar.wall_time > scalars_curr_ea[scalar.step].wall_time:
-                    scalars_curr_ea[scalar.step] = scalar
-            else:
-                scalars_curr_ea[scalar.step] = scalar
+        scalars_curr_ea = read_scalar(ea, key)
         scalars.append(scalars_curr_ea)
     # Sort data and check whether the steps match
     scalars = sorted([list(s.values()) for s in scalars], key=lambda s: len(s))

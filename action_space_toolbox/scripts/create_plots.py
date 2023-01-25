@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from action_space_toolbox.util.tensorboard_logs import (
     create_event_accumulators,
     calculate_mean_std_sequence,
+    read_scalar,
 )
 
 
@@ -38,22 +39,29 @@ def create_plots(
 ) -> None:
     for log_path, name in zip(log_paths, legend):
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
-        tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-        event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
-        (
-            steps,
-            _,
-            value_mean,
-            value_std,
-        ) = calculate_mean_std_sequence(event_accumulators, key)
+        if len(run_dirs) > 0:
+            tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
+            event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
+            (
+                steps,
+                _,
+                value_mean,
+                value_std,
+            ) = calculate_mean_std_sequence(event_accumulators, key)
 
-        value_mean = smooth(value_mean, smoothing_weight)
-        value_std = smooth(value_std, smoothing_weight)
+            value_mean = smooth(value_mean, smoothing_weight)
+            value_std = smooth(value_std, smoothing_weight)
 
-        plt.plot(steps, value_mean, label=name)
-        plt.fill_between(
-            steps, value_mean - value_std, value_mean + value_std, alpha=0.2
-        )
+            plt.plot(steps, value_mean, label=name)
+            plt.fill_between(
+                steps, value_mean - value_std, value_mean + value_std, alpha=0.2
+            )
+        else:
+            tb_dir = log_path / "tensorboard"
+            _, event_accumulator = create_event_accumulators([tb_dir])[0]
+            scalar = read_scalar(event_accumulator, key)
+
+            plt.plot(list(scalar.keys()), list(scalar.values()), label=name)
     plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))
     plt.title(title)
     plt.xlabel(xlabel)
