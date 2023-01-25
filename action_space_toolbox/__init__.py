@@ -272,10 +272,8 @@ def create_tc_env(
     return add_common_wrappers(env, normalize, action_repeat, max_episode_steps)
 
 
-# TODO: Support also fish and ball_in_cup tasks (find sensible limits for the positions)
-dmc_manipulator_tasks = [
-    ("manipulator", task) for task in dm_control.suite.TASKS_BY_DOMAIN["manipulator"]
-]
+# TODO: Support also fish, ball_in_cup (find sensible limits for the positions), and manipulator tasks (find a way to
+#   deal with the tendon-type actuators in the hand)
 BASE_ENV_TYPE_OR_ID = {
     # Classic control
     "Pendulum-v1": PendulumEnv,
@@ -287,10 +285,8 @@ BASE_ENV_TYPE_OR_ID = {
     "Walker2d-v3": Walker2dEnv,
 } | {
     f"dmc_{domain.capitalize()}-{task}-v1": (domain, task)
-    for domain, task in itertools.chain(
-        dm_control.suite.BENCHMARKING, dmc_manipulator_tasks
-    )
-    if domain != "fish" and domain != "ball_in_cup"
+    for domain, task in dm_control.suite.BENCHMARKING
+    if domain not in ["fish", "ball_in_cup", "manipulator", "point_mass"]
 }
 
 DEFAULT_PARAMETERS = {
