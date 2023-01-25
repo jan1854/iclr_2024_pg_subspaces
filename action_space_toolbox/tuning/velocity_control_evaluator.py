@@ -92,7 +92,7 @@ class VelocityControlEvaluator(ControllerEvaluator):
                 diff = env.actuator_velocities - target[1]
                 joint_vel_errors.append(np.mean(np.abs(diff)))
 
-        return np.mean(joint_vel_errors)  # type: ignore
+        return np.mean(joint_vel_errors).item()
 
     @staticmethod
     def _set_state(env, state: State) -> None:

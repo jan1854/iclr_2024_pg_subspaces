@@ -112,4 +112,4 @@ class PositionControlEvaluator(ControllerEvaluator):
                         break
                 joint_errors[-1] /= i
 
-        return np.mean(joint_errors)  # type: ignore
+        return np.mean(joint_errors).item()
