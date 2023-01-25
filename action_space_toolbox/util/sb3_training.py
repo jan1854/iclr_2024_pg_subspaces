@@ -1,4 +1,7 @@
-from typing import Optional, Tuple
+import collections
+import functools
+import math
+from typing import Optional, Tuple, List, Callable
 
 import gym
 import numpy as np
@@ -6,30 +9,35 @@ import stable_baselines3.common.vec_env
 import stable_baselines3.common.buffers
 import torch
 import torch.nn.functional as F
+from stable_baselines3.common.type_aliases import RolloutBufferSamples
 from stable_baselines3.common.utils import obs_as_tensor
-from tqdm import tqdm
+
+EnvSteps = collections.namedtuple(
+    "EnvSteps",
+    "observations actions rewards rewards_no_bootstrap dones values log_probs",
+)
 
 
 def fill_rollout_buffer(
-    agent: stable_baselines3.ppo.PPO,
-    env: stable_baselines3.common.vec_env.VecEnv,
+    env_factory: Callable[[], gym.Env],
+    agent_factory: Callable[[gym.Env], stable_baselines3.ppo.PPO],
     rollout_buffer: Optional[stable_baselines3.common.buffers.RolloutBuffer],
     rollout_buffer_no_value_bootstrap: Optional[
         stable_baselines3.common.buffers.RolloutBuffer
     ] = None,
-    show_progress: bool = False,
+    num_processes: int = 1,
 ) -> None:
     """
     Collect experiences using the current policy and fill a ``RolloutBuffer``. The code is adapted from
     stable-baselines3's OnPolicyAlgorithm.collect_rollouts() (we cannot use that function since it modifies the
     state of the agent (e.g. the number of timesteps)).
 
-    :param agent:                               The RL agent
-    :param env:                                 The training environment
+    :param agent_factory:                       A function that creates the RL agent
+    :param env_factory:                         A function that creates the environment
     :param rollout_buffer:                      Buffer to fill with rollouts
     :param rollout_buffer_no_value_bootstrap:   A separate buffer for without the value bootstrap (i.e, the last reward
                                                 of truncated episodes is not modified to reward + gamma * next_value)
-    :param show_progress:                       Shows a progress bar if true
+    :param num_processes:                       The number of processes to use
     """
     assert rollout_buffer is not None or rollout_buffer_no_value_bootstrap is not None
     assert (
@@ -43,101 +51,187 @@ def fill_rollout_buffer(
         else rollout_buffer_no_value_bootstrap.buffer_size
     )
 
-    last_obs = env.reset()
-    last_episode_starts = np.ones(env.num_envs)
-
-    # Switch to eval mode (this affects batch norm / dropout)
-    agent.policy.set_training_mode(False)
+    if num_processes == 1:
+        env_steps = [collect_complete_episodes(buffer_size, env_factory, agent_factory)]
+    else:
+        jobs = [math.ceil(buffer_size / num_processes)] * (num_processes - 1) + [
+            buffer_size - math.ceil(buffer_size / num_processes) * (num_processes - 1)
+        ]
+        with torch.multiprocessing.get_context("spawn").Pool(num_processes) as pool:
+            env_steps = pool.map(
+                functools.partial(
+                    collect_complete_episodes,
+                    env_factory=env_factory,
+                    agent_factory=agent_factory,
+                ),
+                jobs,
+            )
 
     if rollout_buffer is not None:
         rollout_buffer.reset()
     if rollout_buffer_no_value_bootstrap is not None:
         rollout_buffer_no_value_bootstrap.reset()
+
+    num_samples = 0
+    final_next_obs = None
+    final_done = None
+    last_done = None
+    for curr_env_steps in env_steps:
+        last_done = True
+        for obs, act, rew, rew_no_bootstrap, done, val, log_prob in zip(
+            *curr_env_steps
+        ):
+            # Since we collected complete episodes, the number of samples collected might be higher than the number of
+            # samples that needed --> Discard any additional samples
+            if num_samples >= buffer_size:
+                if final_next_obs is None:
+                    final_next_obs = obs
+                    final_done = np.array([[done]])
+                break
+
+            if rollout_buffer is not None:
+                rollout_buffer.add(
+                    obs,
+                    act,
+                    rew,
+                    last_done,
+                    val,
+                    log_prob,
+                )
+            if rollout_buffer_no_value_bootstrap is not None:
+                rollout_buffer_no_value_bootstrap.add(
+                    obs,
+                    act,
+                    rew_no_bootstrap,
+                    last_done,
+                    val,
+                    log_prob,
+                )
+            last_done = done
+            num_samples += 1
+
+    assert rollout_buffer is None or rollout_buffer.full
+    assert (
+        rollout_buffer_no_value_bootstrap is None
+        or rollout_buffer_no_value_bootstrap.full
+    )
+
+    agent = agent_factory(env_factory())
+    if final_next_obs is None:
+        # In the case that we sampled exactly the required number of steps, the last step will be the end of an episode
+        # (because we only sample full episodes). Therefore, the value argument is irrelevant (as it will be multiplied
+        # by zero in RolloutBuffer.compute_returns_and_advantage() anyway).
+        assert last_done
+        final_done = np.array([[True]])
+        value = torch.zeros((1, 1), device=agent.device)
+    else:
+        with torch.no_grad():
+            # Compute value for the last timestep
+            value = agent.policy.predict_values(
+                obs_as_tensor(final_next_obs, agent.device).unsqueeze(0)
+            )
+    if rollout_buffer is not None:
+        rollout_buffer.compute_returns_and_advantage(
+            last_values=value, dones=final_done
+        )
+    if rollout_buffer_no_value_bootstrap is not None:
+        rollout_buffer_no_value_bootstrap.compute_returns_and_advantage(
+            last_values=value, dones=final_done
+        )
+
+
+def collect_complete_episodes(
+    min_num_env_steps: int,
+    env_factory: Callable[[], gym.Env],
+    agent_factory: Callable[[gym.Env], stable_baselines3.ppo.PPO],
+) -> EnvSteps:
+    env = env_factory()
+    agent = agent_factory(env)
+
+    observations = []
+    actions = []
+    rewards = []
+    rewards_no_bootstrap = []
+    dones = []
+    values = []
+    log_probs = []
+
+    observations.append(env.reset())
+
+    # Switch to eval mode (this affects batch norm / dropout)
+    agent.policy.set_training_mode(False)
+
     # Sample new weights for the state dependent exploration
     if agent.use_sde:
-        agent.policy.reset_noise(env.num_envs)
+        agent.policy.reset_noise()
 
-    for n_steps in tqdm(
-        range(buffer_size),
-        disable=not show_progress,
-        desc="Collecting samples",
-        unit="samples",
-    ):
+    n_steps = 0
+    done = False
+    while n_steps < min_num_env_steps or not done:
         if (
             agent.use_sde
             and agent.sde_sample_freq > 0
             and (n_steps - 1) % agent.sde_sample_freq == 0
         ):
             # Sample a new noise matrix
-            agent.policy.reset_noise(env.num_envs)
+            agent.policy.reset_noise()
 
         with torch.no_grad():
             # Convert to pytorch tensor or to TensorDict
-            obs_tensor = obs_as_tensor(last_obs, agent.device)
-            actions, values, log_probs = agent.policy(obs_tensor)
-        actions = actions.cpu().numpy()
+            obs_tensor = obs_as_tensor(observations[-1], agent.device)
+            action, value, log_prob = agent.policy(obs_tensor.unsqueeze(0))
+        action = action.squeeze(0).cpu().numpy()
 
         # Rescale and perform action
-        clipped_actions = actions
-        # Clip the actions to avoid out of bounds error
+        clipped_action = action
+        # Clip the action to avoid out of bounds error
         if isinstance(agent.action_space, gym.spaces.Box):
-            clipped_actions = np.clip(
-                actions, agent.action_space.low, agent.action_space.high
+            clipped_action = np.clip(
+                action, agent.action_space.low, agent.action_space.high
             )
 
-        new_obs, rewards, dones, infos = env.step(clipped_actions)
+        obs, reward, done, info = env.step(clipped_action)
 
         if isinstance(agent.action_space, gym.spaces.Discrete):
             # Reshape in case of discrete action
-            actions = actions.reshape(-1, 1)
+            action = action.reshape(-1, 1)
 
         # Handle timeout by bootstrapping with value function
         # see GitHub issue #633
-        rewards_no_bootstrap = rewards.copy()
-        for idx, done in enumerate(dones):
-            if (
-                done
-                and infos[idx].get("terminal_observation") is not None
-                and infos[idx].get("TimeLimit.truncated", False)
-            ):
-                terminal_obs = agent.policy.obs_to_tensor(
-                    infos[idx]["terminal_observation"]
-                )[0]
-                with torch.no_grad():
-                    terminal_value = agent.policy.predict_values(terminal_obs)[0]
-                rewards[idx] += agent.gamma * terminal_value
+        reward_no_bootstrap = reward
+        if done and info.get("TimeLimit.truncated", False):
+            terminal_obs = agent.policy.obs_to_tensor(obs)[0]
+            with torch.no_grad():
+                terminal_value = agent.policy.predict_values(terminal_obs)[0]
+            reward += agent.gamma * terminal_value.item()
 
-        if rollout_buffer is not None:
-            rollout_buffer.add(
-                last_obs,
-                actions,
-                rewards,
-                last_episode_starts,
-                values,
-                log_probs,
-            )
-        if rollout_buffer_no_value_bootstrap is not None:
-            rollout_buffer_no_value_bootstrap.add(
-                last_obs,
-                actions,
-                rewards_no_bootstrap,
-                last_episode_starts,
-                values,
-                log_probs,
-            )
+        if done:
+            obs = env.reset()
 
-        last_obs = new_obs
-        last_episode_starts = dones
+        # This is for the next step (we add the first observation before the loop); the last observation of each episode
+        # is not added to observations since it is not needed for filling a RolloutBuffer.
+        observations.append(obs)
+        actions.append(action)
+        rewards.append(reward)
+        rewards_no_bootstrap.append(reward_no_bootstrap)
+        dones.append(done)
+        values.append(value)
+        log_probs.append(log_prob)
 
-    with torch.no_grad():
-        # Compute value for the last timestep
-        values = agent.policy.predict_values(obs_as_tensor(new_obs, agent.device))
-    if rollout_buffer is not None:
-        rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
-    if rollout_buffer_no_value_bootstrap is not None:
-        rollout_buffer_no_value_bootstrap.compute_returns_and_advantage(
-            last_values=values, dones=dones
-        )
+        n_steps += 1
+
+    # Check that the last episode is complete
+    assert dones[-1]
+
+    return EnvSteps(
+        np.stack(observations[:-1], axis=0),
+        np.stack(actions, axis=0),
+        np.stack(rewards, axis=0),
+        np.stack(rewards_no_bootstrap, axis=0),
+        np.stack(dones, axis=0),
+        torch.stack(values, dim=0),
+        torch.stack(log_probs, dim=0),
+    )
 
 
 def ppo_loss(
@@ -211,3 +305,43 @@ def ppo_loss(
         agent.vf_coef * value_loss,
         ratio.mean(),
     )
+
+
+def ppo_gradient(
+    agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
+) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
+    loss, _, _, _ = ppo_loss(agent, rollout_data)
+    agent.policy.zero_grad()
+    loss.backward()
+    combined_gradient = [p.grad for p in agent.policy.parameters()]
+    policy_gradient = [p.grad for p in get_policy_parameters(agent)]
+    value_function_gradient = [p.grad for p in get_value_function_parameters(agent)]
+    return combined_gradient, policy_gradient, value_function_gradient
+
+
+def get_policy_parameters(agent: stable_baselines3.ppo.PPO) -> List[torch.nn.Parameter]:
+    policy = agent.policy
+    assert policy.share_features_extractor
+    params_feature_extractor = list(policy.features_extractor.parameters()) + list(
+        policy.pi_features_extractor.parameters()
+    )
+    params_mlp_extractor = list(policy.mlp_extractor.shared_net.parameters()) + list(
+        policy.mlp_extractor.policy_net.parameters()
+    )
+    params_action_net = list(policy.action_net.parameters())
+    return params_feature_extractor + params_mlp_extractor + params_action_net
+
+
+def get_value_function_parameters(
+    agent: stable_baselines3.ppo.PPO,
+) -> List[torch.nn.Parameter]:
+    policy = agent.policy
+    assert policy.share_features_extractor
+    params_feature_extractor = list(policy.features_extractor.parameters()) + list(
+        policy.vf_features_extractor.parameters()
+    )
+    params_mlp_extractor = list(policy.mlp_extractor.shared_net.parameters()) + list(
+        policy.mlp_extractor.value_net.parameters()
+    )
+    params_value_net = list(policy.value_net.parameters())
+    return params_feature_extractor + params_mlp_extractor + params_value_net

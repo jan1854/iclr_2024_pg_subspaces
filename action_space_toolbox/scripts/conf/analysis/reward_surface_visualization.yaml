@@ -2,6 +2,8 @@ _target_: action_space_toolbox.analysis.reward_surface_visualization.reward_surf
 analysis_run_id: default
 grid_size: 31
 magnitude: 1.0
+plot_in_gradient_direction: false
+gradient_direction_num_samples: 1_000_000
 num_steps: 200000
 num_plots: 1
 num_processes: 1

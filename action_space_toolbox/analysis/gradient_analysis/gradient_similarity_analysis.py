@@ -1,13 +1,11 @@
-import itertools
-from typing import Optional, Sequence, List, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import stable_baselines3
 import torch
 from stable_baselines3.common.buffers import RolloutBuffer
-from stable_baselines3.common.type_aliases import RolloutBufferSamples
 
-from action_space_toolbox.util.sb3_training import ppo_loss
+from action_space_toolbox.util.sb3_training import ppo_gradient
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
@@ -158,18 +156,25 @@ class GradientSimilarityAnalysis:
         batch_size: Optional[int] = None,
         max_num_gradients: Optional[int] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        gradients = []
+        policy_gradients = []
+        vf_gradients = []
+        combined_gradients = []
         for i, batch in enumerate(rollout_buffer.get(batch_size)):
             # Do not use incomplete batches
             if (max_num_gradients is not None and i >= max_num_gradients) or (
                 batch_size is not None and batch.actions.shape[0] != batch_size
             ):
                 break
-            gradients.append(cls._ppo_gradient(agent, batch))
-        policy_gradients, value_function_gradients, combined_gradients = zip(*gradients)
+            combined_gradient, policy_gradient, vf_gradient = ppo_gradient(agent, batch)
+            policy_gradients.append(torch.cat([g.flatten() for g in policy_gradient]))
+            vf_gradients.append(torch.cat([g.flatten() for g in vf_gradient]))
+            combined_gradients.append(
+                torch.cat([g.flatten() for g in combined_gradient])
+            )
+
         return (
             torch.stack(policy_gradients),
-            torch.stack(value_function_gradients),
+            torch.stack(vf_gradients),
             torch.stack(combined_gradients),
         )
 
@@ -183,52 +188,3 @@ class GradientSimilarityAnalysis:
         t2_normalized = t2 / torch.clamp(t2_norm, min=eps)
         sim_mt = torch.mm(t1_normalized, t2_normalized.transpose(0, 1))
         return sim_mt
-
-    @classmethod
-    def _ppo_gradient(
-        cls, agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # TODO: This current includes both the gradients for the policy and the value function, should it be this way?
-        loss, _, _, _ = ppo_loss(agent, rollout_data)
-        agent.policy.zero_grad()
-        loss.backward()
-        policy_gradient = torch.cat(
-            [p.grad.flatten() for p in cls._get_policy_parameters(agent)]
-        )
-        value_function_gradient = torch.cat(
-            [p.grad.flatten() for p in cls._get_value_function_parameters(agent)]
-        )
-        combined_gradient = torch.cat(
-            [p.grad.flatten() for p in agent.policy.parameters()]
-        )
-        return policy_gradient, value_function_gradient, combined_gradient
-
-    @classmethod
-    def _get_policy_parameters(
-        cls, agent: stable_baselines3.ppo.PPO
-    ) -> List[torch.nn.Parameter]:
-        policy = agent.policy
-        assert policy.share_features_extractor
-        params_feature_extractor = list(policy.features_extractor.parameters()) + list(
-            policy.pi_features_extractor.parameters()
-        )
-        params_mlp_extractor = list(
-            policy.mlp_extractor.shared_net.parameters()
-        ) + list(policy.mlp_extractor.policy_net.parameters())
-        params_action_net = list(policy.action_net.parameters())
-        return params_feature_extractor + params_mlp_extractor + params_action_net
-
-    @classmethod
-    def _get_value_function_parameters(
-        cls, agent: stable_baselines3.ppo.PPO
-    ) -> List[torch.nn.Parameter]:
-        policy = agent.policy
-        assert policy.share_features_extractor
-        params_feature_extractor = list(policy.features_extractor.parameters()) + list(
-            policy.vf_features_extractor.parameters()
-        )
-        params_mlp_extractor = list(
-            policy.mlp_extractor.shared_net.parameters()
-        ) + list(policy.mlp_extractor.value_net.parameters())
-        params_value_net = list(policy.value_net.parameters())
-        return params_feature_extractor + params_mlp_extractor + params_value_net

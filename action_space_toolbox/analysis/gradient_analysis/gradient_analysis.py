@@ -112,10 +112,12 @@ class GradientAnalysis(Analysis):
 
         policy = agent.policy
         fill_rollout_buffer(
-            agent, env, rollout_buffer_true_gradient, show_progress=show_progress
+            self.env_factory,
+            self.agent_factory,
+            rollout_buffer_true_gradient,
         )
         fill_rollout_buffer(
-            agent, env, rollout_buffer_gradient_estimates, show_progress=False
+            self.env_factory, self.agent_factory, rollout_buffer_gradient_estimates
         )
         logs = self.gradient_similarity_analysis.analyze(
             rollout_buffer_true_gradient,

@@ -18,7 +18,11 @@ from action_space_toolbox.analysis.reward_surface_visualization.plotting import 
     plot_results,
 )
 from action_space_toolbox.util.get_episode_length import get_episode_length
-from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_loss
+from action_space_toolbox.util.sb3_training import (
+    fill_rollout_buffer,
+    ppo_loss,
+    ppo_gradient,
+)
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
@@ -51,6 +55,8 @@ class RewardSurfaceVisualization(Analysis):
         run_dir: Path,
         grid_size: int,
         magnitude: float,
+        plot_in_gradient_direction: bool,
+        gradient_direction_num_samples: int,
         num_steps: int,
         num_plots: int,
         num_processes: int,
@@ -65,6 +71,8 @@ class RewardSurfaceVisualization(Analysis):
         )
         self.grid_size = grid_size
         self.magnitude = magnitude
+        self.plot_in_gradient_direction = plot_in_gradient_direction
+        self.gradient_direction_num_samples = gradient_direction_num_samples
         self.num_steps = num_steps
         self.num_plots = num_plots
         self.num_processes = num_processes
@@ -111,10 +119,35 @@ class RewardSurfaceVisualization(Analysis):
                 logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
             agent = self.agent_factory(self.env_factory())
-            direction1 = [
-                self.sample_filter_normalized_direction(p.detach())
-                for p in agent.policy.parameters()
-            ]
+            if self.plot_in_gradient_direction:
+                rollout_buffer_gradient_direction = (
+                    stable_baselines3.common.buffers.RolloutBuffer(
+                        self.gradient_direction_num_samples,
+                        agent.observation_space,
+                        agent.action_space,
+                        agent.device,
+                        agent.gae_lambda,
+                        agent.gamma,
+                    )
+                )
+                fill_rollout_buffer(
+                    self.env_factory,
+                    self.agent_factory,
+                    rollout_buffer_gradient_direction,
+                    num_processes=self.num_processes,
+                )
+                gradient, _, _ = ppo_gradient(
+                    agent, next(rollout_buffer_gradient_direction.get())
+                )
+                gradient_norm = torch.linalg.norm(
+                    torch.cat([g.flatten() for g in gradient])
+                )
+                direction1 = [g / gradient_norm for g in gradient]
+            else:
+                direction1 = [
+                    self.sample_filter_normalized_direction(p.detach())
+                    for p in agent.policy.parameters()
+                ]
             direction2 = [
                 self.sample_filter_normalized_direction(p.detach())
                 for p in agent.policy.parameters()
@@ -311,11 +344,10 @@ class RewardSurfaceVisualization(Analysis):
             for parameters, weights in zip(agent.policy.parameters(), agent_weights):
                 parameters.data[:] = weights
         fill_rollout_buffer(
-            agent,
-            env,
+            env_factory,
+            agent_factory,
             None,
             rollout_buffer_no_value_bootstrap,
-            show_progress=False,
         )
         episode_rewards_undiscounted = []
         episode_rewards_discounted = []
@@ -369,11 +401,10 @@ class RewardSurfaceVisualization(Analysis):
             agent.gamma,
         )
         fill_rollout_buffer(
-            agent,
-            env,
+            env_factory,
+            agent_factory,
             rollout_buffer,
             None,
-            show_progress=False,
         )
         combined_losses = []
         policy_losses = []
@@ -455,7 +486,9 @@ class RewardSurfaceVisualization(Analysis):
                     agent.gamma,
                 )
             )
-            fill_rollout_buffer(agent, agent.env, rollout_buffer_gradient_step)
+            fill_rollout_buffer(
+                self.env_factory, self.agent_factory, rollout_buffer_gradient_step
+            )
             loss, _, _, _ = ppo_loss(
                 agent, next(rollout_buffer_gradient_step.get(agent.batch_size))
             )
