@@ -56,7 +56,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         stdout=subprocess.PIPE,
     )
     logger.debug(
-        f"Commit action_space_optimization: {result_commit.stdout.decode().strip()}"
+        f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
     )
 
     logger.info(f"Log directory: {Path.cwd()}")
