@@ -1,6 +1,7 @@
 import gym
 import numpy as np
 import pytest
+from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
@@ -40,7 +41,7 @@ class DummyEnv(gym.Env):
         return (
             np.array([self.counter / self.max_step]),
             float(self.counter),
-            self.counter == self.max_step,
+            False,
             {},
         )
 
@@ -53,7 +54,7 @@ class DummyEnv(gym.Env):
 
 
 def env_factory():
-    return DummyEnv()
+    return TimeLimit(DummyEnv(), 5)
 
 
 def agent_factory(env):

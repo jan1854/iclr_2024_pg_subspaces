@@ -12,6 +12,8 @@ import torch.nn.functional as F
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
 from stable_baselines3.common.utils import obs_as_tensor
 
+from action_space_toolbox.util.get_episode_length import get_episode_length
+
 EnvSteps = collections.namedtuple(
     "EnvSteps",
     "observations actions rewards rewards_no_bootstrap dones values log_probs",
@@ -148,15 +150,17 @@ def collect_complete_episodes(
     env = env_factory()
     agent = agent_factory(env)
 
-    observations = []
-    actions = []
-    rewards = []
-    rewards_no_bootstrap = []
-    dones = []
-    values = []
-    log_probs = []
+    episode_length = get_episode_length(env)
+    arr_len = min_num_env_steps + episode_length + 1
+    observations = np.empty((arr_len, *env.observation_space.shape))
+    actions = np.empty((arr_len, *env.action_space.shape))
+    rewards = np.empty(arr_len)
+    rewards_no_bootstrap = np.empty(arr_len)
+    dones = np.empty(arr_len, dtype=bool)
+    values = torch.empty(arr_len)
+    log_probs = torch.empty(arr_len)
 
-    observations.append(env.reset())
+    observations[0] = env.reset()
 
     # Switch to eval mode (this affects batch norm / dropout)
     agent.policy.set_training_mode(False)
@@ -178,7 +182,7 @@ def collect_complete_episodes(
 
         with torch.no_grad():
             # Convert to pytorch tensor or to TensorDict
-            obs_tensor = obs_as_tensor(observations[-1], agent.device)
+            obs_tensor = obs_as_tensor(observations[n_steps], agent.device)
             action, value, log_prob = agent.policy(obs_tensor.unsqueeze(0))
         action = action.squeeze(0).cpu().numpy()
 
@@ -210,27 +214,27 @@ def collect_complete_episodes(
 
         # This is for the next step (we add the first observation before the loop); the last observation of each episode
         # is not added to observations since it is not needed for filling a RolloutBuffer.
-        observations.append(obs)
-        actions.append(action)
-        rewards.append(reward)
-        rewards_no_bootstrap.append(reward_no_bootstrap)
-        dones.append(done)
-        values.append(value)
-        log_probs.append(log_prob)
+        observations[n_steps + 1] = obs
+        actions[n_steps] = action
+        rewards[n_steps] = reward
+        rewards_no_bootstrap[n_steps] = reward_no_bootstrap
+        dones[n_steps] = done
+        values[n_steps] = value.item()
+        log_probs[n_steps] = log_prob.item()
 
         n_steps += 1
 
     # Check that the last episode is complete
-    assert dones[-1]
+    assert dones[n_steps - 1]
 
     return EnvSteps(
-        np.stack(observations[:-1], axis=0),
-        np.stack(actions, axis=0),
-        np.stack(rewards, axis=0),
-        np.stack(rewards_no_bootstrap, axis=0),
-        np.stack(dones, axis=0),
-        torch.stack(values, dim=0),
-        torch.stack(log_probs, dim=0),
+        observations[:n_steps],
+        actions[:n_steps],
+        rewards[:n_steps],
+        rewards_no_bootstrap[:n_steps],
+        dones[:n_steps],
+        values[:n_steps],
+        log_probs[:n_steps],
     )
 
 
