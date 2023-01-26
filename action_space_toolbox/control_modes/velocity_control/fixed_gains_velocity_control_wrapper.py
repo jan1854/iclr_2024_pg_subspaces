@@ -32,7 +32,7 @@ class FixedGainsVelocityControlWrapper(AbstractVelocityControlWrapper):
         gains = np.asarray(gains)
         assert gains.shape == env.action_space.shape
         self.gains = gains
-        logger.info(f"Using gains: {gains}.")
+        logger.debug(f"Using gains: {gains}.")
 
         self.action_space = gym.spaces.Box(
             self.target_velocity_limits[:, 0].astype(np.float32),

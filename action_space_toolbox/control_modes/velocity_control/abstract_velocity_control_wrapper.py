@@ -15,7 +15,7 @@ from action_space_toolbox.control_modes.check_wrapped import (
     check_wrapped,
 )
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 class AbstractVelocityControlWrapper(ActionTransformationWrapper, abc.ABC):
@@ -37,7 +37,7 @@ class AbstractVelocityControlWrapper(ActionTransformationWrapper, abc.ABC):
                 self.target_velocity_limits = env.actuator_vel_bounds  # type: ignore
             else:
                 self.target_velocity_limits = np.array([-10.0, 10.0])
-                logger.info(
+                logger.debug(
                     f"Did not find target velocity limits for environment {env}. Using the default [-10, 10]."
                 )
         # Assume that the limits are the same for each action dimension if a single (low, high) pair is passed

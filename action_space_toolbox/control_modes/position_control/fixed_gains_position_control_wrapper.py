@@ -39,7 +39,7 @@ class FixedGainsPositionControlWrapper(AbstractPositionControlWrapper):
         assert p_gains.shape == d_gains.shape == env.action_space.shape
         self.p_gains = p_gains
         self.d_gains = d_gains
-        logger.info(f"Using p_gains: {p_gains} and d_gains: {d_gains}.")
+        logger.debug(f"Using p_gains: {p_gains} and d_gains: {d_gains}.")
 
         self.action_space = gym.spaces.Box(
             self.target_position_limits[:, 0].astype(np.float32),

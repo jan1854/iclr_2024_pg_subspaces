@@ -19,4 +19,9 @@ hydra:
     dir: ${run_log_dir}
   job:
     chdir: true
-  verbose: [__main__, action_space_optimization]
+  verbose: [
+    __main__,
+    action_space_toolbox.control_modes.velocity_control.fixed_gains_velocity_control_wrapper,
+    action_space_toolbox.control_modes.velocity_control.abstract_velocity_control_wrapper,
+    action_space_toolbox.control_modes.position_control.fixed_gains_position_control_wrapper
+  ]
