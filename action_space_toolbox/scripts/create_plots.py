@@ -61,7 +61,11 @@ def create_plots(
             _, event_accumulator = create_event_accumulators([tb_dir])[0]
             scalar = read_scalar(event_accumulator, key)
 
-            plt.plot(list(scalar.keys()), list(scalar.values()), label=name)
+            plt.plot(
+                list(scalar.keys()),
+                smooth([e.value for e in scalar.values()], smoothing_weight),
+                label=name,
+            )
     plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))
     plt.title(title)
     plt.xlabel(xlabel)

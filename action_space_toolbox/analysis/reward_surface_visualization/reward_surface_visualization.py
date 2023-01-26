@@ -218,6 +218,7 @@ class RewardSurfaceVisualization(Analysis):
                     [d.cpu().numpy() for d in direction1],
                     [d.cpu().numpy() for d in direction2],
                 ),
+                "gradient_direction": 0 if self.plot_in_gradient_direction else None,
                 "sampled_projected_optimizer_steps": projected_optimizer_steps,
                 "sampled_projected_sgd_steps": projected_sgd_steps,
                 "policy_ratio": loss_surface_results.policy_ratios,

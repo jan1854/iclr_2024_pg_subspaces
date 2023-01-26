@@ -1,5 +1,6 @@
 import pickle
 from pathlib import Path
+from typing import Optional
 
 import PIL.Image
 import numpy as np
@@ -10,15 +11,15 @@ from scipy.interpolate import RegularGridInterpolator
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
-PLOT_NAME_TO_TITLE_DESCR = {
-    "reward_surface_undiscounted": "reward surface (undiscounted)",
-    "reward_surface_discounted": "reward surface (discounted)",
-    "policy_loss_surface": "policy loss surface",
-    "negative_policy_loss_surface": "negative policy loss surface",
-    "value_function_loss_surface": "value function loss surface",
-    "negative_value_function_loss_surface": "negative value function loss surface",
-    "loss_surface": "loss surface",
-    "negative_loss_surface": "negative loss surface",
+PLOT_NAME_TO_DESCR = {
+    "reward_surface_undiscounted": "reward (undiscounted)",
+    "reward_surface_discounted": "reward (discounted) surface",
+    "policy_loss_surface": "policy loss",
+    "negative_policy_loss_surface": "negative policy loss",
+    "value_function_loss_surface": "value function loss",
+    "negative_value_function_loss_surface": "negative value function loss",
+    "loss_surface": "loss",
+    "negative_loss_surface": "negative loss",
 }
 
 
@@ -31,7 +32,7 @@ def plot_results(
 ) -> TensorboardLogs:
     logs = TensorboardLogs()
 
-    for plot_name, plot_title in PLOT_NAME_TO_TITLE_DESCR.items():
+    for plot_name, plot_descr in PLOT_NAME_TO_DESCR.items():
         for results_path in (analysis_dir / plot_name / "data").glob(
             f"*{step:07d}_{plot_num:02d}*"
         ):
@@ -54,7 +55,8 @@ def plot_results(
                     plot_name,
                     results["env_step"],
                     results["plot_num"],
-                    plot_title,
+                    plot_descr,
+                    results.get("gradient_direction", None),
                     results.get("sampled_projected_optimizer_steps", []),
                     sgd_steps,
                     logs,
@@ -71,7 +73,8 @@ def plot_surface(
     plot_name: str,
     env_step: int,
     plot_nr: int,
-    title_descr: str,
+    descr: str,
+    gradient_direction: Optional[int],
     projected_optimizer_steps: np.ndarray,
     projected_sgd_steps: np.ndarray,
     logs: TensorboardLogs,
@@ -79,14 +82,29 @@ def plot_surface(
     outpath: Path,
 ) -> None:
     outpath.parent.mkdir(parents=True, exist_ok=True)
-    title = f"{env_name} | {title_descr} | magnitude: {magnitude}"
+    title = f"{env_name} | {descr} surface | magnitude: {magnitude}"
 
     coords = np.linspace(-magnitude, magnitude, num=results.shape[0])
 
+    if gradient_direction is not None:
+        yaxis_title = (
+            "Gradient direction" if gradient_direction == 0 else "Random direction"
+        )
+        xaxis_title = (
+            "Gradient direction" if gradient_direction == 1 else "Random direction"
+        )
+    else:
+        yaxis_title = "Random direction 1"
+        xaxis_title = "Random direction 2"
     fig = plotly.graph_objects.Figure(
         layout=plotly.graph_objects.Layout(
             margin=plotly.graph_objects.layout.Margin(l=20, r=20, t=50, b=25),
-            scene={"aspectmode": "cube"},
+            scene={
+                "aspectmode": "cube",
+                "yaxis_title": yaxis_title,
+                "xaxis_title": xaxis_title,
+                "zaxis_title": descr,
+            },
         )
     )
 
