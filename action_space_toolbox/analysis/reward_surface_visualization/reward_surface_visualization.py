@@ -142,7 +142,9 @@ class RewardSurfaceVisualization(Analysis):
                     rollout_buffer_gradient_direction,
                     num_processes=self.num_processes,
                 )
-                # Normalize the gradient to have the same length as the random direction vector
+                # Normalize the gradient to have the same length as the random direction vector (as described in
+                # appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in Reinforcement Learning
+                # Environments))
                 gradient, _, _ = ppo_gradient(
                     agent, next(rollout_buffer_gradient_direction.get())
                 )
