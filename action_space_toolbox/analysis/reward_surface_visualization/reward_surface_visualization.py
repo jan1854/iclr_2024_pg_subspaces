@@ -119,6 +119,12 @@ class RewardSurfaceVisualization(Analysis):
                 logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
             agent = self.agent_factory(self.env_factory())
+
+            direction2 = [
+                self.sample_filter_normalized_direction(p.detach())
+                for p in agent.policy.parameters()
+            ]
+
             if self.plot_in_gradient_direction:
                 rollout_buffer_gradient_direction = (
                     stable_baselines3.common.buffers.RolloutBuffer(
@@ -136,22 +142,19 @@ class RewardSurfaceVisualization(Analysis):
                     rollout_buffer_gradient_direction,
                     num_processes=self.num_processes,
                 )
+                # Normalize the gradient to have the same length as the random direction vector
                 gradient, _, _ = ppo_gradient(
                     agent, next(rollout_buffer_gradient_direction.get())
                 )
-                gradient_norm = torch.linalg.norm(
-                    torch.cat([g.flatten() for g in gradient])
+                direction2_norm = torch.linalg.norm(
+                    torch.cat([g.flatten() for g in direction2])
                 )
-                direction1 = [g / gradient_norm for g in gradient]
+                direction1 = [g / direction2_norm for g in gradient]
             else:
                 direction1 = [
                     self.sample_filter_normalized_direction(p.detach())
                     for p in agent.policy.parameters()
                 ]
-            direction2 = [
-                self.sample_filter_normalized_direction(p.detach())
-                for p in agent.policy.parameters()
-            ]
 
             agent_weights = [p.data.detach() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
