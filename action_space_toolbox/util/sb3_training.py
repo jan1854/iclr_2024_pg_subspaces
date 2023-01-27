@@ -74,57 +74,56 @@ def fill_rollout_buffer(
     if rollout_buffer_no_value_bootstrap is not None:
         rollout_buffer_no_value_bootstrap.reset()
 
-    num_samples = 0
     final_next_obs = None
     final_done = None
-    last_done = None
     for curr_env_steps in env_steps:
-        last_done = True
-        for obs, act, rew, rew_no_bootstrap, done, val, log_prob in zip(
-            *curr_env_steps
-        ):
-            # Since we collected complete episodes, the number of samples collected might be higher than the number of
-            # samples that needed --> Discard any additional samples
-            if num_samples >= buffer_size:
-                if final_next_obs is None:
-                    final_next_obs = obs
-                    final_done = np.array([[done]])
-                break
+        elements_to_add = min(
+            rollout_buffer.buffer_size - rollout_buffer.pos, len(curr_env_steps.actions)
+        )
+        if elements_to_add == 0:
+            break
+        episode_starts = np.concatenate(([True], curr_env_steps.dones[:-1]))
+        rbs = []
+        rews = []
+        if rollout_buffer is not None:
+            rbs.append(rollout_buffer)
+            rews.append(curr_env_steps.rewards)
+        if rollout_buffer_no_value_bootstrap is not None:
+            rbs.append(rollout_buffer_no_value_bootstrap)
+            rews.append(curr_env_steps.rewards_no_value_bootstrap)
+        for rb, rew in zip(rbs, rews):
+            # This is not how stable-baselines3's RolloutBuffer is intended to be used, but this is way faster than
+            # adding each element individually.
+            next_pos = rb.pos + elements_to_add
+            rb.observations[rb.pos : next_pos, 0, :] = curr_env_steps.observations[
+                :elements_to_add
+            ]
+            rb.actions[rb.pos : next_pos, 0, :] = curr_env_steps.actions[
+                :elements_to_add
+            ]
+            rb.rewards[rb.pos : next_pos, 0] = rew[:elements_to_add]
+            rb.episode_starts[rb.pos : next_pos, 0] = episode_starts[:elements_to_add]
+            rb.values[rb.pos : next_pos, 0] = curr_env_steps.values[:elements_to_add]
+            rb.log_probs[rb.pos : next_pos, 0] = curr_env_steps.log_probs[
+                :elements_to_add
+            ]
+            rb.pos = next_pos
+        final_done = curr_env_steps.dones[elements_to_add - 1]
+        if elements_to_add < len(curr_env_steps.observations):
+            final_next_obs = curr_env_steps.observations[elements_to_add]
 
-            if rollout_buffer is not None:
-                rollout_buffer.add(
-                    obs,
-                    act,
-                    rew,
-                    last_done,
-                    val,
-                    log_prob,
-                )
-            if rollout_buffer_no_value_bootstrap is not None:
-                rollout_buffer_no_value_bootstrap.add(
-                    obs,
-                    act,
-                    rew_no_bootstrap,
-                    last_done,
-                    val,
-                    log_prob,
-                )
-            last_done = done
-            num_samples += 1
+    if rollout_buffer is not None:
+        rollout_buffer.full = True
+    if rollout_buffer_no_value_bootstrap is not None:
+        rollout_buffer_no_value_bootstrap.full = True
 
-    assert rollout_buffer is None or rollout_buffer.full
-    assert (
-        rollout_buffer_no_value_bootstrap is None
-        or rollout_buffer_no_value_bootstrap.full
-    )
+    del env_steps
 
     agent = agent_factory(env_factory())
     if final_next_obs is None:
         # In the case that we sampled exactly the required number of steps, the last step will be the end of an episode
         # (because we only sample full episodes). Therefore, the value argument is irrelevant (as it will be multiplied
         # by zero in RolloutBuffer.compute_returns_and_advantage() anyway).
-        assert last_done
-        final_done = np.array([[True]])
         value = torch.zeros((1, 1), device=agent.device)
     else:
         with torch.no_grad():
@@ -134,11 +133,11 @@ def fill_rollout_buffer(
             )
     if rollout_buffer is not None:
         rollout_buffer.compute_returns_and_advantage(
-            last_values=value, dones=final_done
+            last_values=value, dones=np.array([[final_done]])
         )
     if rollout_buffer_no_value_bootstrap is not None:
         rollout_buffer_no_value_bootstrap.compute_returns_and_advantage(
-            last_values=value, dones=final_done
+            last_values=value, dones=np.array([[final_done]])
         )
 
 
@@ -152,13 +151,13 @@ def collect_complete_episodes(
 
     episode_length = get_episode_length(env)
     arr_len = min_num_env_steps + episode_length + 1
-    observations = np.empty((arr_len, *env.observation_space.shape))
-    actions = np.empty((arr_len, *env.action_space.shape))
-    rewards = np.empty(arr_len)
-    rewards_no_bootstrap = np.empty(arr_len)
+    observations = np.empty((arr_len, *env.observation_space.shape), dtype=np.float32)
+    actions = np.empty((arr_len, *env.action_space.shape), dtype=np.float32)
+    rewards = np.empty(arr_len, dtype=np.float32)
+    rewards_no_bootstrap = np.empty(arr_len, dtype=np.float32)
     dones = np.empty(arr_len, dtype=bool)
-    values = torch.empty(arr_len)
-    log_probs = torch.empty(arr_len)
+    values = np.empty(arr_len, dtype=np.float32)
+    log_probs = np.empty(arr_len, dtype=np.float32)
 
     observations[0] = env.reset()
 
@@ -214,8 +213,8 @@ def collect_complete_episodes(
 
         # This is for the next step (we add the first observation before the loop); the last observation of each episode
         # is not added to observations since it is not needed for filling a RolloutBuffer.
-        observations[n_steps + 1] = obs
-        actions[n_steps] = action
+        observations[n_steps + 1, :] = obs
+        actions[n_steps, :] = action
         rewards[n_steps] = reward
         rewards_no_bootstrap[n_steps] = reward_no_bootstrap
         dones[n_steps] = done
