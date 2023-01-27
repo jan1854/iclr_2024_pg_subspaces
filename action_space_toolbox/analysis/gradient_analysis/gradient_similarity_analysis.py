@@ -1,3 +1,4 @@
+import math
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -153,17 +154,28 @@ class GradientSimilarityAnalysis:
         cls,
         rollout_buffer: RolloutBuffer,
         agent: stable_baselines3.ppo.PPO,
-        batch_size: Optional[int] = None,
+        num_samples_per_gradient: Optional[int] = None,
         max_num_gradients: Optional[int] = None,
+        max_batch_size: int = 100000,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         policy_gradients = []
         vf_gradients = []
         combined_gradients = []
+        if num_samples_per_gradient is None:
+            num_samples_per_gradient = rollout_buffer.buffer_size
+        assert (
+            num_samples_per_gradient < max_batch_size
+            or num_samples_per_gradient % max_batch_size == 0
+        ), "The maximum number of samples has to be divisible by the maximum batch size"
+        batch_size = min(num_samples_per_gradient, max_batch_size)
+        batches_per_gradient = num_samples_per_gradient // batch_size
+
         for i, batch in enumerate(rollout_buffer.get(batch_size)):
             # Do not use incomplete batches
-            if (max_num_gradients is not None and i >= max_num_gradients) or (
-                batch_size is not None and batch.actions.shape[0] != batch_size
-            ):
+            if (
+                max_num_gradients is not None
+                and i >= max_num_gradients * batches_per_gradient
+            ) or (batch.actions.shape[0] != batch_size):
                 break
             combined_gradient, policy_gradient, vf_gradient = ppo_gradient(agent, batch)
             policy_gradients.append(torch.cat([g.flatten() for g in policy_gradient]))
@@ -172,11 +184,31 @@ class GradientSimilarityAnalysis:
                 torch.cat([g.flatten() for g in combined_gradient])
             )
 
-        return (
-            torch.stack(policy_gradients),
-            torch.stack(vf_gradients),
-            torch.stack(combined_gradients),
+        policy_gradients = cls.average_gradient_batches(
+            torch.stack(policy_gradients), batches_per_gradient
         )
+        vf_gradients = cls.average_gradient_batches(
+            torch.stack(vf_gradients), batches_per_gradient
+        )
+        combined_gradients = cls.average_gradient_batches(
+            torch.stack(combined_gradients), batches_per_gradient
+        )
+
+        return policy_gradients, vf_gradients, combined_gradients
+
+    @classmethod
+    def average_gradient_batches(
+        cls, gradient_batches: torch.Tensor, batches_per_gradient: int
+    ) -> torch.Tensor:
+        num_batches = gradient_batches.shape[0]
+        # num_batches might not be divisible by batches_per_gradient
+        # --> do not compute gradients for which we do not have enough batches
+        num_gradients = math.floor(num_batches / batches_per_gradient)
+        gradient_batches = gradient_batches[: num_gradients * batches_per_gradient]
+        gradient_batches = gradient_batches.reshape(
+            num_gradients, batches_per_gradient, gradient_batches.shape[-1]
+        )
+        return gradient_batches.mean(dim=1)
 
     @classmethod
     def _cosine_similarities(

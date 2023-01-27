@@ -102,7 +102,12 @@ class GradientAnalysis(Analysis):
             agent.gamma,
         )
         rollout_buffer_gradient_estimates = RolloutBuffer(
-            self.samples_true_gradient,
+            max(
+                np.max(
+                    self.gradient_similarity_analysis.batch_sizes_gradient_estimates
+                ),
+                agent.batch_size * self.num_gradient_estimates,
+            ),
             agent.observation_space,
             agent.action_space,
             agent.device,
@@ -188,8 +193,9 @@ class GradientAnalysis(Analysis):
 
         return logs
 
+    @classmethod
     def compute_value_function_gae_mre(
-        self,
+        cls,
         agent: stable_baselines3.ppo.PPO,
         rollout_buffer_true_gradient: RolloutBuffer,
     ) -> float:
