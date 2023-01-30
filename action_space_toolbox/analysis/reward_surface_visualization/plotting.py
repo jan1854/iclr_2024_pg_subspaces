@@ -147,7 +147,7 @@ def plot_surface(
         # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
         # error). Scale the gradient step to reduce the length but keep the direction the same.
         if np.max(np.abs(grad_step)) > magnitude:
-            grad_step = grad_step * magnitude / np.max(np.abs(grad_step)) - 1e-8
+            grad_step = grad_step * magnitude / np.max(np.abs(grad_step) + 1e-6)
         visualization_steps = np.linspace(np.zeros(2), grad_step, 200)
         # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
         fig.add_scatter3d(
