@@ -128,7 +128,6 @@ def calculate_mean_std_sequence(
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     assert len(event_accumulators) > 0
     scalars = []
-    warning_multiple_values_issued = False
     for ea in event_accumulators:
         scalars_curr_ea = read_scalar(ea, key)
         scalars.append(scalars_curr_ea)
