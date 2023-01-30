@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -27,21 +27,33 @@ def smooth(
 
 def create_plots(
     log_paths: Sequence[Path],
-    legend: Sequence[str],
+    legend: Optional[Sequence[str]],
     title: str,
     xlabel: str,
     ylabel: str,
     xlimits: Tuple[float, float],
     ylimits: Tuple[float, float],
-    key: str,
+    xaxis_log: bool,
+    keys: List[str],
     smoothing_weight: float,
     out: Path,
 ) -> None:
-    for log_path, name in zip(log_paths, legend):
+    ax = plt.gca()
+    for log_path in log_paths:
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
         if len(run_dirs) > 0:
             tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
             event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
+            key_indices = np.argwhere(
+                [
+                    np.all([key in ea.Tags()["scalars"] for ea in event_accumulators])
+                    for key in keys
+                ]
+            )
+            assert (
+                key_indices.shape[0] > 0
+            ), f"None of the keys {','.join(keys)} is present in all tensorboard logs of {log_path}."
+            key = keys[key_indices[0].item()]
             (
                 steps,
                 _,
@@ -52,34 +64,51 @@ def create_plots(
             value_mean = smooth(value_mean, smoothing_weight)
             value_std = smooth(value_std, smoothing_weight)
 
-            plt.plot(steps, value_mean, label=name)
+            if xaxis_log:
+                steps = 10**steps
+                plt.xscale("log")
+            color = next(ax._get_lines.prop_cycler)["color"]
+            plt.plot(steps, value_mean, color=color)
             plt.fill_between(
-                steps, value_mean - value_std, value_mean + value_std, alpha=0.2
+                steps,
+                value_mean - value_std,
+                value_mean + value_std,
+                alpha=0.2,
+                label="_nolegend_",
+                color=color,
             )
         else:
-            tb_dir = log_path / "tensorboard"
+            if (log_path / "tensorboard").exists():
+                tb_dir = log_path / "tensorboard"
+            else:
+                tb_dir = log_path
             _, event_accumulator = create_event_accumulators([tb_dir])[0]
             scalar = read_scalar(event_accumulator, key)
 
+            steps = np.fromiter(scalar.keys(), dtype=int)
+            if xaxis_log:
+                steps = 10**steps
+                plt.xscale("log")
             plt.plot(
-                list(scalar.keys()),
+                steps,
                 smooth([e.value for e in scalar.values()], smoothing_weight),
-                label=name,
             )
-    plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))
+    if not xaxis_log:
+        plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xlim(xlimits)
     plt.ylim(ylimits)
-    plt.legend(loc="lower right")
+    if legend is not None:
+        plt.legend(legend, loc="lower right")
     plt.savefig(out)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_paths", type=str, nargs="+")
-    parser.add_argument("--key", type=str, default="rollout/ep_rew_mean")
+    parser.add_argument("--key", type=str, nargs="+", default=["rollout/ep_rew_mean"])
     parser.add_argument("--legend", type=str, nargs="+")
     parser.add_argument("--title", type=str, default="")
     parser.add_argument("--xlabel", type=str, default="Environment steps")
@@ -88,6 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--xmax", type=float)
     parser.add_argument("--ymin", type=float)
     parser.add_argument("--ymax", type=float)
+    parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
@@ -104,6 +134,7 @@ if __name__ == "__main__":
         args.ylabel,
         (args.xmin, args.xmax),
         (args.ymin, args.ymax),
+        args.xaxis_log,
         args.key,
         args.smoothing_weight,
         out,
