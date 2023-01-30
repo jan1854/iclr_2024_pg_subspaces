@@ -16,7 +16,7 @@ from action_space_toolbox.util.get_episode_length import get_episode_length
 
 EnvSteps = collections.namedtuple(
     "EnvSteps",
-    "observations actions rewards rewards_no_bootstrap dones values log_probs",
+    "observations actions rewards rewards_no_value_bootstrap dones values log_probs",
 )
 
 
@@ -77,11 +77,6 @@ def fill_rollout_buffer(
     final_next_obs = None
     final_done = None
     for curr_env_steps in env_steps:
-        elements_to_add = min(
-            rollout_buffer.buffer_size - rollout_buffer.pos, len(curr_env_steps.actions)
-        )
-        if elements_to_add == 0:
-            break
         episode_starts = np.concatenate(([True], curr_env_steps.dones[:-1]))
         rbs = []
         rews = []
@@ -91,6 +86,12 @@ def fill_rollout_buffer(
         if rollout_buffer_no_value_bootstrap is not None:
             rbs.append(rollout_buffer_no_value_bootstrap)
             rews.append(curr_env_steps.rewards_no_value_bootstrap)
+
+        elements_to_add = min(
+            rbs[0].buffer_size - rbs[0].pos, len(curr_env_steps.actions)
+        )
+        if elements_to_add == 0:
+            break
         for rb, rew in zip(rbs, rews):
             # This is not how stable-baselines3's RolloutBuffer is intended to be used, but this is way faster than
             # adding each element individually.
