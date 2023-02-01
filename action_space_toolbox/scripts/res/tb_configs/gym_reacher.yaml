@@ -1,5 +1,5 @@
 ppo_torque_control: Reacher_TC-v2/2022-11-14/13-55-59
-ppo_velocity_control: Reacher_VC-v2/2022-11-14/13-58-20
+ppo_velocity_control: Reacher_VC-v2/2023-01-13/16-01-01
 ppo_position_control: Reacher_PC-v2/2022-11-14/13-57-50
 ppo_variable_gains_position_control_fixed_d_gains: Reacher_VarPC-v2/2022-11-22/17-31-39
 ppo_variable_gains_position_control_variable_d_gains: Reacher_VarPC-v2/2022-11-22/17-45-46
