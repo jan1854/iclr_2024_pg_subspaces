@@ -148,10 +148,13 @@ class RewardSurfaceVisualization(Analysis):
                 gradient, _, _ = ppo_gradient(
                     agent, next(rollout_buffer_gradient_direction.get())
                 )
+                gradient_norm = torch.linalg.norm(
+                    torch.cat([g.flatten() for g in gradient])
+                )
                 direction2_norm = torch.linalg.norm(
                     torch.cat([g.flatten() for g in direction2])
                 )
-                direction1 = [g / direction2_norm for g in gradient]
+                direction1 = [g / gradient_norm * direction2_norm for g in gradient]
             else:
                 direction1 = [
                     self.sample_filter_normalized_direction(p.detach())
