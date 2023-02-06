@@ -52,7 +52,7 @@ def create_plots(
             )
             assert (
                 key_indices.shape[0] > 0
-            ), f"None of the keys {','.join(keys)} is present in all tensorboard logs of {log_path}."
+            ), f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
             key = keys[key_indices[0].item()]
             (
                 steps,
@@ -84,14 +84,16 @@ def create_plots(
                 tb_dir = log_path
             _, event_accumulator = create_event_accumulators([tb_dir])[0]
             scalar = read_scalar(event_accumulator, key)
+            scalar = list(scalar.items())
+            scalar.sort(key=lambda x: x[0])
 
-            steps = np.fromiter(scalar.keys(), dtype=int)
+            steps = np.array([s[0] for s in scalar])
             if xaxis_log:
                 steps = 10**steps
                 plt.xscale("log")
             plt.plot(
                 steps,
-                smooth([e.value for e in scalar.values()], smoothing_weight),
+                smooth([s[1] for s in scalar], smoothing_weight),
             )
     if not xaxis_log:
         plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))

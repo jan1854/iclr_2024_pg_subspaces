@@ -133,6 +133,10 @@ def calculate_mean_std_sequence(
         scalars.append(scalars_curr_ea)
     # Sort data and check whether the steps match
     scalars = sorted([list(s.values()) for s in scalars], key=lambda s: len(s))
+    steps = set([s.step for s in scalars[-1]])
+    for scalar in scalars:
+        scalar.sort(key=lambda s: s.step)
+        assert np.all(s.step in steps for s in scalar), "Steps do not match."
     steps = [scalar.step for scalar in scalars[0]]
     if len(steps) < len(scalars[-1]):
         logger.warning(
