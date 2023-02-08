@@ -174,7 +174,13 @@ def plot_surface(
 
     if projected_optimizer_steps is not None:
         _plot_gradient_steps(
-            fig, projected_optimizer_steps, interpolator, magnitude, z_range, "black"
+            fig,
+            projected_optimizer_steps,
+            interpolator,
+            magnitude,
+            z_range,
+            "Optimizer trajectory",
+            "black",
         )
     if projected_sgd_steps is not None:
         _plot_gradient_steps(
@@ -183,6 +189,7 @@ def plot_surface(
             interpolator,
             magnitude,
             z_range,
+            "SGD trajectory",
             "#FFFF00",
         )
     if projected_optimizer_steps_true_grad is not None:
@@ -192,6 +199,7 @@ def plot_surface(
             interpolator,
             magnitude,
             z_range,
+            "True gradient optimizer trajectory",
             "#158463",
         )
     if projected_sgd_steps_true_grad is not None:
@@ -201,6 +209,7 @@ def plot_surface(
             interpolator,
             magnitude,
             z_range,
+            "True gradient SGD trajectory",
             "#FF6600",
         )
 
@@ -217,18 +226,22 @@ def plot_surface(
 
 def _plot_gradient_steps(
     fig: plotly.graph_objects.Figure,
-    projected_steps: np.ndarray,
+    projected_trajectories: np.ndarray,
     interpolator: Callable[[np.ndarray], np.ndarray],
     magnitude: float,
     z_range: float,
+    name: str,
     color: str,
     opacity: float = 0.5,
 ) -> None:
     # Backward compatibility
-    if projected_steps.ndim == 2:
-        projected_steps = projected_steps[None]
+    if projected_trajectories.ndim == 2:
+        projected_trajectories = projected_trajectories[None]
 
-    for grad_steps in projected_steps:
+    for i, grad_steps in enumerate(projected_trajectories):
+        name_curr_trajectory = (
+            f"{name} ({i})" if len(projected_trajectories) > 1 else name
+        )
         # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
         # error). Scale the gradient step to reduce the length but keep the direction the same.
         visualization_steps = []
@@ -256,6 +269,7 @@ def _plot_gradient_steps(
             )
         visualization_steps = np.stack(visualization_steps)
 
+        legend_entry_created = False
         for segment in visualization_steps:
             # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
             z_values_segment = interpolator(segment) + 0.01 * z_range
@@ -266,17 +280,21 @@ def _plot_gradient_steps(
                 mode="lines",
                 line_width=8,
                 line_color=color,
-                showlegend=False,
+                name=name_curr_trajectory,
+                showlegend=not legend_entry_created,
+                legendgroup=name_curr_trajectory,
                 opacity=opacity,
             )
+            if not legend_entry_created:
+                legend_entry_created = True
         # Only show the additional markers if the plot is zoomed in enough (the average distance between markers is
         # larger than some threshold) to avoid clutter
         if (
             np.mean(np.linalg.norm(grad_steps[1:] - grad_steps[:-1], axis=-1))
             > 0.005 * magnitude
         ):
-            markers = projected_steps[
-                np.all(np.abs(projected_steps) < magnitude, axis=-1), :
+            markers = projected_trajectories[
+                np.all(np.abs(projected_trajectories) < magnitude, axis=-1), :
             ]
             assert np.all(np.abs(markers) < magnitude)
             z_values_markers = interpolator(markers) + 0.01 * z_range
@@ -288,6 +306,8 @@ def _plot_gradient_steps(
                 marker_size=2,
                 marker_color=color,
                 showlegend=False,
+                name=name_curr_trajectory,
+                legendgroup=name_curr_trajectory,
                 opacity=opacity,
             )
 
