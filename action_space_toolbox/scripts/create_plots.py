@@ -83,6 +83,13 @@ def create_plots(
             else:
                 tb_dir = log_path
             _, event_accumulator = create_event_accumulators([tb_dir])[0]
+            key_indices = np.argwhere(
+                [key in event_accumulator.Tags()["scalars"] for key in keys]
+            )
+            assert (
+                key_indices.shape[0] > 0
+            ), f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
+            key = keys[key_indices[0].item()]
             scalar = read_scalar(event_accumulator, key)
             scalar = list(scalar.items())
             scalar.sort(key=lambda x: x[0])
@@ -93,7 +100,7 @@ def create_plots(
                 plt.xscale("log")
             plt.plot(
                 steps,
-                smooth([s[1] for s in scalar], smoothing_weight),
+                smooth([s[1].value for s in scalar], smoothing_weight),
             )
     if not xaxis_log:
         plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))
