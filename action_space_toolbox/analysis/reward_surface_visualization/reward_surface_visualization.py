@@ -3,7 +3,7 @@ import logging
 import pickle
 from collections import namedtuple
 from pathlib import Path
-from typing import Callable, Iterable, Sequence, Tuple, Union
+from typing import Callable, Iterable, Sequence, Tuple, Union, Optional
 
 import gym
 import numpy as np
@@ -62,6 +62,7 @@ class RewardSurfaceVisualization(Analysis):
         num_processes: int,
         plot_sgd_steps: bool,
         max_gradient_trajectories: int,
+        max_steps_per_gradient_trajectory: Optional[int],
     ):
         super().__init__(
             "reward_surface_visualization",
@@ -80,6 +81,7 @@ class RewardSurfaceVisualization(Analysis):
         self.num_processes = num_processes
         self.plot_sgd_steps = plot_sgd_steps
         self.max_gradient_trajectories = max_gradient_trajectories
+        self.max_steps_per_gradient_trajectory = max_steps_per_gradient_trajectory
         self.out_dir = (
             run_dir / "analyses" / "reward_surface_visualization" / analysis_run_id
         )
@@ -330,6 +332,7 @@ class RewardSurfaceVisualization(Analysis):
                         overwrite=overwrite_results,
                         plot_sgd_steps=self.plot_sgd_steps,
                         max_gradient_trajectories=self.max_gradient_trajectories,
+                        max_steps_per_gradient_trajectory=self.max_steps_per_gradient_trajectory,
                     )
                 )
             )

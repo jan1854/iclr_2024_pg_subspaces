@@ -30,6 +30,7 @@ def plot_results(
     overwrite: bool = False,
     plot_sgd_steps: bool = False,
     max_gradient_trajectories: Optional[int] = None,
+    max_steps_per_gradient_trajectory: Optional[int] = None,
 ) -> TensorboardLogs:
     logs = TensorboardLogs()
 
@@ -46,12 +47,16 @@ def plot_results(
 
                 if plot_sgd_steps and "sampled_projected_sgd_steps" in results:
                     sgd_steps = results["sampled_projected_sgd_steps"]
-                    sgd_steps = sgd_steps[:max_gradient_trajectories]
+                    sgd_steps = sgd_steps[
+                        :max_gradient_trajectories, :max_steps_per_gradient_trajectory
+                    ]
                 else:
                     sgd_steps = None
                 if "sampled_projected_optimizer_steps" in results:
                     optimizer_steps = results["sampled_projected_optimizer_steps"]
-                    optimizer_steps = optimizer_steps[:max_gradient_trajectories]
+                    optimizer_steps = optimizer_steps[
+                        :max_gradient_trajectories, :max_steps_per_gradient_trajectory
+                    ]
                 else:
                     optimizer_steps = None
 
@@ -124,14 +129,14 @@ def plot_surface(
         reversescale=True,
     )
 
-    Z_range = abs(np.max(results) - np.min(results))
+    z_range = abs(np.max(results) - np.min(results))
     # Add a black line at (0,0) to mark the current policy
     fig.add_scatter3d(
         x=[0.0, 0.0],
         y=[0.0, 0.0],
-        z=[np.min(results) - 0.1 * Z_range, np.max(results) + 0.1 * Z_range],
+        z=[np.min(results) - 0.1 * z_range, np.max(results) + 0.1 * z_range],
         mode="lines",
-        line_width=10,
+        line_width=11,
         line_color="black",
         showlegend=False,
     )
@@ -139,7 +144,7 @@ def plot_surface(
 
     if projected_optimizer_steps is not None:
         _plot_gradient_steps(
-            fig, projected_optimizer_steps, interpolator, magnitude, Z_range, "black"
+            fig, projected_optimizer_steps, interpolator, magnitude, z_range, "black"
         )
     if projected_sgd_steps is not None:
         _plot_gradient_steps(
@@ -147,8 +152,9 @@ def plot_surface(
             projected_sgd_steps,
             interpolator,
             magnitude,
-            Z_range,
-            "#595959",
+            z_range,
+            "#4d4d4d",
+            opacity=0.8,
         )
 
     if title is not None:
@@ -169,6 +175,7 @@ def _plot_gradient_steps(
     magnitude: float,
     z_range: float,
     color: str,
+    opacity: float = 0.4,
 ) -> None:
     # Backward compatibility
     if projected_steps.ndim == 2:
@@ -213,7 +220,7 @@ def _plot_gradient_steps(
                 line_width=8,
                 line_color=color,
                 showlegend=False,
-                opacity=0.4,
+                opacity=opacity,
             )
         # Only show the additional markers if the plot is zoomed in enough to avoid clutter
         if np.max(np.abs(grad_steps)) >= 0.1 * magnitude:
@@ -230,7 +237,7 @@ def _plot_gradient_steps(
                 marker_size=2,
                 marker_color=color,
                 showlegend=False,
-                opacity=0.4,
+                opacity=opacity,
             )
 
 
