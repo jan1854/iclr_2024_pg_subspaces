@@ -94,7 +94,7 @@ for env_dir in tqdm(log_dir.iterdir()):
                     (
                         optimizer_steps,
                         sgd_steps,
-                    ) = analysis.sample_projected_gradient_steps(
+                    ) = analysis.sample_projected_update_trajectories(
                         [torch.tensor(d) for d in direction[0]],
                         [torch.tensor(d) for d in direction[1]],
                         10,

@@ -1,11 +1,11 @@
 import pickle
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable, Union
 
 import PIL.Image
 import numpy as np
+import plotly.express
 import plotly.graph_objects
-from PIL import Image
 from scipy.interpolate import RegularGridInterpolator
 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -29,6 +29,7 @@ def plot_results(
     plot_num: int,
     overwrite: bool = False,
     plot_sgd_steps: bool = False,
+    max_gradient_trajectories: Optional[int] = None,
 ) -> TensorboardLogs:
     logs = TensorboardLogs()
 
@@ -43,11 +44,17 @@ def plot_results(
                     results = pickle.load(results_file)
                 data = results["data"]
 
-                sgd_steps = (
-                    results.get("sampled_projected_sgd_steps", [])
-                    if plot_sgd_steps
-                    else []
-                )
+                if plot_sgd_steps and "sampled_projected_sgd_steps" in results:
+                    sgd_steps = results["sampled_projected_sgd_steps"]
+                    sgd_steps = sgd_steps[:max_gradient_trajectories]
+                else:
+                    sgd_steps = None
+                if "sampled_projected_optimizer_steps" in results:
+                    optimizer_steps = results["sampled_projected_optimizer_steps"]
+                    optimizer_steps = optimizer_steps[:max_gradient_trajectories]
+                else:
+                    optimizer_steps = None
+
                 plot_surface(
                     results["magnitude"],
                     data,
@@ -56,8 +63,8 @@ def plot_results(
                     results["env_step"],
                     results["plot_num"],
                     plot_descr,
-                    results.get("gradient_direction", None),
-                    results.get("sampled_projected_optimizer_steps", []),
+                    results.get("gradient_direction"),
+                    optimizer_steps,
                     sgd_steps,
                     logs,
                     analysis_dir.name,
@@ -75,8 +82,8 @@ def plot_surface(
     plot_nr: int,
     descr: str,
     gradient_direction: Optional[int],
-    projected_optimizer_steps: np.ndarray,
-    projected_sgd_steps: np.ndarray,
+    projected_optimizer_steps: Optional[np.ndarray],
+    projected_sgd_steps: Optional[np.ndarray],
     logs: TensorboardLogs,
     analysis_run_id: str,
     outpath: Path,
@@ -130,35 +137,18 @@ def plot_surface(
     )
     interpolator = RegularGridInterpolator((coords, coords), results, method="linear")
 
-    for grad_step in projected_sgd_steps:
-        visualization_steps = np.linspace(np.zeros(2), grad_step, 200)
-        fig.add_scatter3d(
-            x=visualization_steps[:, 1],
-            y=visualization_steps[:, 0],
-            z=interpolator(visualization_steps) + 0.01 * Z_range,
-            mode="lines",
-            line_width=8,
-            line_color="blue",
-            showlegend=False,
-            opacity=0.2,
+    if projected_optimizer_steps is not None:
+        _plot_gradient_steps(
+            fig, projected_optimizer_steps, interpolator, magnitude, Z_range, "black"
         )
-
-    for grad_step in projected_optimizer_steps:
-        # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
-        # error). Scale the gradient step to reduce the length but keep the direction the same.
-        if np.max(np.abs(grad_step)) > magnitude:
-            grad_step = grad_step * magnitude / np.max(np.abs(grad_step) + 1e-6)
-        visualization_steps = np.linspace(np.zeros(2), grad_step, 200)
-        # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
-        fig.add_scatter3d(
-            x=visualization_steps[:, 1],
-            y=visualization_steps[:, 0],
-            z=interpolator(visualization_steps) + 0.01 * Z_range,
-            mode="lines",
-            line_width=8,
-            line_color="black",
-            showlegend=False,
-            opacity=0.5,
+    if projected_sgd_steps is not None:
+        _plot_gradient_steps(
+            fig,
+            projected_sgd_steps,
+            interpolator,
+            magnitude,
+            Z_range,
+            "#595959",
         )
 
     if title is not None:
@@ -166,7 +156,87 @@ def plot_surface(
 
     fig.write_image(outpath.with_suffix(".png"), scale=2)
     fig.write_html(outpath.with_suffix(".html"))
-    with Image.open(outpath.with_suffix(".png")) as im:
+    with PIL.Image.open(outpath.with_suffix(".png")) as im:
         # Make the image smaller so that it fits better in tensorboard
         im = im.resize((im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS)
         logs.add_image(f"{plot_name}/{analysis_run_id}/{plot_nr}", im, env_step)
+
+
+def _plot_gradient_steps(
+    fig: plotly.graph_objects.Figure,
+    projected_steps: np.ndarray,
+    interpolator: Callable[[np.ndarray], np.ndarray],
+    magnitude: float,
+    z_range: float,
+    color: str,
+) -> None:
+    # Backward compatibility
+    if projected_steps.ndim == 2:
+        projected_steps = projected_steps[None]
+
+    for grad_steps in projected_steps:
+        # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
+        # error). Scale the gradient step to reduce the length but keep the direction the same.
+        visualization_steps = []
+        grad_steps_start_end = []
+        last_step = np.zeros(2)
+        for step in grad_steps:
+            if np.any(np.abs(step) > magnitude) and np.any(
+                np.abs(last_step) > magnitude
+            ):
+                last_step = step
+                continue
+            else:
+                step_rescaled = _rescale_if_out_of_bounds(step, magnitude)
+                last_step_rescaled = _rescale_if_out_of_bounds(last_step, magnitude)
+                grad_steps_start_end.append((last_step_rescaled, step_rescaled))
+                last_step = step
+        visualization_steps_per_gradient_step = 200 // len(grad_steps_start_end)
+        for last_step, step in grad_steps_start_end:
+            visualization_steps.append(
+                np.linspace(
+                    last_step,
+                    step,
+                    visualization_steps_per_gradient_step,
+                )
+            )
+        visualization_steps = np.stack(visualization_steps)
+
+        for segment in visualization_steps:
+            # TODO: Check out the "Setting Angle Reference" example at https://plotly.com/python/marker-style
+            z_values_segment = interpolator(segment) + 0.01 * z_range
+            fig.add_scatter3d(
+                x=segment[:, 1],
+                y=segment[:, 0],
+                z=z_values_segment,
+                mode="lines",
+                line_width=8,
+                line_color=color,
+                showlegend=False,
+                opacity=0.4,
+            )
+        # Only show the additional markers if the plot is zoomed in enough to avoid clutter
+        if np.max(np.abs(grad_steps)) >= 0.1 * magnitude:
+            markers = projected_steps[
+                np.all(np.abs(projected_steps) < magnitude, axis=-1), :
+            ]
+            assert np.all(np.abs(markers) < magnitude)
+            z_values_markers = interpolator(markers) + 0.01 * z_range
+            fig.add_scatter3d(
+                x=markers[:, 1],
+                y=markers[:, 0],
+                z=z_values_markers,
+                mode="markers",
+                marker_size=2,
+                marker_color=color,
+                showlegend=False,
+                opacity=0.4,
+            )
+
+
+def _rescale_if_out_of_bounds(arr: np.array, bounds: Union[int, np.array]) -> np.array:
+    rescale_factors = bounds / (np.abs(arr) + 1e-8)
+    if np.any(rescale_factors < 1.0):
+        return arr * np.min(rescale_factors)
+    else:
+        return arr

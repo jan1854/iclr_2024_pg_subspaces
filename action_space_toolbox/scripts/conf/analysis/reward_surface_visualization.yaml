@@ -7,3 +7,5 @@ gradient_direction_num_samples: 1_000_000
 num_steps: 200000
 num_plots: 1
 num_processes: 1
+plot_sgd_steps: false
+max_gradient_trajectories: 10
