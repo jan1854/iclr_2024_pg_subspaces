@@ -1,9 +1,10 @@
 import functools
+import itertools
 import logging
 import pickle
 from collections import namedtuple
 from pathlib import Path
-from typing import Callable, Iterable, Sequence, Tuple, Union, Optional
+from typing import Callable, Iterable, Optional, Sequence, Tuple, Union
 
 import gym
 import numpy as np
@@ -56,11 +57,12 @@ class RewardSurfaceVisualization(Analysis):
         grid_size: int,
         magnitude: float,
         plot_in_gradient_direction: bool,
-        gradient_direction_num_samples: int,
+        num_samples_true_gradient: int,
         num_steps: int,
         num_plots: int,
         num_processes: int,
         plot_sgd_steps: bool,
+        plot_true_gradient_steps: bool,
         max_gradient_trajectories: int,
         max_steps_per_gradient_trajectory: Optional[int],
     ):
@@ -75,11 +77,12 @@ class RewardSurfaceVisualization(Analysis):
         self.grid_size = grid_size
         self.magnitude = magnitude
         self.plot_in_gradient_direction = plot_in_gradient_direction
-        self.gradient_direction_num_samples = gradient_direction_num_samples
+        self.num_samples_true_gradient = num_samples_true_gradient
         self.num_steps = num_steps
         self.num_plots = num_plots
         self.num_processes = num_processes
         self.plot_sgd_steps = plot_sgd_steps
+        self.plot_true_gradient_steps = plot_true_gradient_steps
         self.max_gradient_trajectories = max_gradient_trajectories
         self.max_steps_per_gradient_trajectory = max_steps_per_gradient_trajectory
         self.out_dir = (
@@ -125,6 +128,22 @@ class RewardSurfaceVisualization(Analysis):
                 logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
             agent = self.agent_factory(self.env_factory())
+            rollout_buffer_true_gradient = (
+                stable_baselines3.common.buffers.RolloutBuffer(
+                    self.num_samples_true_gradient,
+                    agent.observation_space,
+                    agent.action_space,
+                    agent.device,
+                    agent.gae_lambda,
+                    agent.gamma,
+                )
+            )
+            fill_rollout_buffer(
+                self.env_factory,
+                self.agent_factory,
+                rollout_buffer_true_gradient,
+                num_processes=self.num_processes,
+            )
 
             direction2 = [
                 self.sample_filter_normalized_direction(p.detach())
@@ -132,27 +151,11 @@ class RewardSurfaceVisualization(Analysis):
             ]
 
             if self.plot_in_gradient_direction:
-                rollout_buffer_gradient_direction = (
-                    stable_baselines3.common.buffers.RolloutBuffer(
-                        self.gradient_direction_num_samples,
-                        agent.observation_space,
-                        agent.action_space,
-                        agent.device,
-                        agent.gae_lambda,
-                        agent.gamma,
-                    )
-                )
-                fill_rollout_buffer(
-                    self.env_factory,
-                    self.agent_factory,
-                    rollout_buffer_gradient_direction,
-                    num_processes=self.num_processes,
-                )
                 # Normalize the gradient to have the same length as the random direction vector (as described in
                 # appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in Reinforcement Learning
                 # Environments))
                 gradient, _, _ = ppo_gradient(
-                    agent, next(rollout_buffer_gradient_direction.get())
+                    agent, next(rollout_buffer_true_gradient.get())
                 )
                 gradient_norm = torch.linalg.norm(
                     torch.cat([g.flatten() for g in gradient])
@@ -210,8 +213,13 @@ class RewardSurfaceVisualization(Analysis):
             (
                 projected_optimizer_steps,
                 projected_sgd_steps,
+                projected_optimizer_steps_true_grad,
+                projected_sgd_steps_true_grad,
             ) = self.sample_projected_update_trajectories(
-                direction1, direction2, max(10, self.max_gradient_trajectories)
+                direction1,
+                direction2,
+                max(10, self.max_gradient_trajectories),
+                rollout_buffer_true_gradient,
             )
 
             reward_surface_results_flat = [
@@ -235,8 +243,11 @@ class RewardSurfaceVisualization(Analysis):
                     [d.cpu().numpy() for d in direction2],
                 ),
                 "gradient_direction": 0 if self.plot_in_gradient_direction else None,
+                "num_samples_true_gradient": self.num_samples_true_gradient,
                 "sampled_projected_optimizer_steps": projected_optimizer_steps,
                 "sampled_projected_sgd_steps": projected_sgd_steps,
+                "sampled_projected_optimizer_steps_true_gradient": projected_optimizer_steps_true_grad,
+                "sampled_projected_sgd_steps_true_gradient": projected_sgd_steps_true_grad,
                 "policy_ratio": loss_surface_results.policy_ratios,
             }
 
@@ -331,6 +342,7 @@ class RewardSurfaceVisualization(Analysis):
                         plot_num=plot_num,
                         overwrite=overwrite_results,
                         plot_sgd_steps=self.plot_sgd_steps,
+                        plot_true_gradient_steps=self.plot_true_gradient_steps,
                         max_gradient_trajectories=self.max_gradient_trajectories,
                         max_steps_per_gradient_trajectory=self.max_steps_per_gradient_trajectory,
                     )
@@ -483,7 +495,8 @@ class RewardSurfaceVisualization(Analysis):
         direction1: Sequence[torch.Tensor],
         direction2: Sequence[torch.Tensor],
         num_samples: int,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        rollout_buffer_true_gradient: stable_baselines3.common.buffers.RolloutBuffer,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         projected_optimizer_parameters = []
         projected_sgd_parameters = []
 
@@ -530,8 +543,33 @@ class RewardSurfaceVisualization(Analysis):
             )
             projected_sgd_parameters.append(curr_proj_sgd_parameters)
 
-        return np.stack(projected_optimizer_parameters), np.stack(
-            projected_sgd_parameters
+        agent = self.agent_factory(self.env_factory())
+        true_gradient_data = [next(rollout_buffer_true_gradient.get())] * 32
+        projected_optimizer_parameters_true_grad = (
+            self._sample_projected_update_trajectory(
+                true_gradient_data,
+                agent,
+                agent.policy.optimizer,
+                directions,
+            )
+        )
+
+        agent = self.agent_factory(self.env_factory())
+        sgd = torch.optim.SGD(
+            agent.policy.parameters(), agent.policy.optimizer.param_groups[0]["lr"]
+        )
+        projected_sgd_parameters_true_grad = self._sample_projected_update_trajectory(
+            true_gradient_data,
+            agent,
+            sgd,
+            directions,
+        )
+
+        return (
+            np.stack(projected_optimizer_parameters),
+            np.stack(projected_sgd_parameters),
+            projected_optimizer_parameters_true_grad[None],
+            projected_sgd_parameters_true_grad[None],
         )
 
     def _sample_projected_update_trajectory(

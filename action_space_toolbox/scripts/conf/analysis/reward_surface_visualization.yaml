@@ -3,10 +3,11 @@ analysis_run_id: default
 grid_size: 31
 magnitude: 1.0
 plot_in_gradient_direction: false
-gradient_direction_num_samples: 1_000_000
-num_steps: 200000
+num_samples_true_gradient: 1_000_000
+num_steps: 200_000
 num_plots: 1
 num_processes: 1
 plot_sgd_steps: false
-max_gradient_trajectories: 10
-max_steps_per_gradient_direction: null
+plot_true_gradient_steps: true
+max_gradient_trajectories: 2
+max_steps_per_gradient_trajectory: null

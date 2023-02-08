@@ -29,6 +29,7 @@ def plot_results(
     plot_num: int,
     overwrite: bool = False,
     plot_sgd_steps: bool = False,
+    plot_true_gradient_steps: bool = False,
     max_gradient_trajectories: Optional[int] = None,
     max_steps_per_gradient_trajectory: Optional[int] = None,
 ) -> TensorboardLogs:
@@ -45,13 +46,6 @@ def plot_results(
                     results = pickle.load(results_file)
                 data = results["data"]
 
-                if plot_sgd_steps and "sampled_projected_sgd_steps" in results:
-                    sgd_steps = results["sampled_projected_sgd_steps"]
-                    sgd_steps = sgd_steps[
-                        :max_gradient_trajectories, :max_steps_per_gradient_trajectory
-                    ]
-                else:
-                    sgd_steps = None
                 if "sampled_projected_optimizer_steps" in results:
                     optimizer_steps = results["sampled_projected_optimizer_steps"]
                     optimizer_steps = optimizer_steps[
@@ -59,6 +53,38 @@ def plot_results(
                     ]
                 else:
                     optimizer_steps = None
+                if plot_sgd_steps and "sampled_projected_sgd_steps" in results:
+                    sgd_steps = results["sampled_projected_sgd_steps"]
+                    sgd_steps = sgd_steps[
+                        :max_gradient_trajectories, :max_steps_per_gradient_trajectory
+                    ]
+                else:
+                    sgd_steps = None
+                if (
+                    plot_true_gradient_steps
+                    and "sampled_projected_optimizer_steps_true_gradient" in results
+                ):
+                    optimizer_steps_true_grad = results[
+                        "sampled_projected_optimizer_steps_true_gradient"
+                    ]
+                    optimizer_steps_true_grad = optimizer_steps_true_grad[
+                        :, :max_steps_per_gradient_trajectory
+                    ]
+                else:
+                    optimizer_steps_true_grad = None
+                if (
+                    plot_sgd_steps
+                    and plot_true_gradient_steps
+                    and "sampled_projected_sgd_steps_true_gradient" in results
+                ):
+                    sgd_steps_true_grad = results[
+                        "sampled_projected_sgd_steps_true_gradient"
+                    ]
+                    sgd_steps_true_grad = sgd_steps_true_grad[
+                        :, :max_steps_per_gradient_trajectory
+                    ]
+                else:
+                    sgd_steps_true_grad = None
 
                 plot_surface(
                     results["magnitude"],
@@ -71,6 +97,8 @@ def plot_results(
                     results.get("gradient_direction"),
                     optimizer_steps,
                     sgd_steps,
+                    optimizer_steps_true_grad,
+                    sgd_steps_true_grad,
                     logs,
                     analysis_dir.name,
                     plot_path,
@@ -89,6 +117,8 @@ def plot_surface(
     gradient_direction: Optional[int],
     projected_optimizer_steps: Optional[np.ndarray],
     projected_sgd_steps: Optional[np.ndarray],
+    projected_optimizer_steps_true_grad: Optional[np.ndarray],
+    projected_sgd_steps_true_grad: Optional[np.ndarray],
     logs: TensorboardLogs,
     analysis_run_id: str,
     outpath: Path,
@@ -153,8 +183,25 @@ def plot_surface(
             interpolator,
             magnitude,
             z_range,
-            "#4d4d4d",
-            opacity=0.8,
+            "#FFFF00",
+        )
+    if projected_optimizer_steps_true_grad is not None:
+        _plot_gradient_steps(
+            fig,
+            projected_optimizer_steps_true_grad,
+            interpolator,
+            magnitude,
+            z_range,
+            "#158463",
+        )
+    if projected_sgd_steps_true_grad is not None:
+        _plot_gradient_steps(
+            fig,
+            projected_sgd_steps_true_grad,
+            interpolator,
+            magnitude,
+            z_range,
+            "#FF6600",
         )
 
     if title is not None:
@@ -175,7 +222,7 @@ def _plot_gradient_steps(
     magnitude: float,
     z_range: float,
     color: str,
-    opacity: float = 0.4,
+    opacity: float = 0.5,
 ) -> None:
     # Backward compatibility
     if projected_steps.ndim == 2:
@@ -222,8 +269,12 @@ def _plot_gradient_steps(
                 showlegend=False,
                 opacity=opacity,
             )
-        # Only show the additional markers if the plot is zoomed in enough to avoid clutter
-        if np.max(np.abs(grad_steps)) >= 0.1 * magnitude:
+        # Only show the additional markers if the plot is zoomed in enough (the average distance between markers is
+        # larger than some threshold) to avoid clutter
+        if (
+            np.mean(np.linalg.norm(grad_steps[1:] - grad_steps[:-1], axis=-1))
+            > 0.005 * magnitude
+        ):
             markers = projected_steps[
                 np.all(np.abs(projected_steps) < magnitude, axis=-1), :
             ]
