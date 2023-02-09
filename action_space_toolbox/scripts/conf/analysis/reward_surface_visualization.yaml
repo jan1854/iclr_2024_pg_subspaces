@@ -9,5 +9,5 @@ num_plots: 1
 num_processes: 1
 plot_sgd_steps: false
 plot_true_gradient_steps: true
-max_gradient_trajectories: 2
+max_gradient_trajectories: 1
 max_steps_per_gradient_trajectory: null
