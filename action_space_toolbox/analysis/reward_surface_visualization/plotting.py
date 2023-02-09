@@ -284,6 +284,7 @@ def _plot_gradient_steps(
                 showlegend=not legend_entry_created,
                 legendgroup=name_curr_trajectory,
                 opacity=opacity,
+                visible="legendonly",
             )
             if not legend_entry_created:
                 legend_entry_created = True
@@ -309,6 +310,7 @@ def _plot_gradient_steps(
                 name=name_curr_trajectory,
                 legendgroup=name_curr_trajectory,
                 opacity=opacity,
+                visible="legendonly",
             )
 
 
