@@ -28,8 +28,8 @@ def plot_results(
     step: int,
     plot_num: int,
     overwrite: bool = False,
-    plot_sgd_steps: bool = False,
-    plot_true_gradient_steps: bool = False,
+    plot_sgd_steps: bool = True,
+    plot_true_gradient_steps: bool = True,
     max_gradient_trajectories: Optional[int] = None,
     max_steps_per_gradient_trajectory: Optional[int] = None,
 ) -> TensorboardLogs:
@@ -215,8 +215,11 @@ def plot_surface(
 
     if title is not None:
         fig.update_layout(title=title)
-
+    # All the trajectories are disabled initially anyway, therefore we hide the legend for the png output
+    fig.update_layout(showlegend=False)
     fig.write_image(outpath.with_suffix(".png"), scale=2)
+    fig.update_layout(showlegend=True)
+    fig.update_layout(legend=dict(x=1.06))
     fig.write_html(outpath.with_suffix(".html"))
     with PIL.Image.open(outpath.with_suffix(".png")) as im:
         # Make the image smaller so that it fits better in tensorboard
@@ -240,7 +243,7 @@ def _plot_gradient_steps(
 
     for i, grad_steps in enumerate(projected_trajectories):
         name_curr_trajectory = (
-            f"{name} ({i})" if len(projected_trajectories) > 1 else name
+            f"{name} ({i + 1})" if len(projected_trajectories) > 1 else name
         )
         # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
         # error). Scale the gradient step to reduce the length but keep the direction the same.
