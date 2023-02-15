@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import action_space_toolbox
+from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 logger = logging.getLogger(__file__)
@@ -29,7 +30,6 @@ def analysis_worker(
     show_progress: bool,
 ) -> TensorboardLogs:
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
-    agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
     if device is None:
         device = train_cfg.algorithm.algorithm.device
 
@@ -38,12 +38,11 @@ def analysis_worker(
     agent_checkpoint = (
         run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps"
     )
+    agent_spec = AgentSpec(agent_checkpoint, device)
     analysis = hydra.utils.instantiate(
         analysis_cfg,
         env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
-        agent_factory=functools.partial(
-            agent_class.load, agent_checkpoint, device=device, tensorboard_log=None
-        ),
+        agent_spec=agent_spec,
         run_dir=run_dir,
     )
     return analysis.do_analysis(

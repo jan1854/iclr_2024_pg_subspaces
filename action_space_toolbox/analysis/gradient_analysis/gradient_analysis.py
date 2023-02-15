@@ -2,7 +2,7 @@ import functools
 import logging
 import pickle
 from pathlib import Path
-from typing import List, Tuple, Callable, Union, Sequence
+from typing import List, Tuple, Callable, Sequence
 
 import gym
 import numpy as np
@@ -20,6 +20,7 @@ from action_space_toolbox.analysis.gradient_analysis.value_function import (
     ValueFunction,
 )
 from action_space_toolbox.util import metrics
+from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -32,7 +33,7 @@ class GradientAnalysis(Analysis):
         self,
         analysis_run_id: str,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[[Union[gym.Env, VecEnv]], stable_baselines3.ppo.PPO],
+        agent_spec: AgentSpec,
         run_dir: Path,
         num_gradient_estimates: int = 500,
         samples_true_gradient: int = 10**7,
@@ -47,7 +48,7 @@ class GradientAnalysis(Analysis):
             "gradient_analysis",
             analysis_run_id,
             env_factory,
-            agent_factory,
+            agent_spec,
             run_dir,
             num_processes=1,
         )
@@ -89,7 +90,7 @@ class GradientAnalysis(Analysis):
         )
 
     def analysis_worker(self, env_step: int, show_progress: bool) -> TensorboardLogs:
-        agent = self.agent_factory(self.env_factory())
+        agent = self.agent_spec.create_agent(self.env_factory())
         env = DummyVecEnv([self.env_factory])
         value_function_trainer = ValueFunctionTrainer(agent.batch_size)
 
@@ -118,11 +119,11 @@ class GradientAnalysis(Analysis):
         policy = agent.policy
         fill_rollout_buffer(
             self.env_factory,
-            self.agent_factory,
+            self.agent_spec,
             rollout_buffer_true_gradient,
         )
         fill_rollout_buffer(
-            self.env_factory, self.agent_factory, rollout_buffer_gradient_estimates
+            self.env_factory, self.agent_spec, rollout_buffer_gradient_estimates
         )
         logs = self.gradient_similarity_analysis.analyze(
             rollout_buffer_true_gradient,

@@ -4,13 +4,12 @@ import logging
 import filelock as filelock
 import torch.multiprocessing
 from pathlib import Path
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List
 
 import gym
-import stable_baselines3
-import stable_baselines3.common.vec_env
 import yaml
 
+from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
@@ -23,17 +22,14 @@ class Analysis(abc.ABC):
         analysis_name: str,
         analysis_run_id: str,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[
-            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
-            stable_baselines3.ppo.PPO,
-        ],
+        agent_spec: AgentSpec,
         run_dir: Path,
         num_processes: int,
     ):
         self.analysis_name = analysis_name
         self.analysis_run_id = analysis_run_id
         self.env_factory = env_factory
-        self.agent_factory = agent_factory
+        self.agent_spec = agent_spec
         self.run_dir = run_dir
         self.num_processes = num_processes
         self._analyses_log_file = run_dir / ".analyses.yaml"

@@ -18,6 +18,7 @@ from action_space_toolbox.analysis.reward_surface_visualization.plotting import 
 from action_space_toolbox.analysis.reward_surface_visualization.reward_surface_visualization import (
     RewardSurfaceVisualization,
 )
+from action_space_toolbox.util.agent_spec import AgentSpec
 
 parser = ArgumentParser()
 parser.add_argument("logdir", type=str)
@@ -67,18 +68,17 @@ for env_dir in tqdm(log_dir.iterdir()):
                         / "checkpoints"
                         / f"{train_cfg.algorithm.name}_{agent_step}_steps"
                     )
-                    agent_factory = functools.partial(
-                        agent_class.load,
+                    agent_spec = AgentSpec(
                         agent_checkpoint,
-                        device=device,
-                        tensorboard_log=None,
+                        device,
+                        agent_kwargs={"tensorboard_log": None},
                     )
                     analysis = RewardSurfaceVisualization(
                         "default",
                         env_factory=functools.partial(
                             gym.make, train_cfg.env, **train_cfg.env_args
                         ),
-                        agent_factory=agent_factory,
+                        agent_spec=agent_spec,
                         run_dir=run_dir,
                         magnitude=loss_surface_data["magnitude"],
                         num_steps=agent_step,
@@ -88,7 +88,7 @@ for env_dir in tqdm(log_dir.iterdir()):
                     )
                     grid_size = loss_surface_data["data"].shape[0]
                     magnitude = loss_surface_data["magnitude"]
-                    agent = agent_factory()
+                    agent = agent_spec.create_agent(env)
                     agent_weights = [p.data.detach() for p in agent.policy.parameters()]
                     weights_offsets = [[None] * grid_size for _ in range(grid_size)]
                     coords = np.linspace(-magnitude, magnitude, num=grid_size)
@@ -116,7 +116,7 @@ for env_dir in tqdm(log_dir.iterdir()):
                     losses, policy_ratios = analysis.loss_surface_analysis_worker(
                         weights_offsets,
                         analysis.env_factory,
-                        analysis.agent_factory,
+                        analysis.agent_spec,
                         200000,
                     )
 

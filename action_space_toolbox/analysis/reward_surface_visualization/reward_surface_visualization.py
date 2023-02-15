@@ -1,10 +1,10 @@
 import functools
-import itertools
 import logging
+import math
 import pickle
 from collections import namedtuple
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Sequence, Tuple, Union
+from typing import Callable, Iterable, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
@@ -18,6 +18,7 @@ from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.reward_surface_visualization.plotting import (
     plot_results,
 )
+from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import (
     fill_rollout_buffer,
@@ -49,10 +50,7 @@ class RewardSurfaceVisualization(Analysis):
         self,
         analysis_run_id: str,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[
-            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
-            stable_baselines3.ppo.PPO,
-        ],
+        agent_spec: AgentSpec,
         run_dir: Path,
         grid_size: int,
         magnitude: float,
@@ -70,7 +68,7 @@ class RewardSurfaceVisualization(Analysis):
             "reward_surface_visualization",
             analysis_run_id,
             env_factory,
-            agent_factory,
+            agent_spec,
             run_dir,
             num_processes,
         )
@@ -127,7 +125,7 @@ class RewardSurfaceVisualization(Analysis):
             if show_progress:
                 logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
-            agent = self.agent_factory(self.env_factory())
+            agent = self.agent_spec.create_agent(self.env_factory())
             rollout_buffer_true_gradient = (
                 stable_baselines3.common.buffers.RolloutBuffer(
                     self.num_samples_true_gradient,
@@ -140,7 +138,7 @@ class RewardSurfaceVisualization(Analysis):
             )
             fill_rollout_buffer(
                 self.env_factory,
-                self.agent_factory,
+                self.agent_spec,
                 rollout_buffer_true_gradient,
                 num_processes=self.num_processes,
             )
@@ -186,26 +184,27 @@ class RewardSurfaceVisualization(Analysis):
                     ]
                     weights_offsets[offset1_idx][offset2_idx] = weights_curr_offsets
 
-            weights_offsets_flat = [
-                item for sublist in weights_offsets for item in sublist
+            agent_specs_flat = [
+                self.agent_spec.copy_with_new_weights(weights)
+                for sublist in weights_offsets
+                for weights in sublist
             ]
 
             reward_surface_results_iter = process_pool.imap(
                 functools.partial(
                     self.reward_surface_analysis_worker,
                     env_factory=self.env_factory,
-                    agent_factory=self.agent_factory,
                     num_steps=self.num_steps,
                 ),
-                weights_offsets_flat,
+                agent_specs_flat,
             )
 
             loss_surface_results = process_pool.apply_async(
                 self.loss_surface_analysis_worker,
                 args=(
-                    weights_offsets,
+                    agent_specs_flat,
+                    self.agent_spec,
                     self.env_factory,
-                    self.agent_factory,
                     self.num_steps,
                 ),
             )
@@ -350,18 +349,15 @@ class RewardSurfaceVisualization(Analysis):
             )
         return logs
 
-    @staticmethod
+    @classmethod
     def reward_surface_analysis_worker(
-        agent_weights: Sequence[torch.Tensor],
+        cls,
+        agent_spec: AgentSpec,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[
-            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
-            stable_baselines3.ppo.PPO,
-        ],
         num_steps: int,
     ) -> RewardSurfaceAnalysisResult:
         env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
-        agent = agent_factory(env)
+        agent = agent_spec.create_agent(env)
         rollout_buffer_no_value_bootstrap = (
             stable_baselines3.common.buffers.RolloutBuffer(
                 num_steps,
@@ -372,12 +368,10 @@ class RewardSurfaceVisualization(Analysis):
                 agent.gamma,
             )
         )
-        with torch.no_grad():
-            for parameters, weights in zip(agent.policy.parameters(), agent_weights):
-                parameters.data[:] = weights
+
         fill_rollout_buffer(
             env_factory,
-            agent_factory,
+            agent_spec,
             None,
             rollout_buffer_no_value_bootstrap,
         )
@@ -411,19 +405,16 @@ class RewardSurfaceVisualization(Analysis):
             mean_episode_reward_undiscounted, mean_episode_reward_discounted
         )
 
-    @staticmethod
+    @classmethod
     def loss_surface_analysis_worker(
-        all_agent_weights: Sequence[Sequence[Sequence[torch.Tensor]]],
+        cls,
+        all_agent_specs_flat: Sequence[AgentSpec],
+        original_agent_spec: AgentSpec,
         env_factory: Callable[[], gym.Env],
-        agent_factory: Callable[
-            [Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
-            stable_baselines3.ppo.PPO,
-        ],
         num_steps: int,
     ) -> LossSurfaceAnalysisResult:
-        grid_size = len(all_agent_weights)
-        env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
-        agent = agent_factory(env)
+        grid_size = int(math.sqrt(len(all_agent_specs_flat)))
+        agent = original_agent_spec.create_agent(env_factory())
         rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
             num_steps,
             agent.observation_space,
@@ -434,7 +425,7 @@ class RewardSurfaceVisualization(Analysis):
         )
         fill_rollout_buffer(
             env_factory,
-            agent_factory,
+            original_agent_spec,
             rollout_buffer,
             None,
         )
@@ -442,13 +433,8 @@ class RewardSurfaceVisualization(Analysis):
         policy_losses = []
         value_function_losses = []
         policy_ratios = []
-        all_agent_weights_flat = [w for ws in all_agent_weights for w in ws]
-        for agent_weights in all_agent_weights_flat:
-            with torch.no_grad():
-                for parameters, weights in zip(
-                    agent.policy.parameters(), agent_weights
-                ):
-                    parameters.data[:] = weights
+        for agent_spec in all_agent_specs_flat:
+            agent = agent_spec.create_agent(env_factory())
             combined_loss, policy_loss, value_function_loss, policy_ratio = ppo_loss(
                 agent, next(rollout_buffer.get())
             )
@@ -463,8 +449,8 @@ class RewardSurfaceVisualization(Analysis):
             np.array(policy_ratios).reshape(grid_size, grid_size),
         )
 
-    @staticmethod
-    def sample_filter_normalized_direction(param: torch.Tensor) -> torch.Tensor:
+    @classmethod
+    def sample_filter_normalized_direction(cls, param: torch.Tensor) -> torch.Tensor:
         ndims = len(param.shape)
         if ndims == 1 or ndims == 0:
             # don't do any random direction for scalars
@@ -505,7 +491,7 @@ class RewardSurfaceVisualization(Analysis):
         directions = torch.stack((direction1_vec, direction2_vec), dim=1).double()
 
         for sample in range(num_samples):
-            agent = self.agent_factory(self.env_factory())
+            agent = self.agent_spec.create_agent(self.env_factory())
             rollout_buffer_gradient_step = (
                 stable_baselines3.common.buffers.RolloutBuffer(
                     agent.n_steps,
@@ -518,11 +504,11 @@ class RewardSurfaceVisualization(Analysis):
                 )
             )
             fill_rollout_buffer(
-                self.env_factory, self.agent_factory, rollout_buffer_gradient_step
+                self.env_factory, self.agent_spec, rollout_buffer_gradient_step
             )
 
             data = list(rollout_buffer_gradient_step.get(agent.batch_size))
-            agent = self.agent_factory(self.env_factory())
+            agent = self.agent_spec.create_agent(self.env_factory())
             curr_proj_optimizer_parameters = self._sample_projected_update_trajectory(
                 data,
                 agent,
@@ -531,7 +517,7 @@ class RewardSurfaceVisualization(Analysis):
             )
             projected_optimizer_parameters.append(curr_proj_optimizer_parameters)
 
-            agent = self.agent_factory(self.env_factory())
+            agent = self.agent_spec.create_agent(self.env_factory())
             sgd = torch.optim.SGD(
                 agent.policy.parameters(), agent.policy.optimizer.param_groups[0]["lr"]
             )
@@ -543,7 +529,7 @@ class RewardSurfaceVisualization(Analysis):
             )
             projected_sgd_parameters.append(curr_proj_sgd_parameters)
 
-        agent = self.agent_factory(self.env_factory())
+        agent = self.agent_spec.create_agent(self.env_factory())
         true_gradient_data = [next(rollout_buffer_true_gradient.get())] * 32
         projected_optimizer_parameters_true_grad = (
             self._sample_projected_update_trajectory(
@@ -554,7 +540,7 @@ class RewardSurfaceVisualization(Analysis):
             )
         )
 
-        agent = self.agent_factory(self.env_factory())
+        agent = self.agent_spec.create_agent(self.env_factory())
         sgd = torch.optim.SGD(
             agent.policy.parameters(), agent.policy.optimizer.param_groups[0]["lr"]
         )
@@ -595,10 +581,10 @@ class RewardSurfaceVisualization(Analysis):
             projected_parameters.append(curr_proj_params.detach().cpu().numpy())
         return np.stack(projected_parameters)
 
-    @staticmethod
-    def _flatten(seq: Sequence[torch.Tensor]) -> torch.Tensor:
+    @classmethod
+    def _flatten(cls, seq: Sequence[torch.Tensor]) -> torch.Tensor:
         return torch.cat([s.flatten() for s in seq])
 
-    @staticmethod
-    def _result_filename(plot_name: str, env_step: int, plot_idx: int) -> str:
+    @classmethod
+    def _result_filename(cls, plot_name: str, env_step: int, plot_idx: int) -> str:
         return f"{plot_name}_{env_step:07d}_{plot_idx:02d}"
