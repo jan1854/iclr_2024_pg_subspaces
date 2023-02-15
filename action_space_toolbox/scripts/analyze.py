@@ -18,7 +18,7 @@ import action_space_toolbox
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 def analysis_worker(
@@ -57,6 +57,13 @@ def get_step_from_checkpoint(file_name: str) -> int:
 
 @hydra.main(version_base=None, config_path="conf", config_name="analyze")
 def analyze(cfg: omegaconf.DictConfig) -> None:
+    result_commit = subprocess.run(
+        ["git", "-C", f"{Path(__file__).parent}", "rev-parse", "HEAD"],
+        stdout=subprocess.PIPE,
+    )
+    logger.debug(
+        f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
+    )
     logger.info(f"Analyzing results in {cfg.train_logs}")
     train_logs = Path(cfg.train_logs)
 

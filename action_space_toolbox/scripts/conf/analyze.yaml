@@ -21,3 +21,6 @@ hydra:
   output_subdir: null
   run:
     dir: ${log_dir}/analysis/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  verbose: [
+    __main__
+  ]
