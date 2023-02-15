@@ -210,7 +210,7 @@ def plot_surface(
             magnitude,
             z_range,
             "True gradient SGD trajectory",
-            "#FF6600",
+            "#9723C2",
         )
 
     if title is not None:
