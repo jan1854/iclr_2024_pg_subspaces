@@ -75,7 +75,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         train_logs_local.mkdir(exist_ok=True, parents=True)
         logger.info(f"Syncing logs from {train_logs} to {train_logs_local.absolute()}.")
         rsync_result = subprocess.run(
-            ["rsync", "-ua", str(train_logs) + "/", str(train_logs_local)],
+            ["rsync", "-uaPz", str(train_logs) + "/", str(train_logs_local)],
             stderr=subprocess.STDOUT,
         )
         rsync_result.check_returncode()
@@ -168,7 +168,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             f"Syncing results from {train_logs_local} back to {train_logs.absolute()}."
         )
         rsync_result = subprocess.run(
-            ["rsync", "-ua", str(train_logs_local) + "/", str(train_logs)],
+            ["rsync", "-uaPz", str(train_logs_local) + "/", str(train_logs)],
             stderr=subprocess.STDOUT,
         )
         rsync_result.check_returncode()
