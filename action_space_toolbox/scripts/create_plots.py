@@ -111,7 +111,8 @@ def create_plots(
     plt.ylim(ylimits)
     if legend is not None:
         plt.legend(legend, loc="lower right")
-    plt.savefig(out)
+    plt.savefig(out.with_suffix(".png"))
+    plt.savefig(out.with_suffix(".pdf"))
 
 
 if __name__ == "__main__":
