@@ -6,7 +6,11 @@ from typing import Sequence, Any, Dict
 import yaml
 from tqdm import tqdm
 
-from action_space_toolbox.util.tensorboard_logs import combine_tb_logs
+from action_space_toolbox.util.tensorboard_logs import (
+    combine_tb_logs,
+    check_new_data_indicator,
+    remove_new_data_indicator,
+)
 
 
 def same_configurations(run_dirs: Sequence[Path]) -> bool:
@@ -59,7 +63,7 @@ def combine_metrics(log_path: Path) -> None:
                 update = not combined_dir.exists()
                 for curr_run_dir in run_dirs:
                     if curr_run_dir.exists():
-                        update |= (curr_run_dir / ".new_data").exists()
+                        update |= check_new_data_indicator(curr_run_dir)
                     else:
                         break
 
@@ -72,7 +76,7 @@ def combine_metrics(log_path: Path) -> None:
             shutil.rmtree(combined_dir)
         combine_tb_logs(tb_dirs, combined_dir)
         for run_dir in run_dirs:
-            (run_dir / ".new_data").unlink(missing_ok=True)
+            remove_new_data_indicator(run_dir)
 
 
 if __name__ == "__main__":

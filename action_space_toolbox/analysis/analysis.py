@@ -10,8 +10,10 @@ import gym
 import yaml
 
 from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
-
+from action_space_toolbox.util.tensorboard_logs import (
+    TensorboardLogs,
+    add_new_data_indicator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,6 @@ class Analysis(abc.ABC):
         self._analyses_log_file = run_dir / ".analyses.yaml"
         if not self._analyses_log_file.exists():
             self._analyses_log_file.touch()
-        self._new_data_indicator = run_dir / ".new_data"
 
     def do_analysis(
         self,
@@ -70,7 +71,7 @@ class Analysis(abc.ABC):
                     analyses_logs[self.analysis_name][self.analysis_run_id].sort()
                     with self._analyses_log_file.open("w") as analyses_log_file:
                         yaml.dump(analyses_logs, analyses_log_file)
-            self._new_data_indicator.touch()
+            add_new_data_indicator(self.run_dir)
             return results
         else:
             return TensorboardLogs()

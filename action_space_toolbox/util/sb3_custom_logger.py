@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional
 
 import stable_baselines3.common.logger
 
+from action_space_toolbox.util.tensorboard_logs import add_new_data_indicator
+
 
 class SB3CustomLogger(stable_baselines3.common.logger.Logger):
     def __init__(
@@ -30,7 +32,7 @@ class SB3CustomLogger(stable_baselines3.common.logger.Logger):
                     step,
                 )
         run_dir = Path(self.dir).parent
-        (run_dir / ".new_data").touch()
+        add_new_data_indicator(run_dir)
 
         self.name_to_value.clear()
         self.name_to_count.clear()

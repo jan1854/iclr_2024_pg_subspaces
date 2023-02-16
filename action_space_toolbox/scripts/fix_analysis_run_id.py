@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from action_space_toolbox.util.tensorboard_logs import add_new_data_indicator
+
 parser = argparse.ArgumentParser()
 parser.add_argument("logpath", type=str)
 args = parser.parse_args()
@@ -49,4 +51,4 @@ for env_dir in log_dir.iterdir():
                                 analyses_data[key] = {"default": val}
                         with (run_dir / ".analyses.yaml").open("w") as analyses_file:
                             yaml.dump(analyses_data, analyses_file)
-                        (run_dir / ".new_data").touch()
+                        add_new_data_indicator(run_dir)

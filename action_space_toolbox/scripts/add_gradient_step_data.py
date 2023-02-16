@@ -17,6 +17,7 @@ from action_space_toolbox.analysis.reward_surface_visualization.plotting import 
 from action_space_toolbox.analysis.reward_surface_visualization.reward_surface_visualization import (
     RewardSurfaceVisualization,
 )
+from action_space_toolbox.util.tensorboard_logs import add_new_data_indicator
 
 parser = ArgumentParser()
 parser.add_argument("logdir", type=str)
@@ -125,4 +126,4 @@ for env_dir in tqdm(log_dir.iterdir()):
                         analysis_dir, agent_step, plot_num, overwrite=True
                     )
                     logs.log(summary_writer)
-                    (run_dir / ".new_data").touch()
+                    add_new_data_indicator(run_dir)

@@ -268,3 +268,22 @@ def combine_tb_logs(
                     image_event.wall_time,
                     dataformats="HWC",
                 )
+
+
+def add_new_data_indicator(run_dir: Path) -> None:
+    with (run_dir / ".new_data").open("w") as f:
+        f.write("1")
+
+
+def check_new_data_indicator(run_dir: Path) -> bool:
+    indicator_path = run_dir / ".new_data"
+    if not indicator_path.exists():
+        return False
+    with indicator_path.open("r") as f:
+        indicator_content = f.read().strip()
+    return indicator_content != "0" and indicator_content != ""
+
+
+def remove_new_data_indicator(run_dir: Path) -> None:
+    with (run_dir / ".new_data").open("w") as f:
+        f.write("0")
