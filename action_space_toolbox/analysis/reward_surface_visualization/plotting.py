@@ -297,9 +297,7 @@ def _plot_gradient_steps(
             np.mean(np.linalg.norm(grad_steps[1:] - grad_steps[:-1], axis=-1))
             > 0.005 * magnitude
         ):
-            markers = projected_trajectories[
-                np.all(np.abs(projected_trajectories) < magnitude, axis=-1), :
-            ]
+            markers = grad_steps[np.all(np.abs(grad_steps) < magnitude, axis=-1), :]
             assert np.all(np.abs(markers) < magnitude)
             z_values_markers = interpolator(markers) + 0.01 * z_range
             fig.add_scatter3d(
