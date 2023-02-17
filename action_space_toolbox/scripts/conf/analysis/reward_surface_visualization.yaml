@@ -3,7 +3,7 @@ analysis_run_id: default
 grid_size: 31
 magnitude: 1.0
 plot_in_gradient_direction: false
-num_samples_true_gradient: 1_000_000
+num_samples_true_loss: 1_000_000
 num_steps: 200_000
 num_plots: 1
 num_processes: 1

@@ -113,7 +113,7 @@ for env_dir in tqdm(log_dir.iterdir()):
                         item for sublist in weights_offsets for item in sublist
                     ]
 
-                    losses, policy_ratios = analysis.loss_surface_analysis_worker(
+                    losses, policy_ratios = analysis.loss_surface_analysis(
                         weights_offsets,
                         analysis.env_factory,
                         analysis.agent_spec,

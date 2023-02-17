@@ -1,6 +1,5 @@
 import functools
 import logging
-import math
 import pickle
 from collections import namedtuple
 from pathlib import Path
@@ -55,7 +54,7 @@ class RewardSurfaceVisualization(Analysis):
         grid_size: int,
         magnitude: float,
         plot_in_gradient_direction: bool,
-        num_samples_true_gradient: int,
+        num_samples_true_loss: int,
         num_steps: int,
         num_plots: int,
         num_processes: int,
@@ -75,7 +74,7 @@ class RewardSurfaceVisualization(Analysis):
         self.grid_size = grid_size
         self.magnitude = magnitude
         self.plot_in_gradient_direction = plot_in_gradient_direction
-        self.num_samples_true_gradient = num_samples_true_gradient
+        self.num_samples_true_loss = num_samples_true_loss
         self.num_steps = num_steps
         self.num_plots = num_plots
         self.num_processes = num_processes
@@ -126,20 +125,18 @@ class RewardSurfaceVisualization(Analysis):
                 logger.info(f"Creating plot {plot_num} for step {env_step}.")
 
             agent = self.agent_spec.create_agent(self.env_factory())
-            rollout_buffer_true_gradient = (
-                stable_baselines3.common.buffers.RolloutBuffer(
-                    self.num_samples_true_gradient,
-                    agent.observation_space,
-                    agent.action_space,
-                    agent.device,
-                    agent.gae_lambda,
-                    agent.gamma,
-                )
+            rollout_buffer_true_loss = stable_baselines3.common.buffers.RolloutBuffer(
+                self.num_samples_true_loss,
+                agent.observation_space,
+                agent.action_space,
+                agent.device,
+                agent.gae_lambda,
+                agent.gamma,
             )
             fill_rollout_buffer(
                 self.env_factory,
                 self.agent_spec,
-                rollout_buffer_true_gradient,
+                rollout_buffer_true_loss,
                 num_processes=self.num_processes,
             )
 
@@ -153,7 +150,7 @@ class RewardSurfaceVisualization(Analysis):
                 # appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in Reinforcement Learning
                 # Environments))
                 gradient, _, _ = ppo_gradient(
-                    agent, next(rollout_buffer_true_gradient.get())
+                    agent, next(rollout_buffer_true_loss.get())
                 )
                 gradient_norm = torch.linalg.norm(
                     torch.cat([g.flatten() for g in gradient])
@@ -184,10 +181,13 @@ class RewardSurfaceVisualization(Analysis):
                     ]
                     weights_offsets[offset1_idx][offset2_idx] = weights_curr_offsets
 
-            agent_specs_flat = [
-                self.agent_spec.copy_with_new_weights(weights)
+            agent_specs = [
+                [self.agent_spec.copy_with_new_weights(weights) for weights in sublist]
                 for sublist in weights_offsets
-                for weights in sublist
+            ]
+
+            agent_specs_flat = [
+                agent_spec for sublist in agent_specs for agent_spec in sublist
             ]
 
             reward_surface_results_iter = process_pool.imap(
@@ -199,14 +199,8 @@ class RewardSurfaceVisualization(Analysis):
                 agent_specs_flat,
             )
 
-            loss_surface_results = process_pool.apply_async(
-                self.loss_surface_analysis_worker,
-                args=(
-                    agent_specs_flat,
-                    self.agent_spec,
-                    self.env_factory,
-                    self.num_steps,
-                ),
+            loss_surface_results = self.loss_surface_analysis(
+                agent_specs, rollout_buffer_true_loss, self.env_factory
             )
 
             (
@@ -218,7 +212,7 @@ class RewardSurfaceVisualization(Analysis):
                 direction1,
                 direction2,
                 max(10, self.max_gradient_trajectories),
-                rollout_buffer_true_gradient,
+                rollout_buffer_true_loss,
             )
 
             reward_surface_results_flat = [
@@ -230,8 +224,6 @@ class RewardSurfaceVisualization(Analysis):
                 )
             ]
 
-            loss_surface_results = loss_surface_results.get()
-
             plot_info = {
                 "env_name": agent.env.get_attr("spec")[0].id,
                 "env_step": env_step,
@@ -242,7 +234,7 @@ class RewardSurfaceVisualization(Analysis):
                     [d.cpu().numpy() for d in direction2],
                 ),
                 "gradient_direction": 0 if self.plot_in_gradient_direction else None,
-                "num_samples_true_gradient": self.num_samples_true_gradient,
+                "num_samples_true_loss": self.num_samples_true_loss,
                 "sampled_projected_optimizer_steps": projected_optimizer_steps,
                 "sampled_projected_sgd_steps": projected_sgd_steps,
                 "sampled_projected_optimizer_steps_true_gradient": projected_optimizer_steps_true_grad,
@@ -406,47 +398,38 @@ class RewardSurfaceVisualization(Analysis):
         )
 
     @classmethod
-    def loss_surface_analysis_worker(
+    def loss_surface_analysis(
         cls,
-        all_agent_specs_flat: Sequence[AgentSpec],
-        original_agent_spec: AgentSpec,
+        all_agent_specs: Sequence[Sequence[AgentSpec]],
+        rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
         env_factory: Callable[[], gym.Env],
-        num_steps: int,
     ) -> LossSurfaceAnalysisResult:
-        grid_size = int(math.sqrt(len(all_agent_specs_flat)))
-        agent = original_agent_spec.create_agent(env_factory())
-        rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
-            num_steps,
-            agent.observation_space,
-            agent.action_space,
-            "cpu",
-            agent.gae_lambda,
-            agent.gamma,
-        )
-        fill_rollout_buffer(
-            env_factory,
-            original_agent_spec,
-            rollout_buffer,
-            None,
-        )
         combined_losses = []
         policy_losses = []
         value_function_losses = []
         policy_ratios = []
-        for agent_spec in all_agent_specs_flat:
-            agent = agent_spec.create_agent(env_factory())
-            combined_loss, policy_loss, value_function_loss, policy_ratio = ppo_loss(
-                agent, next(rollout_buffer.get())
-            )
-            combined_losses.append(combined_loss.item())
-            policy_losses.append(policy_loss.item())
-            value_function_losses.append(value_function_loss.item())
-            policy_ratios.append(policy_ratio.item())
+        for sublist in all_agent_specs:
+            combined_losses.append([])
+            policy_losses.append([])
+            value_function_losses.append([])
+            policy_ratios.append([])
+            for agent_spec in sublist:
+                agent = agent_spec.create_agent(env_factory())
+                (
+                    combined_loss,
+                    policy_loss,
+                    value_function_loss,
+                    policy_ratio,
+                ) = ppo_loss(agent, next(rollout_buffer.get()))
+                combined_losses[-1].append(combined_loss.item())
+                policy_losses[-1].append(policy_loss.item())
+                value_function_losses[-1].append(value_function_loss.item())
+                policy_ratios[-1].append(policy_ratio.item())
         return LossSurfaceAnalysisResult(
-            np.array(policy_losses).reshape(grid_size, grid_size),
-            np.array(value_function_losses).reshape(grid_size, grid_size),
-            np.array(combined_losses).reshape(grid_size, grid_size),
-            np.array(policy_ratios).reshape(grid_size, grid_size),
+            np.array(policy_losses, dtype=np.float32),
+            np.array(value_function_losses, dtype=np.float32),
+            np.array(combined_losses, dtype=np.float32),
+            np.array(policy_ratios, dtype=np.float32),
         )
 
     @classmethod
@@ -577,7 +560,7 @@ class RewardSurfaceVisualization(Analysis):
             curr_proj_params = torch.linalg.solve(
                 directions.T @ directions,
                 directions.T @ (new_optimizer_parameters - old_parameters).double(),
-            )
+            ).to(torch.float32)
             projected_parameters.append(curr_proj_params.detach().cpu().numpy())
         return np.stack(projected_parameters)
 

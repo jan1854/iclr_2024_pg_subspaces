@@ -249,7 +249,7 @@ def _plot_gradient_steps(
         # error). Scale the gradient step to reduce the length but keep the direction the same.
         visualization_steps = []
         grad_steps_start_end = []
-        last_step = np.zeros(2)
+        last_step = np.zeros(2, dtype=np.float32)
         for step in grad_steps:
             if np.any(np.abs(step) > magnitude) and np.any(
                 np.abs(last_step) > magnitude
