@@ -33,7 +33,10 @@ def plot_results(
     max_gradient_trajectories: Optional[int] = None,
     max_steps_per_gradient_trajectory: Optional[int] = None,
 ) -> TensorboardLogs:
-    logs = TensorboardLogs()
+    logs = TensorboardLogs(
+        f"reward_surface_visualization/{analysis_dir.name}",
+        f"reward_surface_visualization_step_plots/{analysis_dir.name}",
+    )
 
     for plot_name, plot_descr in PLOT_NAME_TO_DESCR.items():
         for results_path in (analysis_dir / plot_name / "data").glob(
@@ -100,7 +103,6 @@ def plot_results(
                     optimizer_steps_true_grad,
                     sgd_steps_true_grad,
                     logs,
-                    analysis_dir.name,
                     plot_path,
                 )
     return logs
@@ -120,7 +122,6 @@ def plot_surface(
     projected_optimizer_steps_true_grad: Optional[np.ndarray],
     projected_sgd_steps_true_grad: Optional[np.ndarray],
     logs: TensorboardLogs,
-    analysis_run_id: str,
     outpath: Path,
 ) -> None:
     outpath.parent.mkdir(parents=True, exist_ok=True)
@@ -224,7 +225,7 @@ def plot_surface(
     with PIL.Image.open(outpath.with_suffix(".png")) as im:
         # Make the image smaller so that it fits better in tensorboard
         im = im.resize((im.width // 2, im.height // 2), PIL.Image.Resampling.LANCZOS)
-        logs.add_image(f"{plot_name}/{analysis_run_id}/{plot_nr}", im, env_step)
+        logs.add_image(f"{plot_name}/{plot_nr}", im, env_step)
 
 
 def _plot_gradient_steps(

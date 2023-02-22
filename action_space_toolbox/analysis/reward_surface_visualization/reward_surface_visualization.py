@@ -1,7 +1,6 @@
 import functools
 import logging
 import pickle
-from collections import namedtuple
 from pathlib import Path
 from typing import Callable, Iterable, Optional, Sequence, Tuple
 
@@ -18,11 +17,13 @@ from action_space_toolbox.analysis.reward_surface_visualization.plotting import 
     plot_results,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import (
     fill_rollout_buffer,
     ppo_loss,
     ppo_gradient,
+    flatten_parameters,
+    evaluate_agent_losses,
+    evaluate_agent_returns,
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
@@ -34,14 +35,6 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 torch.set_num_threads(1)
 
 logger = logging.getLogger(__name__)
-
-RewardSurfaceAnalysisResult = namedtuple(
-    "RewardSurfaceAnalysisResult", "reward_undiscounted reward_discounted"
-)
-LossSurfaceAnalysisResult = namedtuple(
-    "LossSurfaceAnalysisResult",
-    "policy_losses value_function_losses combined_losses policy_ratios",
-)
 
 
 class RewardSurfaceVisualization(Analysis):
@@ -107,10 +100,10 @@ class RewardSurfaceVisualization(Analysis):
         self,
         process_pool: torch.multiprocessing.Pool,
         env_step: int,
+        logs: TensorboardLogs,
         overwrite_results: bool,
         show_progress: bool,
     ) -> TensorboardLogs:
-        logs = TensorboardLogs()
         for plot_num in range(self.num_plots):
             if (
                 not overwrite_results
@@ -192,16 +185,16 @@ class RewardSurfaceVisualization(Analysis):
 
             reward_surface_results_iter = process_pool.imap(
                 functools.partial(
-                    self.reward_surface_analysis_worker,
+                    evaluate_agent_returns,
                     env_factory=self.env_factory,
                     num_steps=self.num_steps,
                 ),
-                agent_specs_flat,
+                [[agent_spec] for agent_spec in agent_specs_flat],
             )
 
-            loss_surface_results = self.loss_surface_analysis(
-                agent_specs, rollout_buffer_true_loss, self.env_factory
-            )
+            loss_surface_results = evaluate_agent_losses(
+                agent_specs_flat, rollout_buffer_true_loss, self.env_factory
+            ).reshape(self.grid_size, self.grid_size)
 
             (
                 projected_optimizer_steps,
@@ -243,7 +236,7 @@ class RewardSurfaceVisualization(Analysis):
             }
 
             rewards_undiscounted = np.array(
-                [result.reward_undiscounted for result in reward_surface_results_flat]
+                [result.rewards_undiscounted for result in reward_surface_results_flat]
             ).reshape(self.grid_size, self.grid_size)
             self.reward_undiscounted_data_dir.mkdir(parents=True, exist_ok=True)
             rewards_undiscounted_file = (
@@ -254,7 +247,7 @@ class RewardSurfaceVisualization(Analysis):
                 pickle.dump(plot_info | {"data": rewards_undiscounted}, f)
 
             rewards_discounted = np.array(
-                [result.reward_discounted for result in reward_surface_results_flat]
+                [result.rewards_discounted for result in reward_surface_results_flat]
             ).reshape(self.grid_size, self.grid_size)
             self.reward_discounted_data_dir.mkdir(parents=True, exist_ok=True)
             rewards_discounted_file = (
@@ -340,97 +333,6 @@ class RewardSurfaceVisualization(Analysis):
                 )
             )
         return logs
-
-    @classmethod
-    def reward_surface_analysis_worker(
-        cls,
-        agent_spec: AgentSpec,
-        env_factory: Callable[[], gym.Env],
-        num_steps: int,
-    ) -> RewardSurfaceAnalysisResult:
-        env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
-        agent = agent_spec.create_agent(env)
-        rollout_buffer_no_value_bootstrap = (
-            stable_baselines3.common.buffers.RolloutBuffer(
-                num_steps,
-                agent.observation_space,
-                agent.action_space,
-                "cpu",
-                agent.gae_lambda,
-                agent.gamma,
-            )
-        )
-
-        fill_rollout_buffer(
-            env_factory,
-            agent_spec,
-            None,
-            rollout_buffer_no_value_bootstrap,
-        )
-        episode_rewards_undiscounted = []
-        episode_rewards_discounted = []
-        curr_reward_undiscounted = None
-        curr_reward_discounted = None
-        curr_episode_length = 0
-        for episode_start, reward in zip(
-            rollout_buffer_no_value_bootstrap.episode_starts,
-            rollout_buffer_no_value_bootstrap.rewards,
-        ):
-            if episode_start:
-                if curr_episode_length > 0:
-                    episode_rewards_undiscounted.append(curr_reward_undiscounted)
-                    episode_rewards_discounted.append(curr_reward_discounted)
-                curr_episode_length = 0
-                curr_reward_discounted = 0.0
-                curr_reward_undiscounted = 0.0
-            curr_episode_length += 1
-            curr_reward_undiscounted += reward
-            curr_reward_discounted += agent.gamma ** (curr_episode_length - 1) * reward
-        # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
-        # the episode if it has the maximum episode length.
-        if curr_episode_length == get_episode_length(env):
-            episode_rewards_undiscounted.append(curr_reward_undiscounted)
-            episode_rewards_discounted.append(curr_reward_discounted)
-        mean_episode_reward_undiscounted = np.mean(episode_rewards_undiscounted)
-        mean_episode_reward_discounted = np.mean(episode_rewards_discounted)
-        return RewardSurfaceAnalysisResult(
-            mean_episode_reward_undiscounted, mean_episode_reward_discounted
-        )
-
-    @classmethod
-    def loss_surface_analysis(
-        cls,
-        all_agent_specs: Sequence[Sequence[AgentSpec]],
-        rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
-        env_factory: Callable[[], gym.Env],
-    ) -> LossSurfaceAnalysisResult:
-        combined_losses = []
-        policy_losses = []
-        value_function_losses = []
-        policy_ratios = []
-        for sublist in all_agent_specs:
-            combined_losses.append([])
-            policy_losses.append([])
-            value_function_losses.append([])
-            policy_ratios.append([])
-            for agent_spec in sublist:
-                agent = agent_spec.create_agent(env_factory())
-                (
-                    combined_loss,
-                    policy_loss,
-                    value_function_loss,
-                    policy_ratio,
-                ) = ppo_loss(agent, next(rollout_buffer.get()))
-                combined_losses[-1].append(combined_loss.item())
-                policy_losses[-1].append(policy_loss.item())
-                value_function_losses[-1].append(value_function_loss.item())
-                policy_ratios[-1].append(policy_ratio.item())
-        return LossSurfaceAnalysisResult(
-            np.array(policy_losses, dtype=np.float32),
-            np.array(value_function_losses, dtype=np.float32),
-            np.array(combined_losses, dtype=np.float32),
-            np.array(policy_ratios, dtype=np.float32),
-        )
 
     @classmethod
     def sample_filter_normalized_direction(cls, param: torch.Tensor) -> torch.Tensor:
@@ -549,13 +451,13 @@ class RewardSurfaceVisualization(Analysis):
         directions: torch.Tensor,
     ) -> np.ndarray:
         projected_parameters = []
-        old_parameters = self._flatten(agent.policy.parameters())
+        old_parameters = flatten_parameters(agent.policy.parameters())
         for batch in data:
             loss, _, _, _ = ppo_loss(agent, batch)
             agent.policy.zero_grad()
             loss.backward()
             optimizer.step()
-            new_optimizer_parameters = self._flatten(agent.policy.parameters())
+            new_optimizer_parameters = flatten_parameters(agent.policy.parameters())
             # Projection matrix: (directions^T @ directions)^(-1) @ directions^T
             curr_proj_params = torch.linalg.solve(
                 directions.T @ directions,
@@ -563,10 +465,6 @@ class RewardSurfaceVisualization(Analysis):
             ).to(torch.float32)
             projected_parameters.append(curr_proj_params.detach().cpu().numpy())
         return np.stack(projected_parameters)
-
-    @classmethod
-    def _flatten(cls, seq: Sequence[torch.Tensor]) -> torch.Tensor:
-        return torch.cat([s.flatten() for s in seq])
 
     @classmethod
     def _result_filename(cls, plot_name: str, env_step: int, plot_idx: int) -> str:

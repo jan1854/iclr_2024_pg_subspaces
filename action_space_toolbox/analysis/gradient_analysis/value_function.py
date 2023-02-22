@@ -1,12 +1,11 @@
 import functools
-from typing import Callable, Dict, List, Optional, Tuple, Type, Union, Any
+from typing import Callable, Dict, List, Tuple, Type, Union
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from stable_baselines3.common.torch_layers import MlpExtractor
 from torch.utils.data import TensorDataset, DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
 from action_space_toolbox.util import metrics
@@ -68,9 +67,10 @@ class ValueFunctionTrainer:
         values: torch.Tensor,
         epochs: int,
         env_step: int,
+        logs: TensorboardLogs,
         val_data_ratio: float = 0.05,
         show_progress: bool = False,
-    ) -> TensorboardLogs:
+    ) -> None:
 
         train_dataset_size = round((1.0 - val_data_ratio) * states.size(0))
         dataset_train = TensorDataset(
@@ -88,8 +88,6 @@ class ValueFunctionTrainer:
             states_val,
             values_val,
         )
-
-        logs = TensorboardLogs()
 
         train_pbar = trange(
             epochs,
@@ -123,82 +121,79 @@ class ValueFunctionTrainer:
             )
             if epochs > 1:
                 logs.add_scalar(
-                    f"gradient_analysis/zz_details/gt_value_function_train_loss_step_{env_step}",
+                    f"zz_details/gt_value_function_train_loss_step_{env_step}",
                     train_set_loss,
                     epoch,
                 )
                 logs.add_scalar(
-                    f"gradient_analysis/zz_details/gt_value_function_val_loss_step_{env_step}",
+                    f"zz_details/gt_value_function_val_loss_step_{env_step}",
                     val_loss.item(),
                     epoch,
                 )
                 logs.add_scalar(
-                    f"gradient_analysis/zz_details/gt_value_function_val_mae_step_{env_step}",
+                    f"zz_details/gt_value_function_val_mae_step_{env_step}",
                     val_metrics["mae"],
                     epoch,
                 )
                 logs.add_scalar(
-                    f"gradient_analysis/zz_details/gt_value_function_val_mre_step_{env_step}",
+                    f"zz_details/gt_value_function_val_mre_step_{env_step}",
                     val_metrics["mre"],
                     epoch,
                 )
 
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_train_loss",
-                train_set_loss,
+                "gt_value_function_train_loss",
+                train_set_loss.item(),
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_val_loss",
+                "gt_value_function_val_loss",
                 val_loss.item(),
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_val_mae",
+                "gt_value_function_val_mae",
                 val_metrics["mae"],
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_val_mre",
+                "gt_value_function_val_mre",
                 val_metrics["mre"],
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_val_loss_mean_baseline",
+                "gt_value_function_val_loss_mean_baseline",
                 val_loss_baseline.item(),
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_val_mae_mean_baseline",
+                "gt_value_function_val_mae_mean_baseline",
                 val_metrics_baseline["mae"],
                 env_step,
             )
             logs.add_scalar(
-                "gradient_analysis/gt_value_function_val_mre_mean_baseline",
+                "gt_value_function_val_mre_mean_baseline",
                 val_metrics_baseline["mre"],
                 env_step,
             )
 
             layout = {
-                "gradient_analysis": {
-                    "gt_value_function_loss_train_val": [
-                        "Multiline",
-                        [
-                            "gradient_analysis/gt_value_function_train_loss",
-                            "gradient_analysis/gt_value_function_val_loss",
-                        ],
+                "gt_value_function_loss_train_val": [
+                    "Multiline",
+                    [
+                        "gradient_analysis/gt_value_function_train_loss",
+                        "gradient_analysis/gt_value_function_val_loss",
                     ],
-                    "gt_value_function_loss_model_baseline": [
-                        "Multiline",
-                        [
-                            "gradient_analysis/gt_value_function_val_loss",
-                            "gradient_analysis/gt_value_function_val_loss_mean_baseline",
-                        ],
+                ],
+                "gt_value_function_loss_model_baseline": [
+                    "Multiline",
+                    [
+                        "gradient_analysis/gt_value_function_val_loss",
+                        "gradient_analysis/gt_value_function_val_loss_mean_baseline",
                     ],
-                }
+                ],
             }
             logs.add_custom_scalars(layout)
-            return logs
 
     @staticmethod
     def _calculate_loss_and_metrics(

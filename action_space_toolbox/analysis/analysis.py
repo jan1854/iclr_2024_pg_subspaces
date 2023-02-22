@@ -44,6 +44,9 @@ class Analysis(abc.ABC):
         overwrite_results: bool = False,
         show_progress: bool = False,
     ) -> TensorboardLogs:
+        prefix = f"{self.analysis_name}/{self.analysis_run_id}"
+        prefix_step_plots = f"{self.analysis_name}_step_plots/{self.analysis_run_id}"
+        logs = TensorboardLogs(prefix, prefix_step_plots)
         # Check whether the analysis was already done for the current step
         analyses_logs = self._load_analysis_logs()
         curr_analysis_logs = analyses_logs[self.analysis_name][self.analysis_run_id]
@@ -51,8 +54,8 @@ class Analysis(abc.ABC):
             with torch.multiprocessing.get_context("spawn").Pool(
                 self.num_processes
             ) as pool:
-                results = self._do_analysis(
-                    pool, env_step, overwrite_results, show_progress
+                logs = self._do_analysis(
+                    pool, env_step, logs, overwrite_results, show_progress
                 )
             if env_step not in curr_analysis_logs:
                 # Lock the analysis.yaml file to ensure sequential access
@@ -72,9 +75,7 @@ class Analysis(abc.ABC):
                     with self._analyses_log_file.open("w") as analyses_log_file:
                         yaml.dump(analyses_logs, analyses_log_file)
             add_new_data_indicator(self.run_dir)
-            return results
-        else:
-            return TensorboardLogs()
+        return logs
 
     def _load_analysis_logs(self) -> Dict[str, Dict[str, List[int]]]:
         with self._analyses_log_file.open("r") as analyses_log_file:
@@ -92,6 +93,7 @@ class Analysis(abc.ABC):
         self,
         process_pool: torch.multiprocessing.Pool,
         env_step: int,
+        logs: TensorboardLogs,
         overwrite_results: bool,
         verbose: bool,
     ) -> TensorboardLogs:

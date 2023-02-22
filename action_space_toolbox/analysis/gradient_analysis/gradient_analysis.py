@@ -50,6 +50,7 @@ class GradientAnalysis(Analysis):
             env_factory,
             agent_spec,
             run_dir,
+            device,
             num_processes=1,
         )
         samples_different_gradient_estimates = np.asarray(
@@ -82,14 +83,17 @@ class GradientAnalysis(Analysis):
         self,
         process_pool: torch.multiprocessing.Pool,
         env_step: int,
+        logs: TensorboardLogs,
         overwrite_results: bool,
         show_progress: bool,
     ) -> TensorboardLogs:
         return process_pool.apply(
-            functools.partial(self.analysis_worker, env_step, show_progress)
+            functools.partial(self.analysis_worker, env_step, logs, show_progress)
         )
 
-    def analysis_worker(self, env_step: int, show_progress: bool) -> TensorboardLogs:
+    def analysis_worker(
+        self, env_step: int, logs: TensorboardLogs, show_progress: bool
+    ) -> TensorboardLogs:
         agent = self.agent_spec.create_agent(self.env_factory())
         env = DummyVecEnv([self.env_factory])
         value_function_trainer = ValueFunctionTrainer(agent.batch_size)
@@ -125,11 +129,12 @@ class GradientAnalysis(Analysis):
         fill_rollout_buffer(
             self.env_factory, self.agent_spec, rollout_buffer_gradient_estimates
         )
-        logs = self.gradient_similarity_analysis.analyze(
+        self.gradient_similarity_analysis.analyze(
             rollout_buffer_true_gradient,
             rollout_buffer_gradient_estimates,
             agent,
             env_step,
+            logs,
         )
 
         states_gt, values_gt = self._compute_gt_values(
@@ -147,16 +152,8 @@ class GradientAnalysis(Analysis):
             policy.predict_values(states_gt), values_gt
         )
 
-        logs.add_scalar(
-            f"gradient_analysis/{self.analysis_run_id}/value_function_gae_mre",
-            value_function_gae_mre,
-            env_step,
-        )
-        logs.add_scalar(
-            f"gradient_analysis/{self.analysis_run_id}/value_function_gt_mre",
-            value_function_gt_mre,
-            env_step,
-        )
+        logs.add_scalar(f"value_function_gae_mre", value_function_gae_mre, env_step)
+        logs.add_scalar(f"value_function_gt_mre", value_function_gt_mre, env_step)
 
         if self.gt_value_function_analysis:
             if self._dump_gt_value_function_dataset:
@@ -181,17 +178,16 @@ class GradientAnalysis(Analysis):
                 lr=policy.optimizer.param_groups[0]["lr"],
                 **policy.optimizer_kwargs,
             )
-            fit_value_function_logs = value_function_trainer.fit_value_function(
+            value_function_trainer.fit_value_function(
                 gt_value_function,
                 value_function_optimizer,
                 states_gt,
                 values_gt,
                 self.epochs_gt_value_function_training,
                 env_step,
+                logs,
                 show_progress=show_progress,
             )
-            logs.update(fit_value_function_logs)
-
         return logs
 
     @classmethod

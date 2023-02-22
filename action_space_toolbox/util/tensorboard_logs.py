@@ -21,16 +21,24 @@ class TensorboardLogs:
     SummaryWriter later on).
     """
 
-    def __init__(self):
+    def __init__(
+        self, prefix: Optional[str] = None, prefix_step_plots: Optional[str] = None
+    ):
         self.scalars = {}
         self.images = {}
         self.custom_scalars_layout = {}
+        self.prefix = prefix
+        self.prefix_step_plots = prefix_step_plots
 
     def add_scalar(
         self, key: str, value: float, step: int, walltime: Optional[float] = None
     ) -> None:
+        key = self._maybe_add_prefix(key, self.prefix)
         if walltime is None:
             walltime = time.time()
+        self._add_scalar(key, value, step, walltime)
+
+    def _add_scalar(self, key: str, value: float, step: int, walltime: float):
         if key in self.scalars:
             self.scalars[key].append((value, step, walltime))
         else:
@@ -43,11 +51,12 @@ class TensorboardLogs:
         values: Sequence[float],
         walltimes: Optional[Sequence[float]] = None,
     ):
+        key = self._maybe_add_prefix(key, self.prefix_step_plots)
         if walltimes is None:
             walltimes = [time.time()] * len(steps)
         assert len(steps) == len(values) == len(walltimes)
         for step, value, walltime in zip(steps, values, walltimes):
-            self.add_scalar(key, value, step, walltime)
+            self._add_scalar(key, value, step, walltime)
 
     def add_image(
         self,
@@ -56,6 +65,7 @@ class TensorboardLogs:
         step: int,
         walltime: Optional[float] = None,
     ) -> None:
+        key = self._maybe_add_prefix(key, self.prefix)
         if walltime is None:
             walltime = time.time()
         if isinstance(image, PIL.Image.Image):
@@ -67,6 +77,8 @@ class TensorboardLogs:
             self.images[key] = [(image, step, walltime)]
 
     def add_custom_scalars(self, layout: Dict[str, Any]) -> None:
+        if self.prefix is not None:
+            layout = {self.prefix: layout}
         self.custom_scalars_layout.update(layout)
 
     def log(self, summary_writer: SummaryWriter) -> None:
@@ -82,6 +94,13 @@ class TensorboardLogs:
         self.scalars.update(logs.scalars)
         self.images.update(logs.images)
         self.custom_scalars_layout.update(logs.custom_scalars_layout)
+
+    @classmethod
+    def _maybe_add_prefix(cls, key: str, prefix: Optional[str]) -> str:
+        if prefix is not None:
+            return f"{prefix}/{key}"
+        else:
+            return key
 
 
 def get_output_keys(key: str, key_prefix: Optional[str]) -> Tuple[str, str, str]:
@@ -210,6 +229,7 @@ def create_event_accumulators(
     return event_accumulators
 
 
+# TODO: This should probably use the TensorboardLogs class
 def combine_tb_logs(
     event_file_dirs: Sequence[Path],
     out_path: Path,

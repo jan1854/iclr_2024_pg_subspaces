@@ -27,7 +27,8 @@ class GradientSimilarityAnalysis:
         rollout_buffer_estimates: RolloutBuffer,
         agent: stable_baselines3.ppo.PPO,
         env_step: int,
-    ) -> TensorboardLogs:
+        logs: TensorboardLogs,
+    ) -> None:
         (
             policy_gradient_true,
             vf_gradient_true,
@@ -56,7 +57,6 @@ class GradientSimilarityAnalysis:
             *gradient_estimates_other
         )
 
-        logs = TensorboardLogs()
         self._evaluate_gradient_estimates(
             policy_gradient_true,
             policy_gradient_agent,
@@ -81,7 +81,6 @@ class GradientSimilarityAnalysis:
             env_step,
             logs,
         )
-        return logs
 
     def _evaluate_gradient_estimates(
         self,
@@ -108,24 +107,22 @@ class GradientSimilarityAnalysis:
         ]
 
         logs.add_scalar(
-            f"gradient_analysis/{self.analysis_run_id}/{gradient_name}/similarity_estimates_true_gradient",
+            f"{gradient_name}/similarity_estimates_true_gradient",
             similarity_original_true,
             env_step,
         )
         logs.add_scalar(
-            f"gradient_analysis/{self.analysis_run_id}/{gradient_name}/similarity_gradient_estimates",
+            f"{gradient_name}/similarity_gradient_estimates",
             similarity_original_estimates,
             env_step,
         )
         logs.add_step_plot(
-            f"gradient_analysis_step_plots/{self.analysis_run_id}/{gradient_name}/"
-            f"similarity_estimates_true_gradient_diff_batch_sizes_logx_{env_step:07d}",
+            f"{gradient_name}/similarity_estimates_true_gradient_diff_batch_sizes_logx_{env_step:07d}",
             np.round(np.log10(self.batch_sizes_gradient_estimates)).astype(int),
             similarities_other_true,
         )
         logs.add_step_plot(
-            f"gradient_analysis_step_plots/{self.analysis_run_id}/{gradient_name}/"
-            f"similarity_gradient_estimates_diff_batch_sizes_logx_{env_step:07d}",
+            f"{gradient_name}/similarity_gradient_estimates_diff_batch_sizes_logx_{env_step:07d}",
             np.round(np.log10(self.batch_sizes_gradient_estimates)).astype(int),
             similarities_other_estimates,
         )
