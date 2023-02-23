@@ -1,12 +1,16 @@
+from typing import Optional, Union
+
 import gym
 import numpy as np
 import pytest
+import stable_baselines3
 from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.angles import normalize_angle
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer
 
@@ -57,8 +61,15 @@ def env_factory():
     return TimeLimit(DummyEnv(), 5)
 
 
-def agent_factory(env):
-    return PPO("MlpPolicy", DummyVecEnv([lambda: env]), device="cpu", seed=42)
+class DummyAgentSpec(AgentSpec):
+    def __init__(self):
+        super().__init__(None, None)
+
+    def create_agent(
+        self,
+        env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
+    ) -> stable_baselines3.ppo.PPO:
+        return PPO("MlpPolicy", DummyVecEnv([lambda: env]), device="cpu", seed=42)
 
 
 def test_fill_rollout_buffer():
@@ -67,15 +78,15 @@ def test_fill_rollout_buffer():
         rollout_buffer = RolloutBuffer(
             num_steps, env.observation_space, env.action_space, device="cpu"
         )
-
+        agent_spec = DummyAgentSpec()
         fill_rollout_buffer(
-            env_factory, agent_factory, rollout_buffer, num_spawned_processes=3
+            env_factory, agent_spec, rollout_buffer, num_spawned_processes=3
         )
 
         rollout_buffer_ppo = RolloutBuffer(
             num_steps, env.observation_space, env.action_space, device="cpu"
         )
-        ppo = agent_factory(env_factory())
+        ppo = agent_spec.create_agent(env_factory())
         ppo._last_obs = ppo.env.reset()
         ppo._last_episode_starts = True
         callback = EvalCallback(DummyVecEnv([env_factory]))
