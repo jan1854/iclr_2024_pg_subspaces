@@ -13,7 +13,7 @@ from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 PLOT_NAME_TO_DESCR = {
     "reward_surface_undiscounted": "reward (undiscounted)",
-    "reward_surface_discounted": "reward (discounted) surface",
+    "reward_surface_discounted": "reward (discounted)",
     "policy_loss_surface": "policy loss",
     "negative_policy_loss_surface": "negative policy loss",
     "value_function_loss_surface": "value function loss",
