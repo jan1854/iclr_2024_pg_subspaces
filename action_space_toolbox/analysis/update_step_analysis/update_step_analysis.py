@@ -1,23 +1,25 @@
 import functools
-import itertools
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Tuple, Union
 
 import gym
 import numpy as np
 import stable_baselines3.common.buffers
+import stable_baselines3.common.vec_env
 import torch.multiprocessing
 
 from action_space_toolbox.analysis.analysis import Analysis
+from action_space_toolbox.analysis.util import (
+    evaluate_agent_losses,
+    evaluate_agent_returns,
+    LossEvaluationResult,
+    ReturnEvaluationResult,
+    flatten_parameters,
+)
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.sb3_training import (
     fill_rollout_buffer,
     sample_update_trajectory,
-    evaluate_agent_returns,
-    flatten_parameters,
-    evaluate_agent_losses,
-    AgentLosses,
-    AgentReturns,
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
@@ -30,8 +32,8 @@ class UpdateStepAnalysis(Analysis):
         agent_spec: AgentSpec,
         run_dir: Path,
         num_steps_true_loss: int,
-        num_steps_evaluation: int,
-        num_update_trajectories: int,
+        num_updates_evaluation: int,
+        num_samples_agent_updates: int,
     ):
         super().__init__(
             "update_step_analysis",
@@ -42,8 +44,9 @@ class UpdateStepAnalysis(Analysis):
             num_processes=1,
         )
         self.num_steps_true_loss = num_steps_true_loss
-        self.num_steps_evaluation = num_steps_evaluation
-        self.num_update_trajectories = num_update_trajectories
+        self.num_steps_evaluation = num_updates_evaluation
+        self.num_updates_evaluation = num_updates_evaluation
+        self.num_samples_agent_updates = num_samples_agent_updates
 
     def _do_analysis(
         self,
@@ -72,17 +75,9 @@ class UpdateStepAnalysis(Analysis):
         )
 
         len_update_trajectory = agent.n_steps * agent.n_envs // agent.batch_size
-        update_trajectory_true_loss = sample_update_trajectory(
-            rollout_buffer_true_loss,
-            self.agent_spec.create_agent(self.env_factory()),
-            agent.policy.optimizer,
-            None,
-            len_update_trajectory,
-            repeat_data=True,
-        )
 
         rollout_buffer_agent = stable_baselines3.common.buffers.RolloutBuffer(
-            agent.n_steps * agent.n_envs,
+            self.num_samples_agent_updates,
             agent.observation_space,
             agent.action_space,
             agent.device,
@@ -90,122 +85,89 @@ class UpdateStepAnalysis(Analysis):
             agent.gamma,
             n_envs=1,
         )
-        update_trajectories_agent = []
-        for _ in range(self.num_update_trajectories):
-            rollout_buffer_agent.reset()
-            fill_rollout_buffer(
-                self.env_factory,
+        fill_rollout_buffer(
+            self.env_factory,
+            self.agent_spec,
+            rollout_buffer_agent,
+            None,
+            self.num_processes,
+        )
+
+        sample_update_trajectory_true_loss = functools.partial(
+            sample_update_trajectory,
+            rollout_buffer_true_loss,
+            self.agent_spec,
+            agent.policy.optimizer,
+            None,
+            len_update_trajectory,
+        )
+        sample_update_trajectory_agent = functools.partial(
+            sample_update_trajectory,
+            rollout_buffer_agent,
+            self.agent_spec,
+            agent.policy.optimizer,
+            agent.batch_size,
+            len_update_trajectory,
+        )
+        avg_update_step_length = self.get_average_update_step_length(
+            sample_update_trajectory_agent
+        )
+        sample_update_trajectory_random = functools.partial(
+            self._sample_random_update_trajectory,
+            [p.detach() for p in agent.policy.parameters()],
+            avg_update_step_length,
+            len_update_trajectory,
+        )
+
+        analysis_results_true_loss = process_pool.apply_async(
+            self.update_step_analysis_worker,
+            (
+                1,
                 self.agent_spec,
-                rollout_buffer_agent,
-                None,
-                self.num_processes,
-            )
-            update_trajectories_agent.append(
-                sample_update_trajectory(
-                    rollout_buffer_agent,
-                    self.agent_spec.create_agent(self.env_factory()),
-                    agent.policy.optimizer,
-                    agent.batch_size,
-                    len_update_trajectory,
-                )
-            )
-
-        update_trajectories_random = self._sample_random_update_trajectories(
-            [p.detach() for p in agent.policy.parameters()], update_trajectories_agent
+                sample_update_trajectory_true_loss,
+                rollout_buffer_true_loss,
+                self.env_factory,
+            ),
+        )
+        analysis_results_agent = process_pool.apply_async(
+            self.update_step_analysis_worker,
+            (
+                self.num_updates_evaluation,
+                self.agent_spec,
+                sample_update_trajectory_agent,
+                rollout_buffer_true_loss,
+                self.env_factory,
+            ),
+        )
+        analysis_results_random = process_pool.apply_async(
+            self.update_step_analysis_worker,
+            (
+                self.num_updates_evaluation,
+                self.agent_spec,
+                sample_update_trajectory_random,
+                rollout_buffer_true_loss,
+                self.env_factory,
+            ),
         )
 
-        agent_spec_single_step_true_loss = self.agent_spec.copy_with_new_weights(
-            update_trajectory_true_loss[0]
-        )
-        agent_specs_single_step_agent = [
-            self.agent_spec.copy_with_new_weights(traj[0])
-            for traj in update_trajectories_agent
-        ]
-        agent_specs_single_step_random = [
-            self.agent_spec.copy_with_new_weights(traj[0])
-            for traj in update_trajectories_random
-        ]
-        agent_spec_trajectory_true_loss = self.agent_spec.copy_with_new_weights(
-            update_trajectory_true_loss[-1]
-        )
-        agent_specs_trajectory_agent = [
-            self.agent_spec.copy_with_new_weights(traj[-1])
-            for traj in update_trajectories_agent
-        ]
-        agent_specs_trajectory_random = [
-            self.agent_spec.copy_with_new_weights(traj[-1])
-            for traj in update_trajectories_random
-        ]
-
-        evaluate_agent_common_parameters = functools.partial(
-            evaluate_agent_returns,
-            env_factory=self.env_factory,
-            num_steps=self.num_steps_evaluation,
-        )
-        returns_single_step_true_loss = process_pool.apply_async(
-            evaluate_agent_common_parameters, ([agent_spec_single_step_true_loss],)
-        )
-        returns_single_step_agent = process_pool.map_async(
-            evaluate_agent_common_parameters, agent_specs_single_step_agent
-        )
-        returns_single_step_random = process_pool.map_async(
-            evaluate_agent_common_parameters, agent_specs_single_step_random
-        )
-        returns_trajectory_true_loss = process_pool.apply_async(
-            evaluate_agent_common_parameters, ([agent_spec_trajectory_true_loss],)
-        )
-        returns_trajectory_agent = process_pool.map_async(
-            evaluate_agent_common_parameters, agent_specs_trajectory_agent
-        )
-        returns_trajectory_random = process_pool.map_async(
-            evaluate_agent_common_parameters, agent_specs_trajectory_random
-        )
-
-        loss_single_step_true_loss = evaluate_agent_losses(
-            [agent_spec_trajectory_true_loss],
-            rollout_buffer_true_loss,
-            self.env_factory,
-        )
-        loss_single_step_agent = evaluate_agent_losses(
-            agent_specs_single_step_agent,
-            rollout_buffer_true_loss,
-            self.env_factory,
-        )
-        loss_single_step_random = evaluate_agent_losses(
-            agent_specs_single_step_random,
-            rollout_buffer_true_loss,
-            self.env_factory,
-        )
-        loss_trajectory_true_loss = evaluate_agent_losses(
-            [agent_spec_trajectory_true_loss],
-            rollout_buffer_true_loss,
-            self.env_factory,
-        )
-        loss_trajectory_agent = evaluate_agent_losses(
-            agent_specs_trajectory_agent,
-            rollout_buffer_true_loss,
-            self.env_factory,
-        )
-        loss_trajectory_random = evaluate_agent_losses(
-            agent_specs_trajectory_random,
-            rollout_buffer_true_loss,
-            self.env_factory,
-        )
-
-        returns_single_step_true_loss = returns_single_step_true_loss.get()
-        returns_single_step_agent = AgentReturns.concatenate(
-            returns_single_step_agent.get()
-        )
-        returns_single_step_random = AgentReturns.concatenate(
-            returns_single_step_random.get()
-        )
-        returns_trajectory_true_loss = returns_trajectory_true_loss.get()
-        returns_trajectory_agent = AgentReturns.concatenate(
-            returns_trajectory_agent.get()
-        )
-        returns_trajectory_random = AgentReturns.concatenate(
-            returns_trajectory_random.get()
-        )
+        (
+            loss_single_step_true_loss,
+            returns_single_step_true_loss,
+            loss_trajectory_true_loss,
+            returns_trajectory_true_loss,
+        ) = analysis_results_true_loss.get()
+        (
+            loss_single_step_agent,
+            returns_single_step_agent,
+            loss_trajectory_agent,
+            returns_trajectory_agent,
+        ) = analysis_results_agent.get()
+        (
+            loss_single_step_random,
+            returns_single_step_random,
+            loss_trajectory_random,
+            returns_trajectory_random,
+        ) = analysis_results_random.get()
 
         self.log_results(
             "true_gradient_single_update_step",
@@ -252,64 +214,111 @@ class UpdateStepAnalysis(Analysis):
         return logs
 
     @classmethod
-    def _sample_random_update_trajectories(
+    def update_step_analysis_worker(
+        cls,
+        num_update_trajectories: int,
+        agent_spec: AgentSpec,
+        update_trajectory_sampler: Callable[[], Sequence[torch.Tensor]],
+        rollout_buffer_true_loss: stable_baselines3.common.buffers.RolloutBuffer,
+        env_factory: Callable[
+            [], Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]
+        ],
+    ) -> Tuple[
+        LossEvaluationResult,
+        ReturnEvaluationResult,
+        LossEvaluationResult,
+        ReturnEvaluationResult,
+    ]:
+        results_loss_single_step = []
+        results_loss_trajectory = []
+        results_return_single_step = []
+        results_return_trajectory = []
+        for _ in range(num_update_trajectories):
+            update_trajectory = update_trajectory_sampler()
+            agent_spec_single_step = agent_spec.copy_with_new_weights(
+                update_trajectory[0]
+            )
+            agent_spec_trajectory = agent_spec.copy_with_new_weights(
+                update_trajectory[-1]
+            )
+            results_loss_single_step.append(
+                evaluate_agent_losses(
+                    [agent_spec_single_step],
+                    rollout_buffer_true_loss,
+                )
+            )
+            results_loss_trajectory.append(
+                evaluate_agent_losses([agent_spec_trajectory], rollout_buffer_true_loss)
+            )
+            results_return_single_step.append(
+                evaluate_agent_returns(
+                    [agent_spec_single_step], env_factory, num_epsiodes=1
+                )
+            )
+            results_return_trajectory.append(
+                evaluate_agent_returns(
+                    [agent_spec_single_step], env_factory, num_epsiodes=1
+                )
+            )
+        results_loss_single_step = LossEvaluationResult.concatenate(
+            results_loss_single_step
+        )
+        results_loss_trajectory = LossEvaluationResult.concatenate(
+            results_loss_trajectory
+        )
+        results_return_single_step = ReturnEvaluationResult.concatenate(
+            results_return_single_step
+        )
+        results_return_trajectory = ReturnEvaluationResult.concatenate(
+            results_return_trajectory
+        )
+        return (
+            results_loss_single_step,
+            results_return_single_step,
+            results_loss_trajectory,
+            results_return_trajectory,
+        )
+
+    @classmethod
+    def _sample_random_update_trajectory(
         cls,
         initial_weights: Sequence[torch.Tensor],
-        update_trajectories_agent: Sequence[Sequence[Sequence[torch.Tensor]]],
-    ) -> Sequence[Sequence[Sequence[torch.Tensor]]]:
+        update_step_length: float,
+        num_update_steps: int,
+    ) -> Sequence[Sequence[torch.Tensor]]:
         """
-        Samples update trajectories of random steps, starting with the given initial parameters. Each step has the same
-        length as the average step in the given update trajectory. The number of trajectories and the length of each
-        trajectory is the same as for the given update trajectories.
+        Samples an update trajectory of random steps, starting with the given initial parameters. Each step has given
+        length.
         :param initial_weights:             The initial weights (the weights of agent before the update)
-        :param update_trajectories_agent:   Update trajectories resulting from the agent optimization
-        :return:                            Update trajectories that take random steps with length being equal to the
-                                            average length of the agent optimization steps
+        :param update_step_length:          The length of each update step
+        :param num_update_steps:            The length of the trajectory in update steps
+        :return:                            Ab update trajectory that take random steps of the given length
         """
         device = initial_weights[0].device
-        update_trajectories_with_init = torch.stack(
-            [
-                flatten_parameters(step)
-                for update_traj in update_trajectories_agent
-                for step in itertools.chain([initial_weights], update_traj)
+        random_update_trajectory = []
+        new_weights = initial_weights
+        for _ in range(num_update_steps):
+            random_step_unnormalized = [
+                torch.distributions.uniform.Uniform(-1, 1)
+                .sample(layer_step.shape)
+                .to(device)
+                for layer_step in initial_weights
             ]
-        )
-        update_trajectories_difference = (
-            update_trajectories_with_init[:, 1:] - update_trajectories_with_init[:, :-1]
-        )
-        avg_step_size_agent = torch.mean(
-            torch.norm(update_trajectories_difference, dim=-1)
-        )
-        random_update_trajectories = []
-        num_trajectories = len(update_trajectories_agent)
-        len_trajectories = len(update_trajectories_agent[0])
-        for _ in range(num_trajectories):
-            random_update_trajectories.append([])
-            new_weights = initial_weights
-            for _ in range(len_trajectories):
-                random_step_unnormalized = [
-                    torch.distributions.uniform.Uniform(-1, 1)
-                    .sample(layer_step.shape)
-                    .to(device)
-                    for layer_step in update_trajectories_agent[0][0]
-                ]
-                curr_step_size = torch.norm(
-                    flatten_parameters(random_step_unnormalized)
-                )
-                random_step = [
-                    layer_step * avg_step_size_agent / curr_step_size
-                    for layer_step in random_step_unnormalized
-                ]
-                new_weights = [w + s for w, s in zip(new_weights, random_step)]
-                random_update_trajectories[-1].append(new_weights)
-        return random_update_trajectories
+            curr_step_size = torch.norm(flatten_parameters(random_step_unnormalized))
+            random_step = [
+                layer_step * update_step_length / curr_step_size
+                for layer_step in random_step_unnormalized
+            ]
+            new_weights = [w + s for w, s in zip(new_weights, random_step)]
+            random_update_trajectory.append(new_weights)
+        return random_update_trajectory
 
     @classmethod
     def log_results(
         cls,
         name: str,
-        losses: AgentLosses,
-        returns: AgentReturns,
+        losses: LossEvaluationResult,
+        returns: ReturnEvaluationResult,
         env_step: int,
         logs: TensorboardLogs,
     ) -> None:
@@ -329,3 +338,28 @@ class UpdateStepAnalysis(Analysis):
         ]
         for plot_name, value in zip(plot_names, values):
             logs.add_scalar(f"{name}/{plot_name}", value, env_step)  # type: ignore
+
+    @classmethod
+    def get_average_update_step_length(
+        cls,
+        update_trajectory_sampler: Callable[[], Sequence[torch.Tensor]],
+        num_trajectories: int = 20,
+    ) -> float:
+        update_trajectories = [
+            update_trajectory_sampler() for _ in range(num_trajectories)
+        ]
+        update_trajectories = torch.stack(
+            [
+                flatten_parameters(step)
+                for update_traj in update_trajectories
+                for step in update_traj
+            ]
+        )
+
+        update_trajectories_difference = (
+            update_trajectories[:, 1:] - update_trajectories[:, :-1]
+        )
+        avg_step_size_agent = torch.mean(
+            torch.norm(update_trajectories_difference, dim=-1)
+        )
+        return avg_step_size_agent.item()

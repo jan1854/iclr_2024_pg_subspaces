@@ -16,14 +16,16 @@ from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.reward_surface_visualization.plotting import (
     plot_results,
 )
+from action_space_toolbox.analysis.util import (
+    flatten_parameters,
+    evaluate_agent_returns,
+    evaluate_agent_losses,
+)
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.sb3_training import (
     fill_rollout_buffer,
     ppo_loss,
     ppo_gradient,
-    flatten_parameters,
-    evaluate_agent_losses,
-    evaluate_agent_returns,
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
@@ -193,7 +195,7 @@ class RewardSurfaceVisualization(Analysis):
             )
 
             loss_surface_results = evaluate_agent_losses(
-                agent_specs_flat, rollout_buffer_true_loss, self.env_factory
+                agent_specs_flat, rollout_buffer_true_loss
             ).reshape(self.grid_size, self.grid_size)
 
             (

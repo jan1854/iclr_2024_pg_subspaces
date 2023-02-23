@@ -1,9 +1,8 @@
 import collections
-import dataclasses
 import functools
 import itertools
 import math
-from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Callable, List, Optional, Tuple
 
 import gym
 import numpy as np
@@ -21,50 +20,6 @@ EnvSteps = collections.namedtuple(
     "EnvSteps",
     "observations actions rewards rewards_no_value_bootstrap dones values log_probs",
 )
-
-
-@dataclasses.dataclass
-class AgentReturns:
-    rewards_undiscounted: np.ndarray
-    rewards_discounted: np.ndarray
-
-    def reshape(self, *dims) -> "AgentReturns":
-        return AgentReturns(
-            self.rewards_undiscounted.reshape(*dims),
-            self.rewards_discounted.reshape(*dims),
-        )
-
-    @classmethod
-    def concatenate(cls, seq: Sequence["AgentReturns"]) -> "AgentReturns":
-        return AgentReturns(
-            np.concatenate([ar.rewards_undiscounted for ar in seq]),
-            np.concatenate([ar.rewards_discounted for ar in seq]),
-        )
-
-
-@dataclasses.dataclass
-class AgentLosses:
-    policy_losses: np.ndarray
-    value_function_losses: np.ndarray
-    combined_losses: np.ndarray
-    policy_ratios: np.ndarray
-
-    def reshape(self, *dims) -> "AgentLosses":
-        return AgentLosses(
-            self.policy_losses.reshape(*dims),
-            self.value_function_losses.reshape(*dims),
-            self.combined_losses.reshape(*dims),
-            self.policy_ratios.reshape(*dims),
-        )
-
-    @classmethod
-    def concatenate(cls, seq: Sequence["AgentLosses"]) -> "AgentLosses":
-        return AgentLosses(
-            np.concatenate([al.policy_losses for al in seq]),
-            np.concatenate([al.value_function_losses for al in seq]),
-            np.concatenate([al.combined_losses for al in seq]),
-            np.concatenate([al.policy_ratios for al in seq]),
-        )
 
 
 def fill_rollout_buffer(
@@ -402,12 +357,13 @@ def get_value_function_parameters(
 
 def sample_update_trajectory(
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
-    agent: stable_baselines3.ppo.PPO,
+    agent_spec: AgentSpec,
     optimizer: torch.optim,
     batch_size: Optional[int],
     max_num_steps: Optional[int],
     repeat_data: bool = False,
 ) -> List[List[torch.Tensor]]:
+    agent = agent_spec.create_agent()
     parameters = []
     data_iter = (
         itertools.cycle(rollout_buffer.get(batch_size))
@@ -423,97 +379,3 @@ def sample_update_trajectory(
         loss.backward()
         parameters.append([p.detach() for p in agent.policy.parameters()])
     return parameters
-
-
-def evaluate_agent_returns(
-    agent_specs: Union[AgentSpec, Sequence[AgentSpec]],
-    env_factory: Callable[[], gym.Env],
-    num_steps: int,
-) -> AgentReturns:
-    mean_episode_rewards_undiscounted = []
-    mean_episode_rewards_discounted = []
-    if not isinstance(agent_specs, Iterable):
-        agent_specs = [agent_specs]
-    for agent_spec in agent_specs:
-        env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
-        agent = agent_spec.create_agent(env)
-        rollout_buffer_no_value_bootstrap = (
-            stable_baselines3.common.buffers.RolloutBuffer(
-                num_steps,
-                agent.observation_space,
-                agent.action_space,
-                "cpu",
-                agent.gae_lambda,
-                agent.gamma,
-            )
-        )
-
-        fill_rollout_buffer(
-            env_factory,
-            agent_spec,
-            None,
-            rollout_buffer_no_value_bootstrap,
-        )
-        episode_rewards_undiscounted = []
-        episode_rewards_discounted = []
-        curr_reward_undiscounted = None
-        curr_reward_discounted = None
-        curr_episode_length = 0
-        for episode_start, reward in zip(
-            rollout_buffer_no_value_bootstrap.episode_starts,
-            rollout_buffer_no_value_bootstrap.rewards,
-        ):
-            if episode_start:
-                if curr_episode_length > 0:
-                    episode_rewards_undiscounted.append(curr_reward_undiscounted)
-                    episode_rewards_discounted.append(curr_reward_discounted)
-                curr_episode_length = 0
-                curr_reward_discounted = 0.0
-                curr_reward_undiscounted = 0.0
-            curr_episode_length += 1
-            curr_reward_undiscounted += reward
-            curr_reward_discounted += agent.gamma ** (curr_episode_length - 1) * reward
-        # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
-        # the episode if it has the maximum episode length.
-        if curr_episode_length == get_episode_length(env):
-            episode_rewards_undiscounted.append(curr_reward_undiscounted)
-            episode_rewards_discounted.append(curr_reward_discounted)
-        mean_episode_rewards_undiscounted.append(np.mean(episode_rewards_undiscounted))
-        mean_episode_rewards_discounted.append(np.mean(episode_rewards_discounted))
-    return AgentReturns(
-        np.array(mean_episode_rewards_undiscounted),
-        np.array(mean_episode_rewards_discounted),
-    )
-
-
-def evaluate_agent_losses(
-    agent_specs: Sequence[AgentSpec],
-    rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
-    env_factory: Callable[[], gym.Env],
-) -> AgentLosses:
-    combined_losses = []
-    policy_losses = []
-    value_function_losses = []
-    policy_ratios = []
-    for agent_spec in agent_specs:
-        agent = agent_spec.create_agent(env_factory())
-        (
-            combined_loss,
-            policy_loss,
-            value_function_loss,
-            policy_ratio,
-        ) = ppo_loss(agent, next(rollout_buffer.get()))
-        combined_losses.append(combined_loss.item())
-        policy_losses.append(policy_loss.item())
-        value_function_losses.append(value_function_loss.item())
-        policy_ratios.append(policy_ratio.item())
-    return AgentLosses(
-        np.array(policy_losses, dtype=np.float32),
-        np.array(value_function_losses, dtype=np.float32),
-        np.array(combined_losses, dtype=np.float32),
-        np.array(policy_ratios, dtype=np.float32),
-    )
-
-
-def flatten_parameters(seq: Sequence[torch.Tensor]) -> torch.Tensor:
-    return torch.cat([s.flatten() for s in seq])

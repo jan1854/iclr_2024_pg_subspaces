@@ -50,7 +50,6 @@ class GradientAnalysis(Analysis):
             env_factory,
             agent_spec,
             run_dir,
-            device,
             num_processes=1,
         )
         samples_different_gradient_estimates = np.asarray(

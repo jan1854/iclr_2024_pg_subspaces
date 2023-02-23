@@ -23,7 +23,8 @@ class AgentSpec:
         self.override_weights = override_weights
 
     def create_agent(
-        self, env: Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]
+        self,
+        env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
     ) -> stable_baselines3.ppo.PPO:
         agent = stable_baselines3.ppo.PPO.load(
             self.checkpoint_path, env, self.device, **self.agent_kwargs
@@ -36,6 +37,6 @@ class AgentSpec:
         return agent
 
     def copy_with_new_weights(
-        self, override_weights: Optional[Sequence[torch.Tensor]] = None
+        self, override_weights: Sequence[torch.Tensor]
     ) -> "AgentSpec":
         return AgentSpec(self.checkpoint_path, self.device, override_weights)
