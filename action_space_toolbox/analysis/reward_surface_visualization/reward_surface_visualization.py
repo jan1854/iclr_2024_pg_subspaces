@@ -132,7 +132,7 @@ class RewardSurfaceVisualization(Analysis):
                 self.env_factory,
                 self.agent_spec,
                 rollout_buffer_true_loss,
-                num_processes=self.num_processes,
+                num_spawned_processes=self.num_processes,
             )
 
             direction2 = [

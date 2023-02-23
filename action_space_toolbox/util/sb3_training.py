@@ -29,19 +29,20 @@ def fill_rollout_buffer(
     rollout_buffer_no_value_bootstrap: Optional[
         stable_baselines3.common.buffers.RolloutBuffer
     ] = None,
-    num_processes: int = 1,
+    num_spawned_processes: int = 0,
 ) -> None:
     """
     Collect experiences using the current policy and fill a ``RolloutBuffer``. The code is adapted from
     stable-baselines3's OnPolicyAlgorithm.collect_rollouts() (we cannot use that function since it modifies the
     state of the agent (e.g. the number of timesteps)).
 
-    :param agent_spec:                       A function that creates the RL agent
+    :param agent_spec:                          A function that creates the RL agent
     :param env_factory:                         A function that creates the environment
     :param rollout_buffer:                      Buffer to fill with rollouts
     :param rollout_buffer_no_value_bootstrap:   A separate buffer for without the value bootstrap (i.e, the last reward
                                                 of truncated episodes is not modified to reward + gamma * next_value)
-    :param num_processes:                       The number of processes to use
+    :param num_spawned_processes:               The number of processes to spawn for collecting the samples (if 0, the
+                                                current process will be used)
     """
     assert rollout_buffer is not None or rollout_buffer_no_value_bootstrap is not None
     assert (
@@ -55,13 +56,20 @@ def fill_rollout_buffer(
         else rollout_buffer_no_value_bootstrap.buffer_size
     )
 
-    if num_processes == 1:
+    assert num_spawned_processes >= 0
+    if num_spawned_processes == 0:
         env_steps = [collect_complete_episodes(buffer_size, env_factory, agent_spec)]
     else:
-        jobs = [math.ceil(buffer_size / num_processes)] * (num_processes - 1) + [
-            buffer_size - math.ceil(buffer_size / num_processes) * (num_processes - 1)
+        jobs = [math.ceil(buffer_size / num_spawned_processes)] * (
+            num_spawned_processes - 1
+        ) + [
+            buffer_size
+            - math.ceil(buffer_size / num_spawned_processes)
+            * (num_spawned_processes - 1)
         ]
-        with torch.multiprocessing.get_context("spawn").Pool(num_processes) as pool:
+        with torch.multiprocessing.get_context("spawn").Pool(
+            num_spawned_processes
+        ) as pool:
             env_steps = pool.map(
                 functools.partial(
                     collect_complete_episodes,

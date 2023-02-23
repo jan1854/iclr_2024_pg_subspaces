@@ -68,7 +68,9 @@ def test_fill_rollout_buffer():
             num_steps, env.observation_space, env.action_space, device="cpu"
         )
 
-        fill_rollout_buffer(env_factory, agent_factory, rollout_buffer, num_processes=3)
+        fill_rollout_buffer(
+            env_factory, agent_factory, rollout_buffer, num_spawned_processes=3
+        )
 
         rollout_buffer_ppo = RolloutBuffer(
             num_steps, env.observation_space, env.action_space, device="cpu"
