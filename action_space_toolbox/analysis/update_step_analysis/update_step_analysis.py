@@ -93,14 +93,6 @@ class UpdateStepAnalysis(Analysis):
             self.num_processes,
         )
 
-        sample_update_trajectory_true_loss = functools.partial(
-            sample_update_trajectory,
-            rollout_buffer_true_loss,
-            self.agent_spec,
-            agent.policy.optimizer,
-            None,
-            len_update_trajectory,
-        )
         sample_update_trajectory_agent = functools.partial(
             sample_update_trajectory,
             rollout_buffer_agent,
@@ -118,21 +110,20 @@ class UpdateStepAnalysis(Analysis):
             avg_update_step_length,
             len_update_trajectory,
         )
-
-        analysis_results_true_loss = process_pool.apply_async(
-            self.update_step_analysis_worker,
-            (
-                1,
-                self.agent_spec,
-                sample_update_trajectory_true_loss,
-                rollout_buffer_true_loss,
-                self.env_factory,
-            ),
+        sample_update_trajectory_true_loss = functools.partial(
+            sample_update_trajectory,
+            rollout_buffer_true_loss,
+            self.agent_spec,
+            agent.policy.optimizer,
+            None,
+            len_update_trajectory,
         )
+
         analysis_results_agent = process_pool.apply_async(
             self.update_step_analysis_worker,
             (
                 self.num_updates_evaluation,
+                1,
                 self.agent_spec,
                 sample_update_trajectory_agent,
                 rollout_buffer_true_loss,
@@ -143,19 +134,28 @@ class UpdateStepAnalysis(Analysis):
             self.update_step_analysis_worker,
             (
                 self.num_updates_evaluation,
+                1,
                 self.agent_spec,
                 sample_update_trajectory_random,
                 rollout_buffer_true_loss,
                 self.env_factory,
             ),
         )
+        # For the other agent and random configurations, we evaluate self.num_updates_evaluation updates for one
+        # episode. Since we only have one "true gradient" update, we evaluate this update for
+        # self.num_updates_evaluation episodes (to get the same total number of evaluation episodes).
+        analysis_results_true_loss = process_pool.apply_async(
+            self.update_step_analysis_worker,
+            (
+                1,
+                self.num_updates_evaluation,
+                self.agent_spec,
+                sample_update_trajectory_true_loss,
+                rollout_buffer_true_loss,
+                self.env_factory,
+            ),
+        )
 
-        (
-            loss_single_step_true_loss,
-            returns_single_step_true_loss,
-            loss_trajectory_true_loss,
-            returns_trajectory_true_loss,
-        ) = analysis_results_true_loss.get()
         (
             loss_single_step_agent,
             returns_single_step_agent,
@@ -168,11 +168,24 @@ class UpdateStepAnalysis(Analysis):
             loss_trajectory_random,
             returns_trajectory_random,
         ) = analysis_results_random.get()
-
-        self.log_results(
-            "true_gradient_single_update_step",
+        (
             loss_single_step_true_loss,
             returns_single_step_true_loss,
+            loss_trajectory_true_loss,
+            returns_trajectory_true_loss,
+        ) = analysis_results_true_loss.get()
+
+        self.log_results(
+            "agent_single_update_step",
+            loss_single_step_agent,
+            returns_single_step_agent,
+            env_step,
+            logs,
+        )
+        self.log_results(
+            "agent_update_trajectory",
+            loss_trajectory_agent,
+            returns_trajectory_agent,
             env_step,
             logs,
         )
@@ -184,9 +197,16 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
         self.log_results(
-            "agent_single_update_step",
-            loss_single_step_agent,
-            returns_single_step_agent,
+            "random_update_trajectory",
+            loss_trajectory_random,
+            returns_trajectory_random,
+            env_step,
+            logs,
+        )
+        self.log_results(
+            "true_gradient_single_update_step",
+            loss_single_step_true_loss,
+            returns_single_step_true_loss,
             env_step,
             logs,
         )
@@ -197,26 +217,13 @@ class UpdateStepAnalysis(Analysis):
             env_step,
             logs,
         )
-        self.log_results(
-            "random_update_trajectory",
-            loss_trajectory_random,
-            returns_trajectory_random,
-            env_step,
-            logs,
-        )
-        self.log_results(
-            "agent_update_trajectory",
-            loss_trajectory_agent,
-            returns_trajectory_agent,
-            env_step,
-            logs,
-        )
         return logs
 
     @classmethod
     def update_step_analysis_worker(
         cls,
         num_update_trajectories: int,
+        num_evaluation_episodes: int,
         agent_spec: AgentSpec,
         update_trajectory_sampler: Callable[[], Sequence[torch.Tensor]],
         rollout_buffer_true_loss: stable_baselines3.common.buffers.RolloutBuffer,
@@ -252,12 +259,16 @@ class UpdateStepAnalysis(Analysis):
             )
             results_return_single_step.append(
                 evaluate_agent_returns(
-                    [agent_spec_single_step], env_factory, num_epsiodes=1
+                    [agent_spec_single_step],
+                    env_factory,
+                    num_epsiodes=num_evaluation_episodes,
                 )
             )
             results_return_trajectory.append(
                 evaluate_agent_returns(
-                    [agent_spec_single_step], env_factory, num_epsiodes=1
+                    [agent_spec_single_step],
+                    env_factory,
+                    num_epsiodes=num_evaluation_episodes,
                 )
             )
         results_loss_single_step = LossEvaluationResult.concatenate(
