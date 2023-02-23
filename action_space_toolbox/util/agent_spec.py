@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 import gym
 import stable_baselines3.common.vec_env
