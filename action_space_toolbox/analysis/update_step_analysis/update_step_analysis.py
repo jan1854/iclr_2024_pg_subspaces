@@ -111,7 +111,7 @@ class UpdateStepAnalysis(Analysis):
             )
 
         update_trajectories_random = self._sample_random_update_trajectories(
-            list(agent.policy.parameters()), update_trajectories_agent
+            [p.detach() for p in agent.policy.parameters()], update_trajectories_agent
         )
 
         agent_spec_single_step_true_loss = self.agent_spec.copy_with_new_weights(
@@ -193,85 +193,56 @@ class UpdateStepAnalysis(Analysis):
         )
 
         returns_single_step_true_loss = returns_single_step_true_loss.get()
-        returns_single_step_agent = returns_single_step_agent.get()
-        returns_single_step_random = returns_single_step_random.get()
+        returns_single_step_agent = AgentReturns.concatenate(
+            returns_single_step_agent.get()
+        )
+        returns_single_step_random = AgentReturns.concatenate(
+            returns_single_step_random.get()
+        )
         returns_trajectory_true_loss = returns_trajectory_true_loss.get()
-        returns_trajectory_agent = returns_trajectory_agent.get()
-        returns_trajectory_random = returns_trajectory_random.get()
-
-        self.log_results_diff(
-            "difference_true_gradient_single_update_step",
-            loss_single_step_true_loss,
-            returns_single_step_true_loss,
-            loss_single_step_agent,
-            returns_single_step_agent,
-            env_step,
-            logs,
+        returns_trajectory_agent = AgentReturns.concatenate(
+            returns_trajectory_agent.get()
         )
-        self.log_results_diff(
-            "difference_random_single_update_step",
-            loss_single_step_random,
-            returns_single_step_random,
-            loss_single_step_agent,
-            returns_single_step_agent,
-            env_step,
-            logs,
-        )
-        self.log_results_diff(
-            "difference_true_gradient_update_trajectory",
-            loss_trajectory_true_loss,
-            returns_trajectory_true_loss,
-            loss_trajectory_agent,
-            returns_trajectory_agent,
-            env_step,
-            logs,
-        )
-        self.log_results_diff(
-            "difference_random_update_trajectory",
-            loss_trajectory_random,
-            returns_trajectory_random,
-            loss_trajectory_agent,
-            returns_trajectory_agent,
-            env_step,
-            logs,
+        returns_trajectory_random = AgentReturns.concatenate(
+            returns_trajectory_random.get()
         )
 
-        self.log_results_raw(
+        self.log_results(
             "true_gradient_single_update_step",
             loss_single_step_true_loss,
             returns_single_step_true_loss,
             env_step,
             logs,
         )
-        self.log_results_raw(
+        self.log_results(
             "random_single_update_step",
             loss_single_step_random,
             returns_single_step_random,
             env_step,
             logs,
         )
-        self.log_results_raw(
+        self.log_results(
             "agent_single_update_step",
             loss_single_step_agent,
             returns_single_step_agent,
             env_step,
             logs,
         )
-        self.log_results_raw(
+        self.log_results(
             "true_gradient_update_trajectory",
             loss_trajectory_true_loss,
             returns_trajectory_true_loss,
             env_step,
             logs,
         )
-        self.log_results_raw(
+        self.log_results(
             "random_update_trajectory",
             loss_trajectory_random,
             returns_trajectory_random,
             env_step,
             logs,
         )
-        self.log_results_raw(
+        self.log_results(
             "agent_update_trajectory",
             loss_trajectory_agent,
             returns_trajectory_agent,
@@ -317,7 +288,9 @@ class UpdateStepAnalysis(Analysis):
             new_weights = initial_weights
             for _ in range(len_trajectories):
                 random_step_unnormalized = [
-                    torch.distributions.uniform.Uniform(-1, 1).sample(layer_step.shape).to(device)
+                    torch.distributions.uniform.Uniform(-1, 1)
+                    .sample(layer_step.shape)
+                    .to(device)
                     for layer_step in update_trajectories_agent[0][0]
                 ]
                 curr_step_size = torch.norm(
@@ -332,50 +305,7 @@ class UpdateStepAnalysis(Analysis):
         return random_update_trajectories
 
     @classmethod
-    def log_results_diff(
-        cls,
-        name: str,
-        losses: AgentLosses,
-        returns: AgentReturns,
-        losses_baseline: AgentLosses,
-        returns_baseline: AgentReturns,
-        env_step: int,
-        logs: TensorboardLogs,
-    ) -> None:
-        plot_names = [
-            "combined_loss",
-            "policy_loss",
-            "value_function_loss",
-            "reward_undiscounted",
-            "reward_discounted",
-        ]
-        values = [
-            np.mean(losses.combined_losses),
-            np.mean(losses.policy_losses),
-            np.mean(losses.value_function_losses),
-            np.mean(returns.rewards_undiscounted),
-            np.mean(returns.rewards_discounted),
-        ]
-        values_baseline = [
-            np.mean(losses_baseline.combined_losses),
-            np.mean(losses_baseline.policy_losses),
-            np.mean(losses_baseline.value_function_losses),
-            np.mean(returns_baseline.rewards_undiscounted),
-            np.mean(returns_baseline.rewards_discounted),
-        ]
-        for plot_name, value, value_baseline in zip(
-            plot_names, values, values_baseline
-        ):
-            abs_diff = value - value_baseline
-            logs.add_scalar(f"{name}/{plot_name}/absolute", abs_diff, env_step)
-        for plot_name, value, value_baseline in zip(
-            plot_names, values, values_baseline
-        ):
-            rel_diff = (value - value_baseline) / values_baseline
-            logs.add_scalar(f"{name}/{plot_name}/relative", rel_diff, env_step)
-
-    @classmethod
-    def log_results_raw(
+    def log_results(
         cls,
         name: str,
         losses: AgentLosses,
@@ -398,4 +328,4 @@ class UpdateStepAnalysis(Analysis):
             np.mean(returns.rewards_discounted),
         ]
         for plot_name, value in zip(plot_names, values):
-            logs.add_scalar(f"zz_raw/{name}/{plot_name}", value, env_step)  # type: ignore
+            logs.add_scalar(f"{name}/{plot_name}", value, env_step)  # type: ignore

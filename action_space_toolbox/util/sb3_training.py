@@ -3,7 +3,7 @@ import dataclasses
 import functools
 import itertools
 import math
-from typing import Optional, Tuple, List, Callable, Sequence
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union
 
 import gym
 import numpy as np
@@ -34,6 +34,13 @@ class AgentReturns:
             self.rewards_discounted.reshape(*dims),
         )
 
+    @classmethod
+    def concatenate(cls, seq: Sequence["AgentReturns"]) -> "AgentReturns":
+        return AgentReturns(
+            np.concatenate([ar.rewards_undiscounted for ar in seq]),
+            np.concatenate([ar.rewards_discounted for ar in seq]),
+        )
+
 
 @dataclasses.dataclass
 class AgentLosses:
@@ -48,6 +55,15 @@ class AgentLosses:
             self.value_function_losses.reshape(*dims),
             self.combined_losses.reshape(*dims),
             self.policy_ratios.reshape(*dims),
+        )
+
+    @classmethod
+    def concatenate(cls, seq: Sequence["AgentLosses"]) -> "AgentLosses":
+        return AgentLosses(
+            np.concatenate([al.policy_losses for al in seq]),
+            np.concatenate([al.value_function_losses for al in seq]),
+            np.concatenate([al.combined_losses for al in seq]),
+            np.concatenate([al.policy_ratios for al in seq]),
         )
 
 
@@ -410,12 +426,14 @@ def sample_update_trajectory(
 
 
 def evaluate_agent_returns(
-    agent_specs: Sequence[AgentSpec],
+    agent_specs: Union[AgentSpec, Sequence[AgentSpec]],
     env_factory: Callable[[], gym.Env],
     num_steps: int,
 ) -> AgentReturns:
     mean_episode_rewards_undiscounted = []
     mean_episode_rewards_discounted = []
+    if not isinstance(agent_specs, Iterable):
+        agent_specs = [agent_specs]
     for agent_spec in agent_specs:
         env = stable_baselines3.common.vec_env.DummyVecEnv([env_factory])
         agent = agent_spec.create_agent(env)
