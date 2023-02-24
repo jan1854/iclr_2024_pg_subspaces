@@ -1,11 +1,12 @@
 import pickle
 from pathlib import Path
-from typing import Optional, Callable, Union
+from typing import Callable, Optional, Sequence, Union
 
 import PIL.Image
 import numpy as np
 import plotly.express
 import plotly.graph_objects
+import skimage.measure
 from scipy.interpolate import RegularGridInterpolator
 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
@@ -102,9 +103,35 @@ def plot_results(
                     sgd_steps,
                     optimizer_steps_true_grad,
                     sgd_steps_true_grad,
+                    results.get("policy_ratio"),
                     logs,
                     plot_path,
                 )
+
+    # Plot the policy ratios (the data is in every plot directory, so just take the first one from PLOT_NAME_TO_DESCR)
+    data_dir_name = next(iter(PLOT_NAME_TO_DESCR.keys()))
+    results_path = next(
+        (analysis_dir / data_dir_name / "data").glob(f"*{step:07d}_{plot_num:02d}*")
+    )
+    with results_path.open("rb") as results_file:
+        results = pickle.load(results_file)
+        plot_surface(
+            results["magnitude"],
+            results["policy_ratio"],
+            results["env_name"],
+            "policy_ratio",
+            results["env_step"],
+            results["plot_num"],
+            "policy ratio",
+            results.get("gradient_direction"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            logs,
+            analysis_dir / "policy_ratios" / f"policy_ratios_{step:07d}",
+        )
     return logs
 
 
@@ -121,6 +148,7 @@ def plot_surface(
     projected_sgd_steps: Optional[np.ndarray],
     projected_optimizer_steps_true_grad: Optional[np.ndarray],
     projected_sgd_steps_true_grad: Optional[np.ndarray],
+    policy_ratios: Optional[np.ndarray],
     logs: TensorboardLogs,
     outpath: Path,
 ) -> None:
@@ -174,9 +202,9 @@ def plot_surface(
     interpolator = RegularGridInterpolator((coords, coords), results, method="linear")
 
     if projected_optimizer_steps is not None:
-        _plot_gradient_steps(
+        _plot_curves(
             fig,
-            projected_optimizer_steps,
+            _prepend_zeros(projected_optimizer_steps),
             interpolator,
             magnitude,
             z_range,
@@ -184,9 +212,9 @@ def plot_surface(
             "black",
         )
     if projected_sgd_steps is not None:
-        _plot_gradient_steps(
+        _plot_curves(
             fig,
-            projected_sgd_steps,
+            _prepend_zeros(projected_sgd_steps),
             interpolator,
             magnitude,
             z_range,
@@ -194,9 +222,9 @@ def plot_surface(
             "#FFFF00",
         )
     if projected_optimizer_steps_true_grad is not None:
-        _plot_gradient_steps(
+        _plot_curves(
             fig,
-            projected_optimizer_steps_true_grad,
+            _prepend_zeros(projected_optimizer_steps_true_grad),
             interpolator,
             magnitude,
             z_range,
@@ -204,14 +232,41 @@ def plot_surface(
             "#158463",
         )
     if projected_sgd_steps_true_grad is not None:
-        _plot_gradient_steps(
+        _plot_curves(
             fig,
-            projected_sgd_steps_true_grad,
+            _prepend_zeros(projected_sgd_steps_true_grad),
             interpolator,
             magnitude,
             z_range,
             "True gradient SGD trajectory",
             "#9723C2",
+        )
+
+    if policy_ratios is not None:
+        clip_contour_lower, clip_contour_upper = _get_clipping_contours(
+            magnitude, policy_ratios, 0.2
+        )  # TODO: Clipping ratio should not be hardcoded
+        _plot_curves(
+            fig,
+            clip_contour_lower,
+            interpolator,
+            magnitude,
+            z_range,
+            "Clipping range lower",
+            "#595959",
+            add_markers=False,
+            single_legend_entry=True,
+        )
+        _plot_curves(
+            fig,
+            clip_contour_upper,
+            interpolator,
+            magnitude,
+            z_range,
+            "Clipping range upper",
+            "#595959",
+            add_markers=False,
+            single_legend_entry=True,
         )
 
     if title is not None:
@@ -228,47 +283,77 @@ def plot_surface(
         logs.add_image(f"{plot_name}/{plot_nr}", im, env_step)
 
 
-def _plot_gradient_steps(
+def _prepend_zeros(trajectories: np.ndarray) -> np.ndarray:
+    # Backward compatibility
+    if trajectories.ndim == 2:
+        trajectories = trajectories[None]
+    return np.concatenate(
+        (np.zeros((trajectories.shape[0], 1, trajectories.shape[2])), trajectories),
+        axis=1,
+    )
+
+
+def _get_clipping_contours(
+    magnitude: float, policy_ratios: np.ndarray, clipping_range: float
+):
+    clip_contours_lower = skimage.measure.find_contours(
+        policy_ratios, 1 - clipping_range
+    )
+    clip_contours_upper = skimage.measure.find_contours(
+        policy_ratios, 1 + clipping_range
+    )
+    # Normalize the coordinates from [0, grid_size - 1] to [-magnitude, magnitude]
+    clip_contours_lower = [
+        (2 * contour / (policy_ratios.shape[0] - 1) - 1.0) * magnitude
+        for contour in clip_contours_lower
+    ]
+    clip_contours_upper = [
+        (2 * contour / (policy_ratios.shape[0] - 1) - 1.0) * magnitude
+        for contour in clip_contours_upper
+    ]
+    return clip_contours_lower, clip_contours_upper
+
+
+def _plot_curves(
     fig: plotly.graph_objects.Figure,
-    projected_trajectories: np.ndarray,
+    curves: Union[np.ndarray, Sequence[np.ndarray]],
     interpolator: Callable[[np.ndarray], np.ndarray],
     magnitude: float,
     z_range: float,
     name: str,
     color: str,
     opacity: float = 0.5,
+    add_markers: bool = True,
+    single_legend_entry: bool = False,
 ) -> None:
-    # Backward compatibility
-    if projected_trajectories.ndim == 2:
-        projected_trajectories = projected_trajectories[None]
-
-    for i, grad_steps in enumerate(projected_trajectories):
+    for i, curve in enumerate(curves):
         name_curr_trajectory = (
-            f"{name} ({i + 1})" if len(projected_trajectories) > 1 else name
+            f"{name} ({i + 1})" if len(curves) > 1 and not single_legend_entry else name
         )
-        # Make sure that the gradient step does not point outside the grid (otherwise the interpolation will throw an
-        # error). Scale the gradient step to reduce the length but keep the direction the same.
+        # Make sure that the curve segment does not point outside the grid (otherwise the interpolation will throw an
+        # error). Scale the curve segment to reduce the length but keep the direction the same.
         visualization_steps = []
-        grad_steps_start_end = []
-        last_step = np.zeros(2, dtype=np.float32)
-        for step in grad_steps:
+        curve_start_end = []
+        last_step = curve[0]
+        for step in curve[1:]:
             if np.any(np.abs(step) > magnitude) and np.any(
                 np.abs(last_step) > magnitude
             ):
                 last_step = step
-                continue
             else:
                 step_rescaled = _rescale_if_out_of_bounds(step, magnitude)
                 last_step_rescaled = _rescale_if_out_of_bounds(last_step, magnitude)
-                grad_steps_start_end.append((last_step_rescaled, step_rescaled))
+                curve_start_end.append((last_step_rescaled, step_rescaled))
                 last_step = step
-        visualization_steps_per_gradient_step = 200 // len(grad_steps_start_end)
-        for last_step, step in grad_steps_start_end:
+        if len(curve_start_end) == 0:
+            continue
+        visualization_steps_per_curve_segment = 200 // len(curve_start_end)
+        for last_step, step in curve_start_end:
             visualization_steps.append(
                 np.linspace(
                     last_step,
                     step,
-                    visualization_steps_per_gradient_step,
+                    visualization_steps_per_curve_segment,
                 )
             )
         visualization_steps = np.stack(visualization_steps)
@@ -295,10 +380,11 @@ def _plot_gradient_steps(
         # Only show the additional markers if the plot is zoomed in enough (the average distance between markers is
         # larger than some threshold) to avoid clutter
         if (
-            np.mean(np.linalg.norm(grad_steps[1:] - grad_steps[:-1], axis=-1))
+            add_markers
+            and np.mean(np.linalg.norm(curve[1:] - curve[:-1], axis=-1))
             > 0.005 * magnitude
         ):
-            markers = grad_steps[np.all(np.abs(grad_steps) < magnitude, axis=-1), :]
+            markers = curve[np.all(np.abs(curve) < magnitude, axis=-1), :]
             assert np.all(np.abs(markers) < magnitude)
             z_values_markers = interpolator(markers) + 0.01 * z_range
             fig.add_scatter3d(
