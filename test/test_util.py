@@ -62,14 +62,15 @@ def env_factory():
 
 
 class DummyAgentSpec(AgentSpec):
-    def __init__(self):
+    def __init__(self, env):
         super().__init__(None, None)
+        self.env = env
 
     def create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
     ) -> stable_baselines3.ppo.PPO:
-        return PPO("MlpPolicy", DummyVecEnv([lambda: env]), device="cpu", seed=42)
+        return PPO("MlpPolicy", DummyVecEnv([lambda: self.env]), device="cpu", seed=42)
 
 
 def test_fill_rollout_buffer():
@@ -78,7 +79,7 @@ def test_fill_rollout_buffer():
         rollout_buffer = RolloutBuffer(
             num_steps, env.observation_space, env.action_space, device="cpu"
         )
-        agent_spec = DummyAgentSpec()
+        agent_spec = DummyAgentSpec(env)
         fill_rollout_buffer(
             env_factory, agent_spec, rollout_buffer, num_spawned_processes=3
         )
