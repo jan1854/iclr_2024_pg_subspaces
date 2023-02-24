@@ -29,13 +29,6 @@ from action_space_toolbox.util.sb3_training import (
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
-
-# To avoid too many open files problems when passing tensors between processes (see
-# https://github.com/pytorch/pytorch/issues/11201#issuecomment-421146936)
-torch.multiprocessing.set_sharing_strategy("file_system")
-# To avoid the warning "Forking a process while a parallel region is active is potentially unsafe."
-torch.set_num_threads(1)
-
 logger = logging.getLogger(__name__)
 
 
