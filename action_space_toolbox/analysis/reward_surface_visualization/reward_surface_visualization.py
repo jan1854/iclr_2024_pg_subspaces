@@ -181,7 +181,7 @@ class RewardSurfaceVisualization(Analysis):
             reward_surface_results_iter = process_pool.imap(
                 functools.partial(
                     evaluate_agent_returns,
-                    env_factory=self.env_factory,
+                    env_or_factory=self.env_factory,
                     num_steps=self.num_steps,
                 ),
                 [[agent_spec] for agent_spec in agent_specs_flat],

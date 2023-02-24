@@ -61,14 +61,17 @@ class LossEvaluationResult:
 
 def evaluate_agent_returns(
     agent_specs: Union[AgentSpec, Sequence[AgentSpec]],
-    env_factory: Callable[[], gym.Env],
+    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
     num_steps: Optional[int] = None,
     num_epsiodes: Optional[int] = None,
 ) -> ReturnEvaluationResult:
     assert (num_steps is not None) ^ (
         num_epsiodes is not None
     ), "Exactly one of num_steps or num_episodes must be specified."
-    env = env_factory()
+    if isinstance(env_or_factory, Callable):
+        env = env_or_factory()
+    else:
+        env = env_or_factory
     if num_epsiodes is not None:
         num_steps = num_epsiodes * get_episode_length(env)
     mean_episode_rewards_undiscounted = []
@@ -76,8 +79,7 @@ def evaluate_agent_returns(
     if not isinstance(agent_specs, Iterable):
         agent_specs = [agent_specs]
     for agent_spec in agent_specs:
-        env.reset()
-        agent = agent_spec.create_agent(env)
+        agent = agent_spec.create_agent()
         rollout_buffer_no_value_bootstrap = (
             stable_baselines3.common.buffers.RolloutBuffer(
                 num_steps,
@@ -90,7 +92,7 @@ def evaluate_agent_returns(
         )
 
         fill_rollout_buffer(
-            env_factory,
+            env_or_factory,
             agent_spec,
             None,
             rollout_buffer_no_value_bootstrap,

@@ -2,7 +2,7 @@ import collections
 import functools
 import itertools
 import math
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 import gym
 import numpy as np
@@ -23,7 +23,7 @@ EnvSteps = collections.namedtuple(
 
 
 def fill_rollout_buffer(
-    env_factory: Callable[[], gym.Env],
+    env_or_factory: Callable[[], gym.Env],
     agent_spec: AgentSpec,
     rollout_buffer: Optional[stable_baselines3.common.buffers.RolloutBuffer],
     rollout_buffer_no_value_bootstrap: Optional[
@@ -37,7 +37,7 @@ def fill_rollout_buffer(
     state of the agent (e.g. the number of timesteps)).
 
     :param agent_spec:                          A function that creates the RL agent
-    :param env_factory:                         A function that creates the environment
+    :param env_or_factory:                      An environment or a function that creates an environment
     :param rollout_buffer:                      Buffer to fill with rollouts
     :param rollout_buffer_no_value_bootstrap:   A separate buffer for without the value bootstrap (i.e, the last reward
                                                 of truncated episodes is not modified to reward + gamma * next_value)
@@ -58,7 +58,7 @@ def fill_rollout_buffer(
 
     assert num_spawned_processes >= 0
     if num_spawned_processes == 0:
-        env_steps = [collect_complete_episodes(buffer_size, env_factory, agent_spec)]
+        env_steps = [collect_complete_episodes(buffer_size, env_or_factory, agent_spec)]
     else:
         jobs = [math.ceil(buffer_size / num_spawned_processes)] * (
             num_spawned_processes - 1
@@ -73,7 +73,7 @@ def fill_rollout_buffer(
             env_steps = pool.map(
                 functools.partial(
                     collect_complete_episodes,
-                    env_factory=env_factory,
+                    env_or_factory=env_or_factory,
                     agent_spec=agent_spec,
                 ),
                 jobs,
@@ -130,7 +130,7 @@ def fill_rollout_buffer(
 
     del env_steps
 
-    agent = agent_spec.create_agent(env_factory())
+    agent = agent_spec.create_agent()
     if final_next_obs is None:
         # In the case that we sampled exactly the required number of steps, the last step will be the end of an episode
         # (because we only sample full episodes). Therefore, the value argument is irrelevant (as it will be multiplied
@@ -154,10 +154,13 @@ def fill_rollout_buffer(
 
 def collect_complete_episodes(
     min_num_env_steps: int,
-    env_factory: Callable[[], gym.Env],
+    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
     agent_spec: AgentSpec,
 ) -> EnvSteps:
-    env = env_factory()
+    if isinstance(env_or_factory, Callable):
+        env = env_or_factory()
+    else:
+        env = env_or_factory
     agent = agent_spec.create_agent(env)
 
     episode_length = get_episode_length(env)
