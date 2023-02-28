@@ -113,14 +113,6 @@ class UpdateStepAnalysis(Analysis):
             [self.agent_spec], rollout_buffer_true_loss
         )
 
-        sample_update_trajectory_true_loss = functools.partial(
-            sample_update_trajectory,
-            rollout_buffer_true_loss,
-            self.agent_spec,
-            agent.policy.optimizer,
-            None,
-            len_update_trajectory,
-        )
         sample_update_trajectory_agent = functools.partial(
             sample_update_trajectory,
             rollout_buffer_agent,
