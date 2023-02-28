@@ -13,6 +13,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.angles import normalize_angle
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer
+from action_space_toolbox.util.tensorboard_logs import merge_dicts
 
 
 def test_angle_normalization():
@@ -103,3 +104,11 @@ def test_fill_rollout_buffer():
         assert rollout_buffer.values == pytest.approx(rollout_buffer_ppo.values)
         assert rollout_buffer.advantages == pytest.approx(rollout_buffer_ppo.advantages)
         assert rollout_buffer.returns == pytest.approx(rollout_buffer_ppo.returns)
+
+
+def test_merge_dicts():
+    d1 = {1: 2, "sub1": {2: 3}, "sub2": {4: 5}}
+    d2 = {3: 4, "sub1": {6: 7}, "sub3": {23: 42}}
+
+    expected = {1: 2, 3: 4, "sub1": {2: 3, 6: 7}, "sub2": {4: 5}, "sub3": {23: 42}}
+    assert merge_dicts(d1, d2) == expected

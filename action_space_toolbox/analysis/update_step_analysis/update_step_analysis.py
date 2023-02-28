@@ -196,7 +196,7 @@ class UpdateStepAnalysis(Analysis):
         ) = analysis_results_true_loss.get()
 
         self.log_results(
-            "improvement_single_update_step/random",
+            "single_update_step/random",
             loss_single_step_random,
             returns_single_step_random,
             loss_curr_policy,
@@ -205,7 +205,7 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
         self.log_results(
-            "improvement_update_trajectory/random",
+            "update_trajectory/random",
             loss_trajectory_random,
             returns_trajectory_random,
             loss_curr_policy,
@@ -214,7 +214,7 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
         self.log_results(
-            "improvement_single_update_step/true_gradient",
+            "single_update_step/true_gradient",
             loss_single_step_true_loss,
             returns_single_step_true_loss,
             loss_curr_policy,
@@ -223,7 +223,7 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
         self.log_results(
-            "improvement_update_trajectory/true_gradient",
+            "update_trajectory/true_gradient",
             loss_trajectory_true_loss,
             returns_trajectory_true_loss,
             loss_curr_policy,
@@ -232,7 +232,7 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
         self.log_results(
-            "improvement_single_update_step/agent",
+            "single_update_step/agent",
             loss_single_step_agent,
             returns_single_step_agent,
             loss_curr_policy,
@@ -241,7 +241,7 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
         self.log_results(
-            "improvement_update_trajectory/agent",
+            "update_trajectory/agent",
             loss_trajectory_agent,
             returns_trajectory_agent,
             loss_curr_policy,
@@ -249,6 +249,21 @@ class UpdateStepAnalysis(Analysis):
             env_step,
             logs,
         )
+
+        for plot_type in [
+            "combined_loss",
+            "policy_loss",
+            "value_function_loss",
+            "reward_undiscounted",
+            "reward_discounted",
+        ]:
+            logs.add_multiline_scalar(
+                f"update_trajectory/{plot_type}",
+                [
+                    f"update_trajectory/{update_type}/{plot_type}"
+                    for update_type in ["random", "agent", "true_gradient"]
+                ],
+            )
         return logs
 
     @classmethod

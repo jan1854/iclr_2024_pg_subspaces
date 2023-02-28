@@ -81,6 +81,22 @@ class TensorboardLogs:
             layout = {self.prefix: layout}
         self.custom_scalars_layout.update(layout)
 
+    def add_multiline_scalar(self, key: str, individual_keys: Sequence[str]):
+        key = self._maybe_add_prefix(key, self.prefix)
+        key_split = key.split("/")
+        layout = {
+            key_split[0]: {
+                "/".join(key_split[1:]): [
+                    "Multiline",
+                    [
+                        self._maybe_add_prefix(key, self.prefix)
+                        for key in individual_keys
+                    ],
+                ]
+            }
+        }
+        self.custom_scalars_layout = merge_dicts(self.custom_scalars_layout, layout)
+
     def log(self, summary_writer: SummaryWriter) -> None:
         for key, scalars in self.scalars.items():
             for value, step, walltime in scalars:
@@ -288,6 +304,22 @@ def combine_tb_logs(
                     image_event.wall_time,
                     dataformats="HWC",
                 )
+
+
+def merge_dicts(d1: Dict[str, Any], d2: Dict[str, Any]) -> Dict[str, Any]:
+    d = {}
+    for key, val in d1.items():
+        if isinstance(val, Dict):
+            assert key not in d2.items() or isinstance(d2[key], Dict)
+            d[key] = merge_dicts(d1[key], d2.get(key, {}))
+        elif key not in d2:
+            d[key] = val
+        else:
+            raise RuntimeError(f"Key {key} is in both dictionaries.")
+    for key, val in d2.items():
+        if key not in d1:
+            d[key] = val
+    return d
 
 
 def add_new_data_indicator(run_dir: Path) -> None:
