@@ -71,8 +71,7 @@ def evaluate_agent_returns(
     env = env_factory()
     if num_epsiodes is not None:
         num_steps = num_epsiodes * get_episode_length(env)
-    mean_episode_rewards_undiscounted = []
-    mean_episode_rewards_discounted = []
+    results = []
     if not isinstance(agent_specs, Iterable):
         agent_specs = [agent_specs]
     for agent_spec in agent_specs:
@@ -95,35 +94,48 @@ def evaluate_agent_returns(
             None,
             rollout_buffer_no_value_bootstrap,
         )
-        episode_rewards_undiscounted = []
-        episode_rewards_discounted = []
-        curr_reward_undiscounted = None
-        curr_reward_discounted = None
-        curr_episode_length = 0
-        for episode_start, reward in zip(
-            rollout_buffer_no_value_bootstrap.episode_starts,
-            rollout_buffer_no_value_bootstrap.rewards,
-        ):
-            if episode_start:
-                if curr_episode_length > 0:
-                    episode_rewards_undiscounted.append(curr_reward_undiscounted)
-                    episode_rewards_discounted.append(curr_reward_discounted)
-                curr_episode_length = 0
-                curr_reward_discounted = 0.0
-                curr_reward_undiscounted = 0.0
-            curr_episode_length += 1
-            curr_reward_undiscounted += reward
-            curr_reward_discounted += agent.gamma ** (curr_episode_length - 1) * reward
-        # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
-        # the episode if it has the maximum episode length.
-        if curr_episode_length == get_episode_length(env):
-            episode_rewards_undiscounted.append(curr_reward_undiscounted)
-            episode_rewards_discounted.append(curr_reward_discounted)
-        mean_episode_rewards_undiscounted.append(np.mean(episode_rewards_undiscounted))
-        mean_episode_rewards_discounted.append(np.mean(episode_rewards_discounted))
+
+        results.append(
+            evaluate_returns_rollout_buffer(
+                rollout_buffer_no_value_bootstrap, agent.gamma, get_episode_length(env)
+            )
+        )
+
+    return ReturnEvaluationResult.concatenate(results)
+
+
+def evaluate_returns_rollout_buffer(
+    rollout_buffer_no_value_bootstrap: stable_baselines3.common.buffers.RolloutBuffer,
+    discount_factor: float,
+    episode_length: Optional[int],
+) -> ReturnEvaluationResult:
+    episode_rewards_undiscounted = []
+    episode_rewards_discounted = []
+    curr_reward_undiscounted = None
+    curr_reward_discounted = None
+    curr_episode_length = 0
+    for episode_start, reward in zip(
+        rollout_buffer_no_value_bootstrap.episode_starts,
+        rollout_buffer_no_value_bootstrap.rewards,
+    ):
+        if episode_start:
+            if curr_episode_length > 0:
+                episode_rewards_undiscounted.append(curr_reward_undiscounted)
+                episode_rewards_discounted.append(curr_reward_discounted)
+            curr_episode_length = 0
+            curr_reward_discounted = 0.0
+            curr_reward_undiscounted = 0.0
+        curr_episode_length += 1
+        curr_reward_undiscounted += reward
+        curr_reward_discounted += discount_factor ** (curr_episode_length - 1) * reward
+    # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
+    # the episode if it has the maximum episode length.
+    if episode_length is not None and curr_episode_length == episode_length:
+        episode_rewards_undiscounted.append(curr_reward_undiscounted)
+        episode_rewards_discounted.append(curr_reward_discounted)
     return ReturnEvaluationResult(
-        np.array(mean_episode_rewards_undiscounted),
-        np.array(mean_episode_rewards_discounted),
+        np.mean(episode_rewards_undiscounted, keepdims=True),
+        np.mean(episode_rewards_discounted, keepdims=True),
     )
 
 

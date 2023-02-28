@@ -15,8 +15,10 @@ from action_space_toolbox.analysis.util import (
     LossEvaluationResult,
     ReturnEvaluationResult,
     flatten_parameters,
+    evaluate_returns_rollout_buffer,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec
+from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import (
     fill_rollout_buffer,
     sample_update_trajectory,
@@ -66,11 +68,22 @@ class UpdateStepAnalysis(Analysis):
             agent.gamma,
             n_envs=1,
         )
+        rollout_buffer_curr_policy_eval = (
+            stable_baselines3.common.buffers.RolloutBuffer(
+                self.num_steps_true_loss,
+                agent.observation_space,
+                agent.action_space,
+                agent.device,
+                agent.gae_lambda,
+                agent.gamma,
+                n_envs=1,
+            )
+        )
         fill_rollout_buffer(
             self.env_factory,
             self.agent_spec,
             rollout_buffer_true_loss,
-            None,
+            rollout_buffer_curr_policy_eval,
             self.num_processes,
         )
 
@@ -91,6 +104,13 @@ class UpdateStepAnalysis(Analysis):
             rollout_buffer_agent,
             None,
             self.num_processes,
+        )
+
+        return_curr_policy = evaluate_returns_rollout_buffer(
+            rollout_buffer_curr_policy_eval, agent.gamma, get_episode_length(agent.env)
+        )
+        loss_curr_policy = evaluate_agent_losses(
+            [self.agent_spec], rollout_buffer_true_loss
         )
 
         sample_update_trajectory_true_loss = functools.partial(
@@ -170,44 +190,56 @@ class UpdateStepAnalysis(Analysis):
         ) = analysis_results_random.get()
 
         self.log_results(
-            "true_gradient_single_update_step",
+            "improvement_single_update_step/true_gradient",
             loss_single_step_true_loss,
             returns_single_step_true_loss,
+            loss_curr_policy,
+            return_curr_policy,
             env_step,
             logs,
         )
         self.log_results(
-            "random_single_update_step",
+            "improvement_single_update_step/random",
             loss_single_step_random,
             returns_single_step_random,
+            loss_curr_policy,
+            return_curr_policy,
             env_step,
             logs,
         )
         self.log_results(
-            "agent_single_update_step",
+            "improvement_single_update_step/agent",
             loss_single_step_agent,
             returns_single_step_agent,
+            loss_curr_policy,
+            return_curr_policy,
             env_step,
             logs,
         )
         self.log_results(
-            "true_gradient_update_trajectory",
+            "improvement_update_trajectory/true_gradient",
             loss_trajectory_true_loss,
             returns_trajectory_true_loss,
+            loss_curr_policy,
+            return_curr_policy,
             env_step,
             logs,
         )
         self.log_results(
-            "random_update_trajectory",
+            "improvement_update_trajectory/random",
             loss_trajectory_random,
             returns_trajectory_random,
+            loss_curr_policy,
+            return_curr_policy,
             env_step,
             logs,
         )
         self.log_results(
-            "agent_update_trajectory",
+            "improvement_update_trajectory/agent",
             loss_trajectory_agent,
             returns_trajectory_agent,
+            loss_curr_policy,
+            return_curr_policy,
             env_step,
             logs,
         )
@@ -319,6 +351,8 @@ class UpdateStepAnalysis(Analysis):
         name: str,
         losses: LossEvaluationResult,
         returns: ReturnEvaluationResult,
+        loss_curr_policy: LossEvaluationResult,
+        return_curr_policy: ReturnEvaluationResult,
         env_step: int,
         logs: TensorboardLogs,
     ) -> None:
@@ -330,11 +364,13 @@ class UpdateStepAnalysis(Analysis):
             "reward_discounted",
         ]
         values = [
-            np.mean(losses.combined_losses),
-            np.mean(losses.policy_losses),
-            np.mean(losses.value_function_losses),
-            np.mean(returns.rewards_undiscounted),
-            np.mean(returns.rewards_discounted),
+            np.mean(losses.combined_losses) - loss_curr_policy.combined_losses,
+            np.mean(losses.policy_losses) - loss_curr_policy.policy_losses,
+            np.mean(losses.value_function_losses)
+            - loss_curr_policy.value_function_losses,
+            np.mean(returns.rewards_undiscounted)
+            - return_curr_policy.rewards_undiscounted,
+            np.mean(returns.rewards_discounted) - return_curr_policy.rewards_discounted,
         ]
         for plot_name, value in zip(plot_names, values):
             logs.add_scalar(f"{name}/{plot_name}", value, env_step)  # type: ignore
