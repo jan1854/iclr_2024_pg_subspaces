@@ -153,7 +153,7 @@ def plot_surface(
     outpath: Path,
 ) -> None:
     outpath.parent.mkdir(parents=True, exist_ok=True)
-    title = f"{env_name} | {descr} surface | magnitude: {magnitude}"
+    title = f"{env_name} | {descr} | magnitude: {magnitude}"
 
     coords = np.linspace(-magnitude, magnitude, num=results.shape[0])
 
