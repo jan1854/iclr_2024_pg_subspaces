@@ -159,14 +159,14 @@ def plot_surface(
 
     if gradient_direction is not None:
         yaxis_title = (
-            "Gradient direction" if gradient_direction == 0 else "Random direction"
+            "gradient direction" if gradient_direction == 0 else "random direction"
         )
         xaxis_title = (
-            "Gradient direction" if gradient_direction == 1 else "Random direction"
+            "gradient direction" if gradient_direction == 1 else "random direction"
         )
     else:
-        yaxis_title = "Random direction 1"
-        xaxis_title = "Random direction 2"
+        yaxis_title = "random direction 1"
+        xaxis_title = "random direction 2"
     fig = plotly.graph_objects.Figure(
         layout=plotly.graph_objects.Layout(
             margin=plotly.graph_objects.layout.Margin(l=20, r=20, t=50, b=25),
