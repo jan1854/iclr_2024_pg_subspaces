@@ -4,3 +4,4 @@ action_transformations.egg-info
 logs
 logs_test
 *.egg-info
+build
