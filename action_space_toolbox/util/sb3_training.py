@@ -24,7 +24,7 @@ EnvSteps = collections.namedtuple(
 
 def fill_rollout_buffer(
     env_or_factory: Callable[[], gym.Env],
-    agent_spec: AgentSpec,
+    agent_or_spec: AgentSpec,
     rollout_buffer: Optional[stable_baselines3.common.buffers.RolloutBuffer],
     rollout_buffer_no_value_bootstrap: Optional[
         stable_baselines3.common.buffers.RolloutBuffer
@@ -36,7 +36,7 @@ def fill_rollout_buffer(
     stable-baselines3's OnPolicyAlgorithm.collect_rollouts() (we cannot use that function since it modifies the
     state of the agent (e.g. the number of timesteps)).
 
-    :param agent_spec:                          A function that creates the RL agent
+    :param agent_or_spec:                       An AgentSpec or a PPO agent
     :param env_or_factory:                      An environment or a function that creates an environment
     :param rollout_buffer:                      Buffer to fill with rollouts
     :param rollout_buffer_no_value_bootstrap:   A separate buffer for without the value bootstrap (i.e, the last reward
@@ -58,7 +58,9 @@ def fill_rollout_buffer(
 
     assert num_spawned_processes >= 0
     if num_spawned_processes == 0:
-        env_steps = [collect_complete_episodes(buffer_size, env_or_factory, agent_spec)]
+        env_steps = [
+            collect_complete_episodes(buffer_size, env_or_factory, agent_or_spec)
+        ]
     else:
         jobs = [math.ceil(buffer_size / num_spawned_processes)] * (
             num_spawned_processes - 1
@@ -74,7 +76,7 @@ def fill_rollout_buffer(
                 functools.partial(
                     collect_complete_episodes,
                     env_or_factory=env_or_factory,
-                    agent_spec=agent_spec,
+                    agent_or_spec=agent_or_spec,
                 ),
                 jobs,
             )
@@ -130,7 +132,7 @@ def fill_rollout_buffer(
 
     del env_steps
 
-    agent = agent_spec.create_agent()
+    agent = maybe_create_agent(agent_or_spec)
     if final_next_obs is None:
         # In the case that we sampled exactly the required number of steps, the last step will be the end of an episode
         # (because we only sample full episodes). Therefore, the value argument is irrelevant (as it will be multiplied
@@ -155,13 +157,13 @@ def fill_rollout_buffer(
 def collect_complete_episodes(
     min_num_env_steps: int,
     env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
-    agent_spec: AgentSpec,
+    agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
 ) -> EnvSteps:
     if isinstance(env_or_factory, Callable):
         env = env_or_factory()
     else:
         env = env_or_factory
-    agent = agent_spec.create_agent(env)
+    agent = maybe_create_agent(agent_or_spec, env)
 
     episode_length = get_episode_length(env)
     arr_len = min_num_env_steps + episode_length + 1
@@ -367,14 +369,14 @@ def get_value_function_parameters(
 
 
 def sample_update_trajectory(
+    agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
-    agent_spec: AgentSpec,
     optimizer: torch.optim,
     batch_size: Optional[int],
     max_num_steps: Optional[int],
     repeat_data: bool = False,
 ) -> List[List[torch.Tensor]]:
-    agent = agent_spec.create_agent()
+    agent = maybe_create_agent(agent_or_spec)
     parameters = []
     data_iter = (
         itertools.cycle(rollout_buffer.get(batch_size))
@@ -390,3 +392,13 @@ def sample_update_trajectory(
         loss.backward()
         parameters.append([p.detach() for p in agent.policy.parameters()])
     return parameters
+
+
+def maybe_create_agent(
+    agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
+    env: Optional[gym.Env] = None,
+) -> stable_baselines3.ppo.PPO:
+    if isinstance(agent_or_spec, AgentSpec):
+        return agent_or_spec.create_agent(env)
+    else:
+        return agent_or_spec

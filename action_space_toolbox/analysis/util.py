@@ -8,7 +8,11 @@ import torch
 
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
-from action_space_toolbox.util.sb3_training import ppo_loss, fill_rollout_buffer
+from action_space_toolbox.util.sb3_training import (
+    ppo_loss,
+    fill_rollout_buffer,
+    maybe_create_agent,
+)
 
 
 @dataclasses.dataclass
@@ -60,7 +64,12 @@ class LossEvaluationResult:
 
 
 def evaluate_agent_returns(
-    agent_specs: Union[AgentSpec, Sequence[AgentSpec]],
+    agents_or_specs: Union[
+        AgentSpec,
+        Sequence[AgentSpec],
+        stable_baselines3.ppo.PPO,
+        Sequence[stable_baselines3.ppo.PPO],
+    ],
     env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
     num_steps: Optional[int] = None,
     num_epsiodes: Optional[int] = None,
@@ -75,10 +84,10 @@ def evaluate_agent_returns(
     if num_epsiodes is not None:
         num_steps = num_epsiodes * get_episode_length(env)
     results = []
-    if not isinstance(agent_specs, Iterable):
-        agent_specs = [agent_specs]
-    for agent_spec in agent_specs:
-        agent = agent_spec.create_agent()
+    if not isinstance(agents_or_specs, Iterable):
+        agents_or_specs = [agents_or_specs]
+    for agent_or_spec in agents_or_specs:
+        agent = maybe_create_agent(agent_or_spec)
         rollout_buffer_no_value_bootstrap = (
             stable_baselines3.common.buffers.RolloutBuffer(
                 num_steps,
@@ -92,7 +101,7 @@ def evaluate_agent_returns(
 
         fill_rollout_buffer(
             env_or_factory,
-            agent_spec,
+            agent_or_spec,
             None,
             rollout_buffer_no_value_bootstrap,
         )
@@ -142,15 +151,22 @@ def evaluate_returns_rollout_buffer(
 
 
 def evaluate_agent_losses(
-    agent_specs: Sequence[AgentSpec],
+    agents_or_specs: Union[
+        AgentSpec,
+        Sequence[AgentSpec],
+        stable_baselines3.ppo.PPO,
+        Sequence[stable_baselines3.ppo.PPO],
+    ],
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
 ) -> LossEvaluationResult:
     combined_losses = []
     policy_losses = []
     value_function_losses = []
     policy_ratios = []
-    for agent_spec in agent_specs:
-        agent = agent_spec.create_agent()
+    if not isinstance(agents_or_specs, Iterable):
+        agents_or_specs = [agents_or_specs]
+    for agent_or_spec in agents_or_specs:
+        agent = maybe_create_agent(agent_or_spec)
         (
             combined_loss,
             policy_loss,

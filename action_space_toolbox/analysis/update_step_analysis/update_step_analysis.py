@@ -115,8 +115,8 @@ class UpdateStepAnalysis(Analysis):
 
         sample_update_trajectory_agent = functools.partial(
             sample_update_trajectory,
-            rollout_buffer_agent,
             self.agent_spec,
+            rollout_buffer_agent,
             agent.policy.optimizer,
             agent.batch_size,
             len_update_trajectory,
@@ -132,8 +132,8 @@ class UpdateStepAnalysis(Analysis):
         )
         sample_update_trajectory_true_loss = functools.partial(
             sample_update_trajectory,
-            rollout_buffer_true_loss,
             self.agent_spec,
+            rollout_buffer_true_loss,
             agent.policy.optimizer,
             None,
             len_update_trajectory,
@@ -293,28 +293,30 @@ class UpdateStepAnalysis(Analysis):
             agent_spec_single_step = agent_spec.copy_with_new_weights(
                 update_trajectory[0]
             )
+            agent_single_step = agent_spec_single_step.create_agent()
             agent_spec_trajectory = agent_spec.copy_with_new_weights(
                 update_trajectory[-1]
             )
+            agent_trajectory = agent_spec_trajectory.create_agent()
             results_loss_single_step.append(
                 evaluate_agent_losses(
-                    [agent_spec_single_step],
+                    [agent_single_step],
                     rollout_buffer_true_loss,
                 )
             )
             results_loss_trajectory.append(
-                evaluate_agent_losses([agent_spec_trajectory], rollout_buffer_true_loss)
+                evaluate_agent_losses([agent_trajectory], rollout_buffer_true_loss)
             )
             results_return_single_step.append(
                 evaluate_agent_returns(
-                    [agent_spec_single_step],
+                    [agent_single_step],
                     env,
                     num_epsiodes=num_evaluation_episodes,
                 )
             )
             results_return_trajectory.append(
                 evaluate_agent_returns(
-                    [agent_spec_trajectory],
+                    [agent_trajectory],
                     env,
                     num_epsiodes=num_evaluation_episodes,
                 )
