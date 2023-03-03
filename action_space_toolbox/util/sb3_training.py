@@ -24,7 +24,7 @@ EnvSteps = collections.namedtuple(
 
 def fill_rollout_buffer(
     env_or_factory: Callable[[], gym.Env],
-    agent_or_spec: AgentSpec,
+    agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
     rollout_buffer: Optional[stable_baselines3.common.buffers.RolloutBuffer],
     rollout_buffer_no_value_bootstrap: Optional[
         stable_baselines3.common.buffers.RolloutBuffer
