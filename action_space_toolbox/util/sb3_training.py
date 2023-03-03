@@ -369,27 +369,28 @@ def get_value_function_parameters(
 
 
 def sample_update_trajectory(
-    agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
+    agent_spec: AgentSpec,
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
     optimizer: torch.optim,
     batch_size: Optional[int],
     max_num_steps: Optional[int],
     repeat_data: bool = False,
 ) -> List[List[torch.Tensor]]:
-    agent = maybe_create_agent(agent_or_spec)
+    agent = agent_spec.create_agent()
     parameters = []
+    assert max_num_steps is not None or not repeat_data
     data_iter = (
         itertools.cycle(rollout_buffer.get(batch_size))
         if repeat_data
         else rollout_buffer.get(batch_size)
     )
-    assert max_num_steps is not None or not repeat_data
     for step, batch in enumerate(data_iter):
         if max_num_steps is not None and step >= max_num_steps:
             break
         loss, _, _, _ = ppo_loss(agent, batch)
         optimizer.zero_grad()
         loss.backward()
+        optimizer.step()
         parameters.append([p.detach() for p in agent.policy.parameters()])
     return parameters
 
