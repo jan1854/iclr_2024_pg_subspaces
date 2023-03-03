@@ -415,9 +415,8 @@ class UpdateStepAnalysis(Analysis):
         ]
         update_trajectories = torch.stack(
             [
-                flatten_parameters(step)
+                torch.stack([flatten_parameters(step) for step in update_traj])
                 for update_traj in update_trajectories
-                for step in update_traj
             ]
         )
 
