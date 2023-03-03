@@ -117,7 +117,6 @@ class UpdateStepAnalysis(Analysis):
             sample_update_trajectory,
             self.agent_spec,
             rollout_buffer_agent,
-            agent.policy.optimizer,
             agent.batch_size,
             len_update_trajectory,
         )
@@ -126,7 +125,7 @@ class UpdateStepAnalysis(Analysis):
         )
         sample_update_trajectory_random = functools.partial(
             self._sample_random_update_trajectory,
-            [p.detach() for p in agent.policy.parameters()],
+            [p.detach().clone() for p in agent.policy.parameters()],
             avg_update_step_length,
             len_update_trajectory,
         )
@@ -134,7 +133,6 @@ class UpdateStepAnalysis(Analysis):
             sample_update_trajectory,
             self.agent_spec,
             rollout_buffer_true_loss,
-            agent.policy.optimizer,
             None,
             len_update_trajectory,
         )

@@ -89,7 +89,9 @@ for env_dir in tqdm(log_dir.iterdir()):
                     grid_size = loss_surface_data["data"].shape[0]
                     magnitude = loss_surface_data["magnitude"]
                     agent = agent_spec.create_agent(env)
-                    agent_weights = [p.data.detach() for p in agent.policy.parameters()]
+                    agent_weights = [
+                        p.detach().clone() for p in agent.policy.parameters()
+                    ]
                     weights_offsets = [[None] * grid_size for _ in range(grid_size)]
                     coords = np.linspace(-magnitude, magnitude, num=grid_size)
 

@@ -153,7 +153,7 @@ class RewardSurfaceVisualization(Analysis):
                     for p in agent.policy.parameters()
                 ]
 
-            agent_weights = [p.data.detach() for p in agent.policy.parameters()]
+            agent_weights = [p.detach().clone() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
             coords = np.linspace(-self.magnitude, self.magnitude, num=self.grid_size)
 

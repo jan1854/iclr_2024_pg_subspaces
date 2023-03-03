@@ -2,7 +2,7 @@ import collections
 import functools
 import itertools
 import math
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import gym
 import numpy as np
@@ -371,12 +371,18 @@ def get_value_function_parameters(
 def sample_update_trajectory(
     agent_spec: AgentSpec,
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
-    optimizer: torch.optim,
     batch_size: Optional[int],
     max_num_steps: Optional[int],
     repeat_data: bool = False,
+    alternative_optimizer_factory: Optional[
+        Callable[[Iterable[torch.nn.Parameter]], torch.optim.Optimizer]
+    ] = None,
 ) -> List[List[torch.Tensor]]:
     agent = agent_spec.create_agent()
+    if alternative_optimizer_factory is not None:
+        optimizer = alternative_optimizer_factory(agent.policy.parameters())
+    else:
+        optimizer = agent.policy.optimizer
     parameters = []
     assert max_num_steps is not None or not repeat_data
     data_iter = (
@@ -391,7 +397,7 @@ def sample_update_trajectory(
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        parameters.append([p.detach() for p in agent.policy.parameters()])
+        parameters.append([p.detach().clone() for p in agent.policy.parameters()])
     return parameters
 
 
