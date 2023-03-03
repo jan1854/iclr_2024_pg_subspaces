@@ -438,8 +438,9 @@ class RewardSurfaceVisualization(Analysis):
             projected_sgd_parameters_true_grad[None],
         )
 
+    @classmethod
     def _sample_projected_update_trajectory(
-        self,
+        cls,
         data: Iterable[stable_baselines3.common.buffers.RolloutBufferSamples],
         agent: stable_baselines3.ppo.PPO,
         optimizer: torch.optim.Optimizer,
