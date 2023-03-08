@@ -1,4 +1,5 @@
 import argparse
+import logging
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
@@ -10,6 +11,9 @@ from action_space_toolbox.util.tensorboard_logs import (
     calculate_mean_std_sequence,
     read_scalar,
 )
+
+
+logger = logging.Logger(__name__)
 
 
 def smooth(
@@ -36,6 +40,7 @@ def create_plots(
     xaxis_log: bool,
     keys: List[str],
     smoothing_weight: float,
+    separate_legend: bool,
     out: Path,
 ) -> None:
     ax = plt.gca()
@@ -50,9 +55,13 @@ def create_plots(
                     for key in keys
                 ]
             )
-            assert (
-                key_indices.shape[0] > 0
-            ), f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
+            if key_indices.shape[0] == 0:
+                logger.warning(
+                    f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
+                )
+                # Empty plot to advance the color cycle (so that future plots have the correct color)
+                plt.plot([], [])
+                continue
             key = keys[key_indices[0].item()]
             (
                 steps,
@@ -109,10 +118,21 @@ def create_plots(
     plt.ylabel(ylabel)
     plt.xlim(xlimits)
     plt.ylim(ylimits)
-    if legend is not None:
+    if legend is not None and not separate_legend:
         plt.legend(legend, loc="lower right")
-    plt.savefig(out.with_suffix(".png"))
+    plt.tight_layout(pad=0.1)
+    # plt.savefig(out.with_suffix(".png"))
     plt.savefig(out.with_suffix(".pdf"))
+    if legend is not None and separate_legend:
+        legend_plt = plt.legend(
+            legend, frameon=False, ncol=len(legend), bbox_to_anchor=(2.0, 2.0)
+        )
+        legend_fig = legend_plt.figure
+        legend_fig.canvas.draw()
+        bbox = legend_plt.get_window_extent().transformed(
+            legend_fig.dpi_scale_trans.inverted()
+        )
+        legend_fig.savefig(out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox)
 
 
 if __name__ == "__main__":
@@ -129,6 +149,7 @@ if __name__ == "__main__":
     parser.add_argument("--ymax", type=float)
     parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
+    parser.add_argument("--separate-legend", action="store_true")
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
@@ -147,5 +168,6 @@ if __name__ == "__main__":
         args.xaxis_log,
         args.key,
         args.smoothing_weight,
+        args.separate_legend,
         out,
     )
