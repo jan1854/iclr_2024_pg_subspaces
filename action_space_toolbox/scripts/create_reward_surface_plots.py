@@ -32,7 +32,7 @@ def create_reward_surface_plots(
             max_gradient_trajectories=max_gradient_trajectories,
             max_steps_per_gradient_trajectory=max_steps_per_gradient_trajectory,
             disable_title=disable_title,
-            outdir=outdir,
+            outdir_override=outdir,
         )
         if summary_writer is not None:
             logs.log(summary_writer)

@@ -37,7 +37,7 @@ def plot_results(
     max_gradient_trajectories: Optional[int] = None,
     max_steps_per_gradient_trajectory: Optional[int] = None,
     disable_title: bool = False,
-    outdir: Optional[Path] = None,
+    outdir_override: Optional[Path] = None,
 ) -> TensorboardLogs:
     logs = TensorboardLogs(
         f"reward_surface_visualization/{analysis_dir.name}",
@@ -48,7 +48,9 @@ def plot_results(
         for results_path in (analysis_dir / plot_name / "data").glob(
             f"*{step:07d}_{plot_num:02d}*"
         ):
-            if outdir is None:
+            if outdir_override is not None:
+                outdir = outdir_override
+            else:
                 outdir = results_path.parents[1]
 
             outpath = outdir / results_path.with_suffix("").name
@@ -124,6 +126,7 @@ def plot_results(
     )
     with results_path.open("rb") as results_file:
         results = pickle.load(results_file)
+    if "policy_ratio" in results:
         plot_surface(
             results["magnitude"],
             results["policy_ratio"],
