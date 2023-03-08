@@ -23,6 +23,9 @@ PLOT_NAME_TO_DESCR = {
     "negative_loss_surface": "negative loss",
 }
 
+PLOT_MARGINS_WITH_TITLE = {"l": 20, "r": 20, "t": 50, "b": 25}
+PLOT_MARGINS_WITHOUT_TITLE = {"l": 0, "r": 0, "t": 0, "b": 0, "pad": 0}
+
 
 def plot_results(
     analysis_dir: Path,
@@ -33,6 +36,8 @@ def plot_results(
     plot_true_gradient_steps: bool = True,
     max_gradient_trajectories: Optional[int] = None,
     max_steps_per_gradient_trajectory: Optional[int] = None,
+    disable_title: bool = False,
+    outdir: Optional[Path] = None,
 ) -> TensorboardLogs:
     logs = TensorboardLogs(
         f"reward_surface_visualization/{analysis_dir.name}",
@@ -43,9 +48,12 @@ def plot_results(
         for results_path in (analysis_dir / plot_name / "data").glob(
             f"*{step:07d}_{plot_num:02d}*"
         ):
-            plot_path = results_path.parents[1] / results_path.with_suffix("").name
+            if outdir is None:
+                outdir = results_path.parents[1]
 
-            if not plot_path.exists() or overwrite:
+            outpath = outdir / results_path.with_suffix("").name
+
+            if not outpath.exists() or overwrite:
                 with results_path.open("rb") as results_file:
                     results = pickle.load(results_file)
                 data = results["data"]
@@ -104,8 +112,9 @@ def plot_results(
                     optimizer_steps_true_grad,
                     sgd_steps_true_grad,
                     results.get("policy_ratio"),
+                    disable_title,
                     logs,
-                    plot_path,
+                    outpath,
                 )
 
     # Plot the policy ratios (the data is in every plot directory, so just take the first one from PLOT_NAME_TO_DESCR)
@@ -129,6 +138,7 @@ def plot_results(
             None,
             None,
             None,
+            disable_title,
             logs,
             analysis_dir / "policy_ratios" / f"policy_ratios_{step:07d}",
         )
@@ -149,11 +159,11 @@ def plot_surface(
     projected_optimizer_steps_true_grad: Optional[np.ndarray],
     projected_sgd_steps_true_grad: Optional[np.ndarray],
     policy_ratios: Optional[np.ndarray],
+    disable_title: bool,
     logs: TensorboardLogs,
     outpath: Path,
 ) -> None:
     outpath.parent.mkdir(parents=True, exist_ok=True)
-    title = f"{env_name} | {descr} | magnitude: {magnitude}"
 
     coords = np.linspace(-magnitude, magnitude, num=results.shape[0])
 
@@ -167,14 +177,19 @@ def plot_surface(
     else:
         yaxis_title = "random direction 1"
         xaxis_title = "random direction 2"
+    margins = PLOT_MARGINS_WITHOUT_TITLE if disable_title else PLOT_MARGINS_WITH_TITLE
     fig = plotly.graph_objects.Figure(
         layout=plotly.graph_objects.Layout(
-            margin=plotly.graph_objects.layout.Margin(l=20, r=20, t=50, b=25),
+            margin=margins,
             scene={
                 "aspectmode": "cube",
-                "yaxis_title": yaxis_title,
                 "xaxis_title": xaxis_title,
+                "yaxis_title": yaxis_title,
                 "zaxis_title": descr,
+            },
+            scene_camera={
+                "eye": {"x": 1.25, "y": 1.25, "z": 1.25},
+                "center": {"z": -0.15},
             },
         )
     )
@@ -186,6 +201,7 @@ def plot_surface(
         y=coords,
         colorscale="RdBu",
         reversescale=True,
+        colorbar={"x": 0.9},
     )
 
     z_range = abs(np.max(results) - np.min(results))
@@ -195,7 +211,7 @@ def plot_surface(
         y=[0.0, 0.0],
         z=[np.min(results) - 0.1 * z_range, np.max(results) + 0.1 * z_range],
         mode="lines",
-        line_width=11,
+        line_width=6,
         line_color="black",
         showlegend=False,
     )
@@ -269,8 +285,10 @@ def plot_surface(
             single_legend_entry=True,
         )
 
-    if title is not None:
+    if not disable_title:
+        title = f"{env_name} | {descr} | magnitude: {magnitude}"
         fig.update_layout(title=title)
+
     # All the trajectories are disabled initially anyway, therefore we hide the legend for the png output
     fig.update_layout(showlegend=False)
     fig.write_image(outpath.with_suffix(".png"), scale=2)
