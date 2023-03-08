@@ -109,9 +109,7 @@ class UpdateStepAnalysis(Analysis):
         return_curr_policy = evaluate_returns_rollout_buffer(
             rollout_buffer_curr_policy_eval, agent.gamma, get_episode_length(agent.env)
         )
-        loss_curr_policy = evaluate_agent_losses(
-            [self.agent_spec], rollout_buffer_true_loss
-        )
+        loss_curr_policy = evaluate_agent_losses(agent, rollout_buffer_true_loss)
 
         sample_update_trajectory_agent = functools.partial(
             sample_update_trajectory,
