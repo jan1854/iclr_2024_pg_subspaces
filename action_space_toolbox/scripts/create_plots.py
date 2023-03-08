@@ -43,6 +43,7 @@ def create_plots(
     separate_legend: bool,
     out: Path,
 ) -> None:
+    plt.rc("font", size=16)
     ax = plt.gca()
     for log_path in log_paths:
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
@@ -112,12 +113,15 @@ def create_plots(
                 smooth([s[1].value for s in scalar], smoothing_weight),
             )
     if not xaxis_log:
-        plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 4))
+        plt.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xlim(xlimits)
     plt.ylim(ylimits)
+    # To avoid cramming ticks labels too close together in the origin
+    ax.tick_params(axis="x", pad=8)
+    ax.tick_params(axis="y", pad=8)
     if legend is not None and not separate_legend:
         plt.legend(legend, loc="lower right")
     plt.tight_layout(pad=0.1)
