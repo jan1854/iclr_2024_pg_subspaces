@@ -10,6 +10,7 @@ from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+from action_space_toolbox.analysis.util import evaluate_agent_returns
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.angles import normalize_angle
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer
@@ -112,3 +113,28 @@ def test_merge_dicts():
 
     expected = {1: 2, 3: 4, "sub1": {2: 3, 6: 7}, "sub2": {4: 5}, "sub3": {23: 42}}
     assert merge_dicts(d1, d2) == expected
+
+
+def test_evaluate_agent_returns():
+    env = gym.wrappers.TimeLimit(DummyEnv(), 50)
+    agent = PPO("MlpPolicy", DummyVecEnv([lambda: env]), device="cpu", seed=42)
+
+    eval_result_steps = evaluate_agent_returns(agent, env, num_steps=123)
+    eval_result_episodes = evaluate_agent_returns(agent, env, num_epsiodes=2)
+    gt_value_undiscounted = np.sum(np.arange(1, env.max_step + 1))
+    gt_value_discounted = np.sum(
+        agent.gamma ** np.arange(env.max_step) * np.arange(1, env.max_step + 1)
+    )
+
+    assert eval_result_steps.rewards_undiscounted.item() == pytest.approx(
+        gt_value_undiscounted
+    )
+    assert eval_result_episodes.rewards_undiscounted.item() == pytest.approx(
+        gt_value_undiscounted
+    )
+    assert eval_result_steps.rewards_discounted.item() == pytest.approx(
+        gt_value_discounted
+    )
+    assert eval_result_episodes.rewards_discounted.item() == pytest.approx(
+        gt_value_discounted
+    )
