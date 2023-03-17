@@ -48,13 +48,15 @@ def learning_curves_gradient_analysis_plots(log_dir: Path, env_name: str) -> str
         log_dir
         / "plots"
         / "gradient_similarity_true_gradient"
-        / f"{env_name}_value_function.png"
+        / f"{env_name}"
+        / "value_function_loss.png"
     )
     gradient_similarity_vf_path = (
         log_dir
         / "plots"
         / "gradient_similarity_true_gradient"
-        / f"{env_name}_policy.png"
+        / f"{env_name}"
+        / "policy_loss.png"
     )
     html_code = f"<img src={learning_curves_path} width={plot_width}>\n"
     if gradient_similarity_combined_path.exists():
