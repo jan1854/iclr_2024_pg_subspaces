@@ -396,6 +396,7 @@ def sample_update_trajectory(
         loss, _, _, _ = ppo_loss(agent, batch)
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(agent.policy.parameters(), agent.max_grad_norm)
         optimizer.step()
         parameters.append([p.detach().clone() for p in agent.policy.parameters()])
     return parameters
