@@ -389,13 +389,14 @@ class UpdateStepAnalysis(Analysis):
             "reward_discounted",
         ]
         values = [
-            np.mean(losses.combined_losses) - loss_curr_policy.combined_losses,
-            np.mean(losses.policy_losses) - loss_curr_policy.policy_losses,
+            np.mean(losses.combined_losses) - loss_curr_policy.combined_losses.item(),
+            np.mean(losses.policy_losses) - loss_curr_policy.policy_losses.item(),
             np.mean(losses.value_function_losses)
-            - loss_curr_policy.value_function_losses,
+            - loss_curr_policy.value_function_losses.item(),
             np.mean(returns.rewards_undiscounted)
-            - return_curr_policy.rewards_undiscounted,
-            np.mean(returns.rewards_discounted) - return_curr_policy.rewards_discounted,
+            - return_curr_policy.rewards_undiscounted.item(),
+            np.mean(returns.rewards_discounted)
+            - return_curr_policy.rewards_discounted.item(),
         ]
         for plot_name, value in zip(plot_names, values):
             logs.add_scalar(f"{name}/{plot_name}", value, env_step)  # type: ignore
