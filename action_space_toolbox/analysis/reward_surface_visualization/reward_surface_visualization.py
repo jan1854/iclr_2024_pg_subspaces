@@ -452,6 +452,9 @@ class RewardSurfaceVisualization(Analysis):
             loss, _, _, _ = ppo_loss(agent, batch)
             agent.policy.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                agent.policy.parameters(), agent.max_grad_norm
+            )
             optimizer.step()
             new_optimizer_parameters = flatten_parameters(agent.policy.parameters())
             # Projection matrix: (directions^T @ directions)^(-1) @ directions^T
