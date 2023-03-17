@@ -125,6 +125,7 @@ def create_plots(
     if legend is not None and not separate_legend:
         plt.legend(legend, loc="lower right")
     plt.tight_layout(pad=0.1)
+    out.parent.mkdir(exist_ok=True, parents=True)
     # plt.savefig(out.with_suffix(".png"))
     plt.savefig(out.with_suffix(".pdf"))
     if legend is not None and separate_legend:
