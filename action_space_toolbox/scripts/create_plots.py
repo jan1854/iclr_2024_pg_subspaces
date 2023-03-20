@@ -122,6 +122,8 @@ def create_plots(
     # To avoid cramming ticks labels too close together in the origin
     ax.tick_params(axis="x", pad=8)
     ax.tick_params(axis="y", pad=8)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(6))
+    ax.yaxis.set_major_locator(plt.MaxNLocator(6))
     if legend is not None and not separate_legend:
         plt.legend(legend, loc="lower right")
     plt.tight_layout(pad=0.1)
