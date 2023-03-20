@@ -114,6 +114,7 @@ def create_plots(
             )
     if not xaxis_log:
         plt.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
