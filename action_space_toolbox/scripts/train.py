@@ -86,7 +86,9 @@ def train(cfg: omegaconf.DictConfig) -> None:
     path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
     algorithm.save(path)
     callbacks = [
-        CheckpointCallback(10000, str(checkpoints_path), cfg.algorithm.name),
+        CheckpointCallback(
+            cfg.checkpoint_interval, str(checkpoints_path), cfg.algorithm.name
+        ),
         FixEpInfoBufferCallback(),
         AdditionalTrainingMetricsCallback(),
     ]
