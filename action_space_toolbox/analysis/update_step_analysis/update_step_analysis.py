@@ -19,6 +19,7 @@ from action_space_toolbox.analysis.util import (
 )
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
+from action_space_toolbox.util.metrics import mean_relative_difference
 from action_space_toolbox.util.sb3_training import (
     fill_rollout_buffer,
     sample_update_trajectory,
@@ -246,17 +247,28 @@ class UpdateStepAnalysis(Analysis):
             logs,
         )
 
-        for plot_type in [
+        plot_names = [
             "combined_loss",
             "policy_loss",
             "value_function_loss",
             "reward_undiscounted",
             "reward_discounted",
-        ]:
+        ]
+        values_curr_policy = [
+            loss_curr_policy.combined_losses.item(),
+            loss_curr_policy.policy_losses.item(),
+            loss_curr_policy.value_function_losses.item(),
+            return_curr_policy.rewards_undiscounted.item(),
+            return_curr_policy.rewards_discounted.item(),
+        ]
+        for plot_name, value in zip(plot_names, values_curr_policy):
+            logs.add_scalar(f"zz_raw/original_agent/{plot_name}", value, env_step)
+
+        for plot_name in plot_names:
             logs.add_multiline_scalar(
-                f"update_trajectory/{plot_type}",
+                f"update_trajectory/{plot_name}",
                 [
-                    f"update_trajectory/{update_type}/{plot_type}"
+                    f"update_trajectory/{update_type}/{plot_name}"
                     for update_type in ["random", "agent", "true_gradient"]
                 ],
             )
@@ -388,18 +400,40 @@ class UpdateStepAnalysis(Analysis):
             "reward_undiscounted",
             "reward_discounted",
         ]
-        values = [
-            np.mean(losses.combined_losses) - loss_curr_policy.combined_losses.item(),
-            np.mean(losses.policy_losses) - loss_curr_policy.policy_losses.item(),
-            np.mean(losses.value_function_losses)
-            - loss_curr_policy.value_function_losses.item(),
-            np.mean(returns.rewards_undiscounted)
-            - return_curr_policy.rewards_undiscounted.item(),
-            np.mean(returns.rewards_discounted)
-            - return_curr_policy.rewards_discounted.item(),
+
+        values_original = [
+            loss_curr_policy.combined_losses.item(),
+            loss_curr_policy.policy_losses.item(),
+            loss_curr_policy.value_function_losses.item(),
+            return_curr_policy.rewards_undiscounted.item(),
+            return_curr_policy.rewards_discounted.item(),
         ]
-        for plot_name, value in zip(plot_names, values):
-            logs.add_scalar(f"{name}/{plot_name}", value, env_step)  # type: ignore
+        values_after_update = [
+            losses.combined_losses,
+            losses.policy_losses,
+            losses.value_function_losses,
+            returns.rewards_undiscounted,
+            returns.rewards_discounted,
+        ]
+
+        for plot_name, value_after_update, value_original in zip(
+            plot_names, values_after_update, values_original
+        ):
+            logs.add_scalar(
+                f"absolute_difference/{name}/{plot_name}",
+                np.mean(value_after_update - value_original),  # type: ignore
+                env_step,
+            )
+            logs.add_scalar(
+                f"relative_difference/{name}/{plot_name}",
+                mean_relative_difference(value_original, value_after_update),
+                env_step,
+            )
+            logs.add_scalar(
+                f"zz_raw/{name}/{plot_name}",
+                np.mean(value_after_update),  # type: ignore
+                env_step,
+            )
 
     @classmethod
     def get_average_update_step_length(
