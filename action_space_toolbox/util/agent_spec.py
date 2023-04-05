@@ -39,4 +39,4 @@ class AgentSpec:
     def copy_with_new_weights(
         self, override_weights: Sequence[torch.Tensor]
     ) -> "AgentSpec":
-        return AgentSpec(self.checkpoint_path, self.device, override_weights)
+        return AgentSpec(self.checkpoint_path, self.device, override_weights, self.agent_kwargs)
