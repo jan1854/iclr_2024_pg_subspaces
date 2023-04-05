@@ -134,6 +134,7 @@ class UpdateStepAnalysis(Analysis):
             rollout_buffer_true_loss,
             None,
             len_update_trajectory,
+            repeat_data=True,
         )
 
         analysis_results_agent = process_pool.apply_async(
