@@ -43,7 +43,7 @@ def create_plots(
     separate_legend: bool,
     out: Path,
 ) -> None:
-    plt.rc("font", size=16)
+    plt.rc("font", size=18)
     ax = plt.gca()
     for log_path in log_paths:
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]

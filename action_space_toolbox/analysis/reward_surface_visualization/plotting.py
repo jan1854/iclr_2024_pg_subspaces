@@ -13,14 +13,14 @@ from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 
 PLOT_NAME_TO_DESCR = {
-    "reward_surface_undiscounted": "reward (undiscounted)",
-    "reward_surface_discounted": "reward (discounted)",
+    "reward_surface_undiscounted": "reward (undis.)",
+    "reward_surface_discounted": "cum. reward",
     "policy_loss_surface": "policy loss",
-    "negative_policy_loss_surface": "negative policy loss",
-    "value_function_loss_surface": "value function loss",
-    "negative_value_function_loss_surface": "negative value function loss",
+    "negative_policy_loss_surface": "neg. policy loss",
+    "value_function_loss_surface": "neg. function loss",
+    "negative_value_function_loss_surface": "neg. value loss",
     "loss_surface": "loss",
-    "negative_loss_surface": "negative loss",
+    "negative_loss_surface": "neg. loss",
 }
 
 PLOT_MARGINS_WITH_TITLE = {"l": 20, "r": 20, "t": 50, "b": 25}
@@ -171,29 +171,42 @@ def plot_surface(
     coords = np.linspace(-magnitude, magnitude, num=results.shape[0])
 
     if gradient_direction is not None:
-        yaxis_title = (
-            "gradient direction" if gradient_direction == 0 else "random direction"
-        )
-        xaxis_title = (
-            "gradient direction" if gradient_direction == 1 else "random direction"
-        )
+        yaxis_title = "gradient dir." if gradient_direction == 0 else "random dir."
+        xaxis_title = "gradient dir." if gradient_direction == 1 else "random dir."
     else:
-        yaxis_title = "random direction 1"
-        xaxis_title = "random direction 2"
+        yaxis_title = "random dir. 1"
+        xaxis_title = "random dir. 2"
     margins = PLOT_MARGINS_WITHOUT_TITLE if disable_title else PLOT_MARGINS_WITH_TITLE
+    axis_label_fontsize = 26
+    ticks_fontsize = 14
     fig = plotly.graph_objects.Figure(
         layout=plotly.graph_objects.Layout(
             margin=margins,
             scene={
                 "aspectmode": "cube",
-                "xaxis_title": xaxis_title,
-                "yaxis_title": yaxis_title,
-                "zaxis_title": descr,
+                "xaxis": {
+                    "title": xaxis_title,
+                    "title_font": {"size": axis_label_fontsize},
+                    "tickfont": {"size": ticks_fontsize},
+                    "range": [-magnitude * 1.15, magnitude * 1.15],
+                },
+                "yaxis": {
+                    "title": yaxis_title,
+                    "title_font": {"size": axis_label_fontsize},
+                    "tickfont": {"size": ticks_fontsize},
+                    "range": [-magnitude * 1.15, magnitude * 1.15],
+                },
+                "zaxis": {
+                    "title": descr,
+                    "title_font": {"size": axis_label_fontsize},
+                    "tickfont": {"size": ticks_fontsize},
+                },
             },
             scene_camera={
                 "eye": {"x": 1.25, "y": 1.25, "z": 1.25},
                 "center": {"z": -0.15},
             },
+            font={"size": 16},
         )
     )
 
@@ -204,6 +217,7 @@ def plot_surface(
         y=coords,
         colorscale="RdBu",
         reversescale=True,
+        showscale=True,
         colorbar={"x": 0.9},
     )
 
@@ -294,6 +308,7 @@ def plot_surface(
 
     # All the trajectories are disabled initially anyway, therefore we hide the legend for the png output
     fig.update_layout(showlegend=False)
+    # Use height=490, width=576 to crop white space
     fig.write_image(outpath.with_suffix(".png"), scale=2)
     fig.update_layout(showlegend=True)
     fig.update_layout(legend=dict(x=1.06))
