@@ -267,6 +267,14 @@ class UpdateStepAnalysis(Analysis):
 
         for plot_name in plot_names:
             logs.add_multiline_scalar(
+                f"single_update_step/{plot_name}",
+                [
+                    f"single_update_step/{update_type}/{plot_name}"
+                    for update_type in ["random", "agent", "true_gradient"]
+                ],
+            )
+        for plot_name in plot_names:
+            logs.add_multiline_scalar(
                 f"update_trajectory/{plot_name}",
                 [
                     f"update_trajectory/{update_type}/{plot_name}"
