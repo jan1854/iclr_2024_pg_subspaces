@@ -9,7 +9,15 @@ def mean_relative_difference(
     modified: Union[np.ndarray, torch.Tensor],
     eps: float = 1e-8,
 ) -> float:
-    return ((modified - original) / (abs(original) + eps)).mean().item()
+    return relative_difference(original, modified, eps).mean().item()
+
+
+def relative_difference(
+    original: Union[float, np.ndarray, torch.Tensor],
+    modified: Union[float, np.ndarray, torch.Tensor],
+    eps: float = 1e-8,
+) -> Union[float, np.ndarray, torch.Tensor]:
+    return (modified - original) / (abs(original) + eps)
 
 
 def mean_relative_error(

@@ -4,9 +4,7 @@ num_processes: 1
 num_samples_true_gradient: 1_000_000
 num_steps_reward_eval: 200_000
 cliff_test_distance: 0.02     # TODO: Check that the original code actually uses 0.02 (as opposed to the paper, which says 0.04)
-cliff_reward_decrease: 0.5
-cliff_reward_decrease_global: 0.25
-a2c_cfg: null
+alternate_agent_cfg: null
 algorithm_overrides:
   ppo:
     - learning_rate: 0.0001

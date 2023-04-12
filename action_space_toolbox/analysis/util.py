@@ -73,6 +73,7 @@ def evaluate_agent_returns(
     env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
     num_steps: Optional[int] = None,
     num_epsiodes: Optional[int] = None,
+    num_spawned_processes: Optional[int] = 0,
 ) -> ReturnEvaluationResult:
     assert (num_steps is not None) ^ (
         num_epsiodes is not None
@@ -104,6 +105,7 @@ def evaluate_agent_returns(
             agent_or_spec,
             None,
             rollout_buffer_no_value_bootstrap,
+            num_spawned_processes,
         )
 
         results.append(

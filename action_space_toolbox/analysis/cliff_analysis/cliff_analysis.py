@@ -1,11 +1,11 @@
 import dataclasses
-import itertools
 import logging
 from pathlib import Path
-from typing import Callable, Any, Dict, Sequence, Optional
+from typing import Callable, Any, Dict, Sequence, Optional, Tuple, Union
 
 import filelock
 import gym
+import hydra.utils
 import numpy as np
 import omegaconf
 import stable_baselines3
@@ -43,11 +43,9 @@ class CliffAnalysis(Analysis):
         run_dir: Path,
         num_processes: int,
         num_samples_true_gradient: int,
-        num_steps_reward_eval: int,
+        num_steps_reward_eval: int,  # TODO: The cliff diving paper appears to use 1000 episodes
         cliff_test_distance: float,
-        cliff_reward_decrease: float,
-        cliff_reward_decrease_global: float,
-        a2c_cfg: Optional[str],
+        alternate_agent_cfg: Optional[str],
         algorithm_overrides: Dict[str, Sequence[Dict[str, Any]]],
     ):
         super().__init__(
@@ -61,24 +59,21 @@ class CliffAnalysis(Analysis):
         self.num_samples_true_gradient = num_samples_true_gradient
         self.num_steps_reward_eval = num_steps_reward_eval
         self.cliff_test_distance = cliff_test_distance
-        self.cliff_reward_decrease = cliff_reward_decrease
-        self.cliff_reward_decrease_global = cliff_reward_decrease_global
-        self.global_reward_range = 0.01  # TODO
         self.results_dir = run_dir / "analyses" / "cliff_analysis" / analysis_run_id
         self.results_dir.mkdir(parents=True, exist_ok=True)
         self.results_file = self.results_dir / "results.yaml"
         self.results_file.touch()
-        if a2c_cfg is not None:
+        if alternate_agent_cfg is not None:
             # TODO: Bit ugly
-            self.a2c_config = omegaconf.OmegaConf.load(
+            self.alternate_agent_cfg = omegaconf.OmegaConf.load(
                 Path(__file__).parents[2]
                 / "scripts"
                 / "conf"
                 / "algorithm"
-                / (a2c_cfg + ".yaml")
+                / (alternate_agent_cfg + ".yaml")
             )
         else:
-            self.a2c_config = None
+            self.alternate_agent_cfg = None
         self.algorithm_overrides = algorithm_overrides
 
     def _do_analysis(
@@ -119,10 +114,6 @@ class CliffAnalysis(Analysis):
 
         results = self._read_results_file()
 
-        # TODO: Check whether env_step
-        if env_step not in results:
-            results[env_step] = {}
-        curr_results = results[env_step]
         if overwrite_results or self._check_logs_complete(results, env_step):
             gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
             gradient_norm = torch.norm(flatten_parameters(gradient))
@@ -151,13 +142,8 @@ class CliffAnalysis(Analysis):
                 cliff_test_agent_spec, rollout_buffer_true_loss
             )
 
-            checkpoint_is_cliff = self.cliff_criterion(
-                reward_checkpoint, reward_cliff_test
-            )
-
             self.dump_pre_update_results(
                 env_step,
-                checkpoint_is_cliff,
                 reward_checkpoint,
                 loss_checkpoint,
                 reward_cliff_test,
@@ -165,39 +151,45 @@ class CliffAnalysis(Analysis):
                 overwrite_results,
             )
 
-        losses_after_update = []
-        rewards_after_update = []
-        overrides = [{}] + list(self.algorithm_overrides["ppo"])
-        for curr_overrides in overrides:
-            if self._overrides_to_str(curr_overrides) not in curr_results.get(
-                "ppo", {}
-            ):
-                agent_spec_overrides = AgentSpec(
-                    self.agent_spec.checkpoint_path,
-                    self.agent_spec.device,
-                    self.agent_spec.override_weights,
-                    {**self.agent_spec.agent_kwargs, **curr_overrides},
-                )
-                agent = agent_spec_overrides.create_agent(self.env_factory())
-                # TODO: This should be changed! --> Put it into the config?
-                agent.learn(2048)
+        if env_step not in results:
+            results[env_step] = {}
+        curr_results = results[env_step]
 
-                rewards_after_update.append(
-                    evaluate_agent_returns(
-                        agent, self.env_factory, self.num_steps_reward_eval
+        agent_names = ["ppo"]
+        agents_spec_or_omegaconf = [self.agent_spec]
+        if self.alternate_agent_cfg is not None:
+            agent_names.append(self.alternate_agent_cfg.name)
+            agents_spec_or_omegaconf.append(self.alternate_agent_cfg)
+        for name, spec_or_omegaconf in zip(agent_names, agents_spec_or_omegaconf):
+            if name not in curr_results:
+                curr_results[name] = {}
+            curr_results = curr_results[name]
+            overrides = [{}] + list(self.algorithm_overrides["ppo"])
+            for curr_overrides in overrides:
+                if overwrite_results or self._overrides_to_str(
+                    curr_overrides
+                ) not in curr_results.get(name, {}).get("configs", {}):
+                    (
+                        loss_after_update,
+                        reward_after_update,
+                    ) = self.evaluate_agent_overrides(
+                        spec_or_omegaconf,
+                        curr_overrides,
+                        rollout_buffer_true_loss,
                     )
-                )
-                losses_after_update.append(
-                    evaluate_agent_losses(agent, rollout_buffer_true_loss)
-                )
 
-        self.dump_update_results(
-            env_step, rewards_after_update, losses_after_update, "ppo", overrides
-        )
+                    self.dump_update_results(
+                        env_step,
+                        reward_after_update,
+                        loss_after_update,
+                        name,
+                        curr_overrides,
+                    )
 
         # TODO: Should probably also compute the performance gain for ground truth gradient steps
         # TODO: Dump agent config somewhere
         # TODO: Should be parallelized (at least put stuff on a separate process to avoid clogging the main process)
+        # TODO: Record also the loss of the alternate agent (at the checkpoint and test location?)
 
         # Dict env_step (maybe also store the parameters of the analysis somewhere?) -->
         # cliff result, performance drop, reward_checkpoint, reward_cliff_test (discounted, undiscounted), losses
@@ -207,23 +199,45 @@ class CliffAnalysis(Analysis):
 
         return TensorboardLogs()
 
-    def cliff_criterion(
+    def evaluate_agent_overrides(
         self,
-        reward_checkpoint: ReturnEvaluationResult,
-        reward_cliff_test: ReturnEvaluationResult,
-    ) -> bool:
-        reward_checkpoint = np.mean(reward_checkpoint.rewards_undiscounted)
-        reward_cliff_test = np.mean(reward_cliff_test.rewards_undiscounted)
-        return (
-            reward_cliff_test <= self.cliff_reward_decrease * reward_checkpoint
-            and (reward_cliff_test - reward_checkpoint) / self.global_reward_range
-            > self.cliff_reward_decrease_global
+        agent_spec_or_omegaconf: Union[AgentSpec, omegaconf.OmegaConf],
+        overrides: Dict[str, Any],
+        rollout_buffer_true_loss: stable_baselines3.common.buffers.RolloutBuffer,
+    ) -> Tuple[LossEvaluationResult, ReturnEvaluationResult]:
+        # TODO: This should be unified by allowing non-PPO agents in AgentSpec
+        if isinstance(agent_spec_or_omegaconf, AgentSpec):
+            agent_spec_overrides = AgentSpec(
+                self.agent_spec.checkpoint_path,
+                self.agent_spec.device,
+                self.agent_spec.override_weights,
+                {**self.agent_spec.agent_kwargs, **overrides},
+            )
+            agent = agent_spec_overrides.create_agent(self.env_factory())
+        else:
+            cfg_overrides = omegaconf.OmegaConf.merge(
+                agent_spec_or_omegaconf, overrides
+            )
+            agent = hydra.utils.instantiate(
+                cfg_overrides.algorithm, env=self.env_factory()
+            )
+        # TODO: This should be changed! --> Put it into the config?
+        agent.learn(2048)
+
+        loss_after_update = evaluate_agent_losses(agent, rollout_buffer_true_loss)
+        reward_after_update = evaluate_agent_returns(
+            # TODO: This does not work for the alternate agent since it is not specified by an AgentSpec. Unify agent creation in AgentSpec!
+            agent_spec_overrides,
+            self.env_factory,
+            self.num_steps_reward_eval,
+            num_spawned_processes=self.num_processes,
         )
+
+        return loss_after_update, reward_after_update
 
     def dump_pre_update_results(
         self,
         env_step: int,
-        checkpoint_is_cliff: bool,
         reward_checkpoint: ReturnEvaluationResult,
         loss_checkpoint: LossEvaluationResult,
         reward_cliff_test: ReturnEvaluationResult,
@@ -239,15 +253,13 @@ class CliffAnalysis(Analysis):
                 results[env_step] = {}
             curr_results = results[env_step]
             assert override or (
-                "checkpoint_is_cliff" not in curr_results
-                and "reward_checkpoint" not in curr_results
+                "reward_checkpoint" not in curr_results
                 and "loss_checkpoint" not in curr_results
             ), (
                 f"Override not set but checkpoint results are non-empty "
                 f"(step: {env_step}, results file: {self.results_file})."
             )
 
-            curr_results["checkpoint_is_cliff"] = checkpoint_is_cliff
             curr_results["reward_checkpoint"] = {
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(reward_checkpoint).items()
@@ -264,14 +276,16 @@ class CliffAnalysis(Analysis):
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(loss_cliff_test).items()
             }
+            with self.results_file.open("w") as f:
+                yaml.dump(results, f)
 
     def dump_update_results(
         self,
         env_step: int,
-        rewards_after_update: Sequence[ReturnEvaluationResult],
-        losses_after_update: Sequence[LossEvaluationResult],
+        reward_after_update: ReturnEvaluationResult,
+        loss_after_update: LossEvaluationResult,
         algorithm_name: str,
-        hyperparameter_overrides: Sequence[Dict[str, Any]],
+        hyperparameter_overrides: Dict[str, Any],
     ) -> None:
         lock = filelock.FileLock(
             self.results_file.with_suffix(self.results_file.suffix + ".lock")
@@ -280,28 +294,25 @@ class CliffAnalysis(Analysis):
             results = self._read_results_file()
             if env_step not in results:
                 results[env_step] = {}
-
-            for (overrides, rew_after, loss_after) in zip(
-                hyperparameter_overrides,
-                rewards_after_update,
-                losses_after_update,
-            ):
-                curr_results = results[env_step]
-                if algorithm_name not in curr_results:
-                    curr_results[algorithm_name] = {}
-                curr_results = curr_results[algorithm_name]
-                overrides_str = self._overrides_to_str(overrides)
-                if overrides_str not in curr_results:
-                    curr_results[overrides_str] = {}
-                curr_results = curr_results[overrides_str]
-                curr_results["reward_update"] = {
-                    k: np.mean(v).item()
-                    for k, v in dataclasses.asdict(rew_after).items()
-                }
-                curr_results["loss_update"] = {
-                    k: np.mean(v).item()
-                    for k, v in dataclasses.asdict(loss_after).items()
-                }
+            curr_results = results[env_step]
+            if "configs" not in curr_results:
+                curr_results["configs"] = {}
+            curr_results = curr_results["configs"]
+            if algorithm_name not in curr_results:
+                curr_results[algorithm_name] = {}
+            curr_results = curr_results[algorithm_name]
+            overrides_str = self._overrides_to_str(hyperparameter_overrides)
+            if overrides_str not in curr_results:
+                curr_results[overrides_str] = {}
+            curr_results = curr_results[overrides_str]
+            curr_results["reward_update"] = {
+                k: np.mean(v).item()
+                for k, v in dataclasses.asdict(reward_after_update).items()
+            }
+            curr_results["loss_update"] = {
+                k: np.mean(v).item()
+                for k, v in dataclasses.asdict(loss_after_update).items()
+            }
             with self.results_file.open("w") as f:
                 yaml.dump(results, f)
 

@@ -2,7 +2,8 @@ name: "ppo"
 
 algorithm:
   _target_: stable_baselines3.PPO
-  policy: 'MlpPolicy'
+  policy: "MlpPolicy"
+  device: "auto"
   batch_size: 32
   n_steps: 512
   gamma: 0.98
