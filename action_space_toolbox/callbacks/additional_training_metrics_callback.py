@@ -19,20 +19,24 @@ class AdditionalTrainingMetricsCallback(
 
     def _on_rollout_end(self) -> None:
         algorithm = self.locals["self"]
-        self.logger.record(
-            "rollout/ep_rew_mean_gradient_steps",
-            safe_mean([ep_info["r"] for ep_info in algorithm.ep_info_buffer]),
-        )
-        timesteps_per_policy_update = algorithm.n_steps * algorithm.n_envs
-        curr_num_policy_updates = algorithm.num_timesteps // timesteps_per_policy_update
-        # The last gradient step is done on a smaller batch if the number of samples is not divisible by the batch size
-        gradient_steps_per_epoch = math.ceil(
-            timesteps_per_policy_update / algorithm.batch_size
-        )
-        curr_num_gradient_steps = (
-            curr_num_policy_updates * algorithm.n_epochs * gradient_steps_per_epoch
-        )
-        self.logger.dump(step=curr_num_gradient_steps)
+        if len(algorithm.ep_info_buffer) > 0:
+            self.logger.record(
+                "rollout/ep_rew_mean_gradient_steps",
+                safe_mean([ep_info["r"] for ep_info in algorithm.ep_info_buffer]),
+            )
+            timesteps_per_policy_update = algorithm.n_steps * algorithm.n_envs
+            curr_num_policy_updates = (
+                algorithm.num_timesteps // timesteps_per_policy_update
+            )
+            # The last gradient step is done on a smaller batch if the number of samples is not divisible by the batch
+            # size
+            gradient_steps_per_epoch = math.ceil(
+                timesteps_per_policy_update / algorithm.batch_size
+            )
+            curr_num_gradient_steps = (
+                curr_num_policy_updates * algorithm.n_epochs * gradient_steps_per_epoch
+            )
+            self.logger.dump(step=curr_num_gradient_steps)
 
     def _on_step(self) -> bool:
         return True
