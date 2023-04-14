@@ -54,14 +54,12 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                             if len(results_config["no cliff"]) > 0
                             else "N/A"
                         )
-                        num_cliff_locations = len(results_config["cliff"])
                         csvwriter.writerow(
                             [
                                 algorithm_name,
                                 config_str,
                                 reward_change_cliff,
                                 reward_change_no_cliff,
-                                num_cliff_locations,
                             ]
                         )
                 infofile.write(
