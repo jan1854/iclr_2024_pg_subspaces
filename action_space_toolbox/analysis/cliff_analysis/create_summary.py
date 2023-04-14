@@ -30,59 +30,60 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for analysis_run_id, results_id in results.items():
         with (out_dir / f"results_{analysis_run_id}.csv").open("w") as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(
+                [
+                    "Algorithm",
+                    "Configuration",
+                    "Rel. Reward change (cliff)",
+                    "Rel. Reward change (no cliff)",
+                    "Std across checkpoints (cliff)",
+                    "Std across checkpoints (no cliff)",
+                ]
+            )
+            for algorithm_name, results_algo in results_id.items():
+                # Sort the output but always put default as first item
+                results_algo_items_sorted = [
+                    ("default", results_algo["default"])
+                ] + sorted([r for r in results_algo.items() if r[0] != "default"])
+                for config_str, results_config in results_algo_items_sorted:
+                    reward_change_cliff = (
+                        f"{np.mean(results_config['cliff']):.6f}"
+                        if len(results_config["cliff"]) > 0
+                        else "N/A"
+                    )
+                    reward_change_no_cliff = (
+                        f"{np.mean(results_config['no cliff']):.6f}"
+                        if len(results_config["no cliff"]) > 0
+                        else "N/A"
+                    )
+                    std_reward_change_cliff = (
+                        f"{np.std(results_config['cliff']):.6f}"
+                        if len(results_config["cliff"]) > 0
+                        else "N/A"
+                    )
+                    std_reward_change_no_cliff = (
+                        f"{np.std(results_config['no cliff']):.6f}"
+                        if len(results_config["no cliff"]) > 0
+                        else "N/A"
+                    )
+                    csvwriter.writerow(
+                        [
+                            algorithm_name,
+                            config_str,
+                            reward_change_cliff,
+                            reward_change_no_cliff,
+                            std_reward_change_cliff,
+                            std_reward_change_no_cliff,
+                        ]
+                    )
+
             with (out_dir / f"additional_information_{analysis_run_id}.txt").open(
                 "w"
             ) as infofile:
-                csvwriter = csv.writer(csvfile)
-                csvwriter.writerow(
-                    [
-                        "Algorithm",
-                        "Configuration",
-                        "Rel. Reward change (cliff)",
-                        "Rel. Reward change (no cliff)",
-                        "Std across checkpoints (cliff)",
-                        "Std across checkpoints (no cliff)",
-                    ]
-                )
-                for algorithm_name, results_algo in results_id.items():
-                    # Sort the output but always put default as first item
-                    results_algo_items_sorted = [
-                        ("default", results_algo["default"])
-                    ] + sorted([r for r in results_algo.items() if r[0] != "default"])
-                    for config_str, results_config in results_algo_items_sorted:
-                        reward_change_cliff = (
-                            f"{np.mean(results_config['cliff']):.6f}"
-                            if len(results_config["cliff"]) > 0
-                            else "N/A"
-                        )
-                        reward_change_no_cliff = (
-                            f"{np.mean(results_config['no cliff']):.6f}"
-                            if len(results_config["no cliff"]) > 0
-                            else "N/A"
-                        )
-                        std_reward_change_cliff = (
-                            f"{np.std(results_config['cliff']):.6f}"
-                            if len(results_config["cliff"]) > 0
-                            else "N/A"
-                        )
-                        std_reward_change_no_cliff = (
-                            f"{np.std(results_config['no cliff']):.6f}"
-                            if len(results_config["no cliff"]) > 0
-                            else "N/A"
-                        )
-                        csvwriter.writerow(
-                            [
-                                algorithm_name,
-                                config_str,
-                                reward_change_cliff,
-                                reward_change_no_cliff,
-                                std_reward_change_cliff,
-                                std_reward_change_no_cliff,
-                            ]
-                        )
                 infofile.write(
-                    f"cliff locations: {len(results_config['cliff'])}\n"
-                    f"non-cliff locations: {len(results_config['no cliff'])}"
+                    f"Number of cliff locations: {len(results_config['cliff'])}\n"
+                    f"Number of non-cliff locations: {len(results_config['no cliff'])}\n\n"
                 )
 
 
