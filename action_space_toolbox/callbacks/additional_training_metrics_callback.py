@@ -28,13 +28,18 @@ class AdditionalTrainingMetricsCallback(
             curr_num_policy_updates = (
                 algorithm.num_timesteps // timesteps_per_policy_update
             )
-            # The last gradient step is done on a smaller batch if the number of samples is not divisible by the batch
-            # size
-            gradient_steps_per_epoch = math.ceil(
-                timesteps_per_policy_update / algorithm.batch_size
-            )
+            if isinstance(algorithm, stable_baselines3.a2c.A2C):
+                gradient_steps_per_epoch = 1
+                n_epochs = 1
+            else:
+                # The last gradient step is done on a smaller batch if the number of samples is not divisible by the
+                # batch size
+                gradient_steps_per_epoch = math.ceil(
+                    timesteps_per_policy_update / algorithm.batch_size
+                )
+                n_epochs = algorithm.n_epochs
             curr_num_gradient_steps = (
-                curr_num_policy_updates * algorithm.n_epochs * gradient_steps_per_epoch
+                curr_num_policy_updates * n_epochs * gradient_steps_per_epoch
             )
             self.logger.dump(step=curr_num_gradient_steps)
 
