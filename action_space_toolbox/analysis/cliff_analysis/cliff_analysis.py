@@ -115,6 +115,19 @@ class CliffAnalysis(Analysis):
 
         results = self._read_results_file()
 
+        agent_names = ["ppo"]
+        agent_specs = [self.agent_spec]
+        if self.alternate_agent_cfg is not None:
+            agent_names.append(self.alternate_agent_cfg.name)
+            agent_specs.append(
+                HydraAgentSpec(
+                    self.alternate_agent_cfg,
+                    self.agent_spec.device,
+                    self.env_factory,
+                    self.agent_spec.checkpoint_path,
+                )
+            )
+
         if overwrite_results or self._check_logs_complete(results, env_step):
             gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
             gradient_norm = torch.norm(flatten_parameters(gradient))
@@ -126,19 +139,6 @@ class CliffAnalysis(Analysis):
                 get_episode_length(self.env_factory()),
                 last_episode_done,
             )
-
-            agent_names = ["ppo"]
-            agent_specs = [self.agent_spec]
-            if self.alternate_agent_cfg is not None:
-                agent_names.append(self.alternate_agent_cfg.name)
-                agent_specs.append(
-                    HydraAgentSpec(
-                        self.alternate_agent_cfg,
-                        self.agent_spec.device,
-                        self.env_factory,
-                        self.agent_spec.checkpoint_path,
-                    )
-                )
 
             losses_checkpoint = {
                 name: evaluate_agent_losses(agent_spec, rollout_buffer_true_loss)
