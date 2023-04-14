@@ -29,8 +29,9 @@ def fill_rollout_buffer(
     rollout_buffer_no_value_bootstrap: Optional[
         stable_baselines3.common.buffers.RolloutBuffer
     ] = None,
+    max_num_episodes: Optional[int] = None,
     num_spawned_processes: int = 0,
-) -> None:
+) -> bool:
     """
     Collect experiences using the current policy and fill a ``RolloutBuffer``. The code is adapted from
     stable-baselines3's OnPolicyAlgorithm.collect_rollouts() (we cannot use that function since it modifies the
@@ -43,6 +44,8 @@ def fill_rollout_buffer(
                                                 of truncated episodes is not modified to reward + gamma * next_value)
     :param num_spawned_processes:               The number of processes to spawn for collecting the samples (if 0, the
                                                 current process will be used)
+    :return:                                    Whether the last episode is complete (necessary since the rollout buffer
+                                                only stores the episode starts)
     """
     assert rollout_buffer is not None or rollout_buffer_no_value_bootstrap is not None
     assert (
@@ -59,20 +62,37 @@ def fill_rollout_buffer(
     assert num_spawned_processes >= 0
     if num_spawned_processes == 0:
         env_steps = [
-            collect_complete_episodes(buffer_size, env_or_factory, agent_or_spec)
+            collect_complete_episodes(
+                buffer_size, max_num_episodes, env_or_factory, agent_or_spec
+            )
         ]
     else:
-        jobs = [math.ceil(buffer_size / num_spawned_processes)] * (
-            num_spawned_processes - 1
-        ) + [
-            buffer_size
-            - math.ceil(buffer_size / num_spawned_processes)
-            * (num_spawned_processes - 1)
+        # TODO: Clean this up
+        jobs = [
+            (
+                math.ceil(buffer_size / num_spawned_processes),
+                math.ceil(max_num_episodes / num_spawned_processes)
+                if max_num_episodes is not None
+                else None,
+            )
+        ] * (num_spawned_processes - 1) + [
+            (
+                buffer_size
+                - math.ceil(buffer_size / num_spawned_processes)
+                * (num_spawned_processes - 1),
+                (
+                    max_num_episodes
+                    - math.ceil(max_num_episodes / num_spawned_processes)
+                    * (num_spawned_processes - 1)
+                )
+                if max_num_episodes is not None
+                else None,
+            )
         ]
         with torch.multiprocessing.get_context("spawn").Pool(
             num_spawned_processes
         ) as pool:
-            env_steps = pool.map(
+            env_steps = pool.starmap(
                 functools.partial(
                     collect_complete_episodes,
                     env_or_factory=env_or_factory,
@@ -152,10 +172,12 @@ def fill_rollout_buffer(
         rollout_buffer_no_value_bootstrap.compute_returns_and_advantage(
             last_values=value, dones=np.array([[final_done]])
         )
+    return final_done
 
 
 def collect_complete_episodes(
     min_num_env_steps: int,
+    max_num_episodes: Optional[int],
     env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
     agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
 ) -> EnvSteps:
@@ -185,8 +207,11 @@ def collect_complete_episodes(
         agent.policy.reset_noise()
 
     n_steps = 0
+    n_episodes = 0
     done = False
-    while n_steps < min_num_env_steps or not done:
+    while (n_steps < min_num_env_steps or not done) and (
+        max_num_episodes is None or n_episodes < max_num_episodes
+    ):
         if (
             agent.use_sde
             and agent.sde_sample_freq > 0
@@ -226,6 +251,7 @@ def collect_complete_episodes(
 
         if done:
             obs = env.reset()
+            n_episodes += 1
 
         # This is for the next step (we add the first observation before the loop); the last observation of each episode
         # is not added to observations since it is not needed for filling a RolloutBuffer.

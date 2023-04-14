@@ -101,17 +101,21 @@ def evaluate_agent_returns(
             )
         )
 
-        fill_rollout_buffer(
+        last_episode_done = fill_rollout_buffer(
             env_or_factory,
             agent_or_spec,
             None,
             rollout_buffer_no_value_bootstrap,
+            num_episodes,
             num_spawned_processes,
         )
 
         results.append(
             evaluate_returns_rollout_buffer(
-                rollout_buffer_no_value_bootstrap, agent.gamma, get_episode_length(env)
+                rollout_buffer_no_value_bootstrap,
+                agent.gamma,
+                get_episode_length(env),
+                last_episode_done,
             )
         )
 
@@ -122,6 +126,7 @@ def evaluate_returns_rollout_buffer(
     rollout_buffer_no_value_bootstrap: stable_baselines3.common.buffers.RolloutBuffer,
     discount_factor: float,
     episode_length: Optional[int],
+    last_episode_done: bool,
 ) -> ReturnEvaluationResult:
     episode_rewards_undiscounted = []
     episode_rewards_discounted = []
@@ -142,9 +147,7 @@ def evaluate_returns_rollout_buffer(
         curr_episode_length += 1
         curr_reward_undiscounted += reward
         curr_reward_discounted += discount_factor ** (curr_episode_length - 1) * reward
-    # Since there is no next transition in the buffer, we cannot know if the last episode is complete, so only add
-    # the episode if it has the maximum episode length.
-    if episode_length is not None and curr_episode_length == episode_length:
+    if last_episode_done:
         episode_rewards_undiscounted.append(curr_reward_undiscounted)
         episode_rewards_discounted.append(curr_reward_discounted)
     return ReturnEvaluationResult(

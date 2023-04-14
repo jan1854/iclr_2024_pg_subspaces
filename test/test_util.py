@@ -1,9 +1,10 @@
-from typing import Optional, Union
+from typing import Optional, Union, Any, Dict, Sequence
 
 import gym
 import numpy as np
 import pytest
 import stable_baselines3
+import torch
 from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
@@ -34,25 +35,28 @@ class DummyEnv(gym.Env):
     def __init__(self):
         super().__init__()
         self.counter = 0
-        self.max_step = 50
+        self.max_steps = [23, 50, 12, 9, 15]
         self.observation_space = gym.spaces.Box(
             np.zeros(1, dtype=np.float32), np.ones(1, dtype=np.float32)
         )
         self.action_space = gym.spaces.Box(
             -np.ones(1, dtype=np.float32), np.ones(1, dtype=np.float32)
         )
+        self.curr_episode = -1
 
     def step(self, action):
         self.counter += 1
+        done = self.counter == self.max_steps[self.curr_episode % len(self.max_steps)]
         return (
-            np.array([self.counter / self.max_step]),
+            np.array([self.counter / 50]),
             float(self.counter),
-            False,
+            done,
             {},
         )
 
     def reset(self):
         self.counter = 0
+        self.curr_episode += 1
         return np.zeros(1)
 
     def render(self, mode="human"):
@@ -65,7 +69,7 @@ def env_factory():
 
 class DummyAgentSpec(AgentSpec):
     def __init__(self, env):
-        super().__init__(None, None)
+        super().__init__("cpu", None, None)
         self.env = env
 
     def _create_agent(
@@ -73,6 +77,13 @@ class DummyAgentSpec(AgentSpec):
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
     ) -> stable_baselines3.ppo.PPO:
         return PPO("MlpPolicy", DummyVecEnv([lambda: self.env]), device="cpu", seed=42)
+
+    def copy_with_new_parameters(
+        self,
+        weights: Optional[Sequence[torch.Tensor]] = None,
+        agent_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> "DummyAgentSpec":
+        return DummyAgentSpec(self.env)
 
 
 def test_fill_rollout_buffer():
@@ -119,12 +130,25 @@ def test_evaluate_agent_returns():
     env = gym.wrappers.TimeLimit(DummyEnv(), 50)
     agent = PPO("MlpPolicy", DummyVecEnv([lambda: env]), device="cpu", seed=42)
 
-    eval_result_steps = evaluate_agent_returns(agent, env, num_steps=123)
-    eval_result_episodes = evaluate_agent_returns(agent, env, num_episodes=2)
-    gt_value_undiscounted = np.sum(np.arange(1, env.max_step + 1))
-    gt_value_discounted = np.sum(
-        agent.gamma ** np.arange(env.max_step) * np.arange(1, env.max_step + 1)
-    )
+    num_episodes = 4
+    num_steps = sum(env.max_steps[:num_episodes]) + 3
+    env = gym.wrappers.TimeLimit(DummyEnv(), 50)
+    eval_result_steps = evaluate_agent_returns(agent, env, num_steps=num_steps)
+    env = gym.wrappers.TimeLimit(DummyEnv(), 50)
+    eval_result_episodes = evaluate_agent_returns(agent, env, num_episodes=num_episodes)
+    gt_values_undiscounted = []
+    gt_values_discounted = []
+    for episode in range(num_episodes):
+        curr_max_step = env.max_steps[episode]
+        gt_values_undiscounted.append(np.sum(np.arange(1, curr_max_step + 1)))
+        gt_values_discounted.append(
+            np.sum(
+                agent.gamma ** np.arange(curr_max_step)
+                * np.arange(1, curr_max_step + 1)
+            )
+        )
+    gt_value_undiscounted = np.mean(gt_values_undiscounted)
+    gt_value_discounted = np.mean(gt_values_discounted)
 
     assert eval_result_steps.rewards_undiscounted.item() == pytest.approx(
         gt_value_undiscounted

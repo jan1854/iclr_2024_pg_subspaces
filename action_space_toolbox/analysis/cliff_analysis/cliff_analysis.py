@@ -105,7 +105,7 @@ class CliffAnalysis(Analysis):
                 agent.gamma,
             )
         )
-        fill_rollout_buffer(
+        last_episode_done = fill_rollout_buffer(
             self.env_factory,
             self.agent_spec,
             rollout_buffer_true_loss,
@@ -124,6 +124,7 @@ class CliffAnalysis(Analysis):
                 rollout_buffer_true_loss_no_value_bootstrap,
                 agent.gamma,
                 get_episode_length(self.env_factory()),
+                last_episode_done,
             )
             loss_checkpoint = evaluate_agent_losses(agent, rollout_buffer_true_loss)
 
