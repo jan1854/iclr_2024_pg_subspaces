@@ -43,7 +43,11 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                     ]
                 )
                 for algorithm_name, results_algo in results_id.items():
-                    for config_str, results_config in results_algo.items():
+                    # Sort the output but always put default as first item
+                    results_algo_items_sorted = [
+                        ("default", results_algo["default"])
+                    ] + sorted([r for r in results_algo.items() if r[0] != "default"])
+                    for config_str, results_config in results_algo_items_sorted:
                         reward_change_cliff = (
                             f"{np.mean(results_config['cliff']):.6f}"
                             if len(results_config["cliff"]) > 0
