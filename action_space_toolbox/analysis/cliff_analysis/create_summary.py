@@ -40,6 +40,8 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                         "Configuration",
                         "Rel. Reward change (cliff)",
                         "Rel. Reward change (no cliff)",
+                        "Std across checkpoints (cliff)",
+                        "Std across checkpoints (no cliff)",
                     ]
                 )
                 for algorithm_name, results_algo in results_id.items():
@@ -58,12 +60,24 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                             if len(results_config["no cliff"]) > 0
                             else "N/A"
                         )
+                        std_reward_change_cliff = (
+                            f"{np.std(results_config['cliff']):.6f}"
+                            if len(results_config["cliff"]) > 0
+                            else "N/A"
+                        )
+                        std_reward_change_no_cliff = (
+                            f"{np.std(results_config['no cliff']):.6f}"
+                            if len(results_config["no cliff"]) > 0
+                            else "N/A"
+                        )
                         csvwriter.writerow(
                             [
                                 algorithm_name,
                                 config_str,
                                 reward_change_cliff,
                                 reward_change_no_cliff,
+                                std_reward_change_cliff,
+                                std_reward_change_no_cliff,
                             ]
                         )
                 infofile.write(
