@@ -132,7 +132,7 @@ def fill_rollout_buffer(
 
     del env_steps
 
-    agent = maybe_create_agent(agent_or_spec)
+    agent = maybe_create_agent(agent_or_spec, maybe_create_env(env_or_factory))
     if final_next_obs is None:
         # In the case that we sampled exactly the required number of steps, the last step will be the end of an episode
         # (because we only sample full episodes). Therefore, the value argument is irrelevant (as it will be multiplied
@@ -264,7 +264,7 @@ def ppo_loss(
     :param rollout_data:
     :return:
     """
-    assert isinstance(agent, stable_baselines3.ppo.PPO)
+    assert isinstance(agent, stable_baselines3.ppo.PPO)  # TODO: Put this back in!
 
     # Compute current clip range
     clip_range = agent.clip_range(agent._current_progress_remaining)
@@ -340,6 +340,43 @@ def ppo_gradient(
     return combined_gradient, policy_gradient, value_function_gradient
 
 
+def a2c_loss(
+    agent: stable_baselines3.ppo.PPO,
+    rollout_data: stable_baselines3.common.buffers.RolloutBufferSamples,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    actions = rollout_data.actions
+
+    values, log_prob, entropy = agent.policy.evaluate_actions(
+        rollout_data.observations, actions
+    )
+    values = values.flatten()
+
+    # Normalize advantage (not present in the original implementation)
+    advantages = rollout_data.advantages
+    if agent.normalize_advantage:
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+    # Policy gradient loss
+    policy_loss = -(advantages * log_prob).mean()
+
+    # Value loss using the TD(gae_lambda) target
+    value_loss = F.mse_loss(rollout_data.returns, values)
+
+    # Entropy loss favor exploration
+    if entropy is None:
+        # Approximate entropy when no analytical form
+        entropy_loss = -torch.mean(-log_prob)
+    else:
+        entropy_loss = -torch.mean(entropy)
+
+    loss = policy_loss + agent.ent_coef * entropy_loss + agent.vf_coef * value_loss
+    return (
+        loss,
+        policy_loss + agent.ent_coef * entropy_loss,
+        agent.vf_coef * value_loss,
+    )
+
+
 def get_policy_parameters(agent: stable_baselines3.ppo.PPO) -> List[torch.nn.Parameter]:
     policy = agent.policy
     assert policy.share_features_extractor
@@ -410,3 +447,12 @@ def maybe_create_agent(
         return agent_or_spec.create_agent(env)
     else:
         return agent_or_spec
+
+
+def maybe_create_env(
+    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
+) -> gym.Env:
+    if isinstance(env_or_factory, gym.Env):
+        return env_or_factory
+    else:
+        return env_or_factory()

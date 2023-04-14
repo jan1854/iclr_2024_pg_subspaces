@@ -9,13 +9,14 @@ from typing import Optional
 import gym
 import hydra
 import omegaconf
+import stable_baselines3
 import torch
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import action_space_toolbox
-from action_space_toolbox.util.agent_spec import AgentSpec
+from action_space_toolbox.util.agent_spec import CheckpointAgentSpec
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 
 logger = logging.getLogger(__name__)
@@ -38,15 +39,24 @@ def analysis_worker(
     agent_checkpoint = (
         run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps"
     )
-    agent_spec = AgentSpec(agent_checkpoint, device)
+    agent_spec = CheckpointAgentSpec(
+        stable_baselines3.ppo.PPO, agent_checkpoint, device
+    )
     analysis = hydra.utils.instantiate(
         analysis_cfg,
         env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
         agent_spec=agent_spec,
         run_dir=run_dir,
     )
+    if hasattr(env, "base_env_timestep_factor"):
+        base_env_timestep_factor = env.base_env_timestep_factor
+    else:
+        logger.warning(
+            f"Environment does not have the base_env_timestep_factor attribute, assuming 1."
+        )
+        base_env_timestep_factor = 1
     return analysis.do_analysis(
-        agent_step * env.base_env_timestep_factor, overwrite_results, show_progress
+        agent_step * base_env_timestep_factor, overwrite_results, show_progress
     )
 
 
@@ -93,7 +103,13 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
     # Determine the base_env_timestep_factor to load the correct checkpoints
     train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
     env = gym.make(train_cfg.env, **train_cfg.env_args)
-    base_env_timestep_factor = env.base_env_timestep_factor
+    if hasattr(env, "base_env_timestep_factor"):
+        base_env_timestep_factor = env.base_env_timestep_factor
+    else:
+        logger.warning(
+            f"Environment does not have the base_env_timestep_factor attribute, assuming 1."
+        )
+        base_env_timestep_factor = 1
 
     jobs = []
     summary_writers = {}

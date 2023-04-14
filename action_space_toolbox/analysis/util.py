@@ -12,6 +12,7 @@ from action_space_toolbox.util.sb3_training import (
     ppo_loss,
     fill_rollout_buffer,
     maybe_create_agent,
+    a2c_loss,
 )
 
 
@@ -72,23 +73,23 @@ def evaluate_agent_returns(
     ],
     env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
     num_steps: Optional[int] = None,
-    num_epsiodes: Optional[int] = None,
+    num_episodes: Optional[int] = None,
     num_spawned_processes: Optional[int] = 0,
 ) -> ReturnEvaluationResult:
     assert (num_steps is not None) ^ (
-        num_epsiodes is not None
+        num_episodes is not None
     ), "Exactly one of num_steps or num_episodes must be specified."
     if isinstance(env_or_factory, Callable):
         env = env_or_factory()
     else:
         env = env_or_factory
-    if num_epsiodes is not None:
-        num_steps = num_epsiodes * get_episode_length(env)
+    if num_episodes is not None:
+        num_steps = num_episodes * get_episode_length(env)
     results = []
     if not isinstance(agents_or_specs, Iterable):
         agents_or_specs = [agents_or_specs]
     for agent_or_spec in agents_or_specs:
-        agent = maybe_create_agent(agent_or_spec)
+        agent = maybe_create_agent(agent_or_spec, env)
         rollout_buffer_no_value_bootstrap = (
             stable_baselines3.common.buffers.RolloutBuffer(
                 num_steps,
@@ -156,8 +157,8 @@ def evaluate_agent_losses(
     agents_or_specs: Union[
         AgentSpec,
         Sequence[AgentSpec],
-        stable_baselines3.ppo.PPO,
-        Sequence[stable_baselines3.ppo.PPO],
+        Union[stable_baselines3.ppo.PPO, stable_baselines3.a2c.A2C],
+        Union[Sequence[stable_baselines3.ppo.PPO], Sequence[stable_baselines3.a2c.A2C]],
     ],
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
 ) -> LossEvaluationResult:
@@ -169,16 +170,25 @@ def evaluate_agent_losses(
         agents_or_specs = [agents_or_specs]
     for agent_or_spec in agents_or_specs:
         agent = maybe_create_agent(agent_or_spec)
-        (
-            combined_loss,
-            policy_loss,
-            value_function_loss,
-            policy_ratio,
-        ) = ppo_loss(agent, next(rollout_buffer.get()))
+        if isinstance(agent, stable_baselines3.ppo.PPO):
+            (
+                combined_loss,
+                policy_loss,
+                value_function_loss,
+                policy_ratio,
+            ) = ppo_loss(agent, next(rollout_buffer.get()))
+            policy_ratios.append(policy_ratio.item())
+        elif isinstance(agent, stable_baselines3.a2c.A2C):
+            (
+                combined_loss,
+                policy_loss,
+                value_function_loss,
+            ) = a2c_loss(agent, next(rollout_buffer.get()))
+        else:
+            raise ValueError()
         combined_losses.append(combined_loss.item())
         policy_losses.append(policy_loss.item())
         value_function_losses.append(value_function_loss.item())
-        policy_ratios.append(policy_ratio.item())
     return LossEvaluationResult(
         np.array(policy_losses, dtype=np.float32),
         np.array(value_function_losses, dtype=np.float32),

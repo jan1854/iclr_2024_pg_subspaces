@@ -2,7 +2,8 @@ _target_: action_space_toolbox.analysis.cliff_analysis.cliff_analysis.CliffAnaly
 analysis_run_id: default
 num_processes: 1
 num_samples_true_gradient: 1_000_000
-num_steps_reward_eval: 200_000
+num_episodes_reward_eval: 1_000
+num_env_steps_training: 2048
 cliff_test_distance: 0.02     # TODO: Check that the original code actually uses 0.02 (as opposed to the paper, which says 0.04)
 alternate_agent_cfg: null
 algorithm_overrides:

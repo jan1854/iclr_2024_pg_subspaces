@@ -68,7 +68,7 @@ class DummyAgentSpec(AgentSpec):
         super().__init__(None, None)
         self.env = env
 
-    def create_agent(
+    def _create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
     ) -> stable_baselines3.ppo.PPO:
@@ -120,7 +120,7 @@ def test_evaluate_agent_returns():
     agent = PPO("MlpPolicy", DummyVecEnv([lambda: env]), device="cpu", seed=42)
 
     eval_result_steps = evaluate_agent_returns(agent, env, num_steps=123)
-    eval_result_episodes = evaluate_agent_returns(agent, env, num_epsiodes=2)
+    eval_result_episodes = evaluate_agent_returns(agent, env, num_episodes=2)
     gt_value_undiscounted = np.sum(np.arange(1, env.max_step + 1))
     gt_value_discounted = np.sum(
         agent.gamma ** np.arange(env.max_step) * np.arange(1, env.max_step + 1)

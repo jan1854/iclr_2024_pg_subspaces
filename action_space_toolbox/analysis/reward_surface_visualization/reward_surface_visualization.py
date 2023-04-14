@@ -170,7 +170,7 @@ class RewardSurfaceVisualization(Analysis):
                     weights_offsets[offset1_idx][offset2_idx] = weights_curr_offsets
 
             agent_specs = [
-                [self.agent_spec.copy_with_new_weights(weights) for weights in sublist]
+                [self.agent_spec.copy_with_new_parameters(weights) for weights in sublist]
                 for sublist in weights_offsets
             ]
 

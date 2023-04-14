@@ -1,11 +1,10 @@
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Callable, Any, Dict, Sequence, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 import filelock
 import gym
-import hydra.utils
 import numpy as np
 import omegaconf
 import stable_baselines3
@@ -22,7 +21,7 @@ from action_space_toolbox.analysis.util import (
     evaluate_agent_losses,
     LossEvaluationResult,
 )
-from action_space_toolbox.util.agent_spec import AgentSpec
+from action_space_toolbox.util.agent_spec import AgentSpec, HydraAgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import (
     ppo_gradient,
@@ -43,7 +42,8 @@ class CliffAnalysis(Analysis):
         run_dir: Path,
         num_processes: int,
         num_samples_true_gradient: int,
-        num_steps_reward_eval: int,  # TODO: The cliff diving paper appears to use 1000 episodes
+        num_episodes_reward_eval: int,
+        num_env_steps_training: int,
         cliff_test_distance: float,
         alternate_agent_cfg: Optional[str],
         algorithm_overrides: Dict[str, Sequence[Dict[str, Any]]],
@@ -57,7 +57,8 @@ class CliffAnalysis(Analysis):
             num_processes,
         )
         self.num_samples_true_gradient = num_samples_true_gradient
-        self.num_steps_reward_eval = num_steps_reward_eval
+        self.num_episodes_reward_eval = num_episodes_reward_eval
+        self.num_env_steps_training = num_env_steps_training
         self.cliff_test_distance = cliff_test_distance
         self.results_dir = run_dir / "analyses" / "cliff_analysis" / analysis_run_id
         self.results_dir.mkdir(parents=True, exist_ok=True)
@@ -130,13 +131,13 @@ class CliffAnalysis(Analysis):
                 p + self.cliff_test_distance * g
                 for p, g in zip(agent.policy.parameters(), normalized_gradient)
             ]
-            cliff_test_agent_spec = self.agent_spec.copy_with_new_weights(
+            cliff_test_agent_spec = self.agent_spec.copy_with_new_parameters(
                 cliff_test_parameters
             )
             reward_cliff_test = evaluate_agent_returns(
                 cliff_test_agent_spec,
                 self.env_factory,
-                self.num_steps_reward_eval,
+                num_episodes=self.num_episodes_reward_eval,
             )
             loss_cliff_test = evaluate_agent_losses(
                 cliff_test_agent_spec, rollout_buffer_true_loss
@@ -156,15 +157,23 @@ class CliffAnalysis(Analysis):
         curr_results = results[env_step]
 
         agent_names = ["ppo"]
-        agents_spec_or_omegaconf = [self.agent_spec]
+        agent_specs = [self.agent_spec]
         if self.alternate_agent_cfg is not None:
             agent_names.append(self.alternate_agent_cfg.name)
-            agents_spec_or_omegaconf.append(self.alternate_agent_cfg)
-        for name, spec_or_omegaconf in zip(agent_names, agents_spec_or_omegaconf):
+            agent_specs.append(
+                HydraAgentSpec(
+                    self.alternate_agent_cfg,
+                    self.agent_spec.device,
+                    self.agent_spec.checkpoint_path,
+                )
+            )
+        for name, agent_spec in zip(agent_names, agent_specs):
             if name not in curr_results:
                 curr_results[name] = {}
             curr_results = curr_results[name]
-            overrides = [{}] + list(self.algorithm_overrides["ppo"])
+            overrides = [{}] + list(
+                omegaconf.OmegaConf.to_container(self.algorithm_overrides[name])
+            )
             for curr_overrides in overrides:
                 if overwrite_results or self._overrides_to_str(
                     curr_overrides
@@ -173,7 +182,7 @@ class CliffAnalysis(Analysis):
                         loss_after_update,
                         reward_after_update,
                     ) = self.evaluate_agent_overrides(
-                        spec_or_omegaconf,
+                        agent_spec,
                         curr_overrides,
                         rollout_buffer_true_loss,
                     )
@@ -190,46 +199,33 @@ class CliffAnalysis(Analysis):
         # TODO: Dump agent config somewhere
         # TODO: Should be parallelized (at least put stuff on a separate process to avoid clogging the main process)
         # TODO: Record also the loss of the alternate agent (at the checkpoint and test location?)
+        # TODO: Missing the 10 trials of the paper
 
         # Dict env_step (maybe also store the parameters of the analysis somewhere?) -->
         # cliff result, performance drop, reward_checkpoint, reward_cliff_test (discounted, undiscounted), losses
         # Maybe already add support for logging stuff like the learning rate and number of steps (since that is varied in the paper)
         #   --> The paper also does not use 32 steps, but rather 128 and 2048 (128 due to hyperparameters?)
-        # If we already know that this location is a cliff, we do not need to check it again
 
         return TensorboardLogs()
 
     def evaluate_agent_overrides(
         self,
-        agent_spec_or_omegaconf: Union[AgentSpec, omegaconf.OmegaConf],
+        agent_spec: AgentSpec,
         overrides: Dict[str, Any],
         rollout_buffer_true_loss: stable_baselines3.common.buffers.RolloutBuffer,
     ) -> Tuple[LossEvaluationResult, ReturnEvaluationResult]:
-        # TODO: This should be unified by allowing non-PPO agents in AgentSpec
-        if isinstance(agent_spec_or_omegaconf, AgentSpec):
-            agent_spec_overrides = AgentSpec(
-                self.agent_spec.checkpoint_path,
-                self.agent_spec.device,
-                self.agent_spec.override_weights,
-                {**self.agent_spec.agent_kwargs, **overrides},
-            )
-            agent = agent_spec_overrides.create_agent(self.env_factory())
-        else:
-            cfg_overrides = omegaconf.OmegaConf.merge(
-                agent_spec_or_omegaconf, overrides
-            )
-            agent = hydra.utils.instantiate(
-                cfg_overrides.algorithm, env=self.env_factory()
-            )
-        # TODO: This should be changed! --> Put it into the config?
-        agent.learn(2048)
+        agent_spec_overrides = agent_spec.copy_with_new_parameters(
+            agent_kwargs=agent_spec.agent_kwargs | overrides
+        )
+
+        agent = agent_spec_overrides.create_agent(self.env_factory())
+        agent.learn(self.num_env_steps_training)
 
         loss_after_update = evaluate_agent_losses(agent, rollout_buffer_true_loss)
         reward_after_update = evaluate_agent_returns(
-            # TODO: This does not work for the alternate agent since it is not specified by an AgentSpec. Unify agent creation in AgentSpec!
             agent_spec_overrides,
             self.env_factory,
-            self.num_steps_reward_eval,
+            num_episodes=self.num_episodes_reward_eval,
             num_spawned_processes=self.num_processes,
         )
 
@@ -275,6 +271,7 @@ class CliffAnalysis(Analysis):
             curr_results["loss_cliff_test"] = {
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(loss_cliff_test).items()
+                if len(v) > 0
             }
             with self.results_file.open("w") as f:
                 yaml.dump(results, f)
@@ -312,6 +309,7 @@ class CliffAnalysis(Analysis):
             curr_results["loss_update"] = {
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(loss_after_update).items()
+                if len(v) > 0
             }
             with self.results_file.open("w") as f:
                 yaml.dump(results, f)

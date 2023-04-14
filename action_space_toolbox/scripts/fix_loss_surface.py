@@ -7,6 +7,7 @@ from pathlib import Path
 import gym
 import hydra
 import numpy as np
+import stable_baselines3
 import torch
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
@@ -18,7 +19,7 @@ from action_space_toolbox.analysis.reward_surface_visualization.plotting import 
 from action_space_toolbox.analysis.reward_surface_visualization.reward_surface_visualization import (
     RewardSurfaceVisualization,
 )
-from action_space_toolbox.util.agent_spec import AgentSpec
+from action_space_toolbox.util.agent_spec import CheckpointAgentSpec
 
 parser = ArgumentParser()
 parser.add_argument("logdir", type=str)
@@ -68,7 +69,8 @@ for env_dir in tqdm(log_dir.iterdir()):
                         / "checkpoints"
                         / f"{train_cfg.algorithm.name}_{agent_step}_steps"
                     )
-                    agent_spec = AgentSpec(
+                    agent_spec = CheckpointAgentSpec(
+                        stable_baselines3.ppo.PPO,
                         agent_checkpoint,
                         device,
                         agent_kwargs={"tensorboard_log": None},

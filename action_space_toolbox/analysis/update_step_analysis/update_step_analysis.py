@@ -307,11 +307,11 @@ class UpdateStepAnalysis(Analysis):
         env = env_factory()
         for _ in range(num_update_trajectories):
             update_trajectory = update_trajectory_sampler()
-            agent_spec_single_step = agent_spec.copy_with_new_weights(
+            agent_spec_single_step = agent_spec.copy_with_new_parameters(
                 update_trajectory[0]
             )
             agent_single_step = agent_spec_single_step.create_agent()
-            agent_spec_trajectory = agent_spec.copy_with_new_weights(
+            agent_spec_trajectory = agent_spec.copy_with_new_parameters(
                 update_trajectory[-1]
             )
             agent_trajectory = agent_spec_trajectory.create_agent()
@@ -328,14 +328,14 @@ class UpdateStepAnalysis(Analysis):
                 evaluate_agent_returns(
                     [agent_single_step],
                     env,
-                    num_epsiodes=num_evaluation_episodes,
+                    num_episodes=num_evaluation_episodes,
                 )
             )
             results_return_trajectory.append(
                 evaluate_agent_returns(
                     [agent_trajectory],
                     env,
-                    num_epsiodes=num_evaluation_episodes,
+                    num_episodes=num_evaluation_episodes,
                 )
             )
         results_loss_single_step = LossEvaluationResult.concatenate(
