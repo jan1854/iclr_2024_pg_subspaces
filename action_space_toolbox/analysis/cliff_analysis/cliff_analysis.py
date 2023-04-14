@@ -42,6 +42,7 @@ class CliffAnalysis(Analysis):
         run_dir: Path,
         num_processes: int,
         num_samples_true_gradient: int,
+        num_trials: int,
         num_episodes_reward_eval: int,
         num_env_steps_training: int,
         cliff_test_distance: float,
@@ -57,6 +58,7 @@ class CliffAnalysis(Analysis):
             num_processes,
         )
         self.num_samples_true_gradient = num_samples_true_gradient
+        self.num_trials = num_trials
         self.num_episodes_reward_eval = num_episodes_reward_eval
         self.num_env_steps_training = num_env_steps_training
         self.cliff_test_distance = cliff_test_distance
@@ -206,12 +208,6 @@ class CliffAnalysis(Analysis):
         # TODO: Should probably also compute the performance gain for ground truth gradient steps
         # TODO: Dump agent config somewhere
         # TODO: Should be parallelized (at least put stuff on a separate process to avoid clogging the main process)
-        # TODO: Missing the 10 trials of the paper
-
-        # Dict env_step (maybe also store the parameters of the analysis somewhere?) -->
-        # cliff result, performance drop, reward_checkpoint, reward_cliff_test (discounted, undiscounted), losses
-        # Maybe already add support for logging stuff like the learning rate and number of steps (since that is varied in the paper)
-        #   --> The paper also does not use 32 steps, but rather 128 and 2048 (128 due to hyperparameters?)
 
         return TensorboardLogs()
 
@@ -225,12 +221,21 @@ class CliffAnalysis(Analysis):
             agent_kwargs=agent_spec.agent_kwargs | overrides
         )
 
-        agent = agent_spec_overrides.create_agent(self.env_factory())
-        agent.learn(self.num_env_steps_training)
+        agent_specs_after_update = []
+        for _ in range(self.num_trials):
+            agent = agent_spec_overrides.create_agent(self.env_factory())
+            agent.learn(self.num_env_steps_training)
+            agent_specs_after_update.append(
+                agent_spec_overrides.copy_with_new_parameters(
+                    weights=list(agent.policy.parameters())
+                )
+            )
 
-        loss_after_update = evaluate_agent_losses(agent, rollout_buffer_true_loss)
+        loss_after_update = evaluate_agent_losses(
+            agent_specs_after_update, rollout_buffer_true_loss
+        )
         reward_after_update = evaluate_agent_returns(
-            agent_spec_overrides,
+            agent_specs_after_update,
             self.env_factory,
             num_episodes=self.num_episodes_reward_eval,
             num_spawned_processes=self.num_processes,
@@ -317,11 +322,11 @@ class CliffAnalysis(Analysis):
                 curr_results[overrides_str] = {}
             curr_results = curr_results[overrides_str]
             curr_results["reward_update"] = {
-                k: np.mean(v).item()
+                k: v.tolist()
                 for k, v in dataclasses.asdict(reward_after_update).items()
             }
             curr_results["loss_update"] = {
-                k: np.mean(v).item()
+                k: v.tolist()
                 for k, v in dataclasses.asdict(loss_after_update).items()
                 if len(v) > 0
             }

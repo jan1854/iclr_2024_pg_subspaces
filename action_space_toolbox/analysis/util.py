@@ -145,8 +145,10 @@ def evaluate_returns_rollout_buffer(
             curr_reward_discounted = 0.0
             curr_reward_undiscounted = 0.0
         curr_episode_length += 1
-        curr_reward_undiscounted += reward
-        curr_reward_discounted += discount_factor ** (curr_episode_length - 1) * reward
+        curr_reward_undiscounted += reward.item()
+        curr_reward_discounted += (
+            discount_factor ** (curr_episode_length - 1) * reward.item()
+        )
     if last_episode_done:
         episode_rewards_undiscounted.append(curr_reward_undiscounted)
         episode_rewards_discounted.append(curr_reward_discounted)

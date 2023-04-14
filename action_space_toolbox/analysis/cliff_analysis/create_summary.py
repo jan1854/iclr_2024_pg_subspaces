@@ -6,7 +6,7 @@ from typing import Dict, Any, Sequence
 import numpy as np
 import yaml
 
-from action_space_toolbox.util.metrics import relative_difference
+from action_space_toolbox.util.metrics import mean_relative_difference
 
 
 def cliff_criterion(
@@ -143,9 +143,13 @@ def create_summary(experiment_dir: Path) -> None:
                             is_cliff_str = "cliff" if is_cliff else "no cliff"
                             if is_cliff_str not in update_reward_changes_config:
                                 update_reward_changes_config[is_cliff_str] = []
-                            curr_reward_change = relative_difference(
+                            curr_reward_change = mean_relative_difference(
                                 reward_checkpoint,
-                                config_results["reward_update"]["rewards_undiscounted"],
+                                np.array(
+                                    config_results["reward_update"][
+                                        "rewards_undiscounted"
+                                    ]
+                                ),
                             )
                             update_reward_changes_config[is_cliff_str].append(
                                 curr_reward_change
