@@ -1,0 +1,18 @@
+name: "a2c"
+
+algorithm:
+  _target_: stable_baselines3.A2C
+  policy: "MlpPolicy"
+  device: "auto"
+  ent_coef: 0.0
+  max_grad_norm: 0.5
+  n_steps: 8
+  gae_lambda: 0.9
+  vf_coef: 0.4
+  gamma: 0.99
+  use_rms_prop: True
+  normalize_advantage: False
+  learning_rate: 1.90609e-05 # TODO: Should be: lin_0.00096 (current value is copied from PPO)
+
+training:
+  steps: 10_000_000
