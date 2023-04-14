@@ -126,30 +126,48 @@ class CliffAnalysis(Analysis):
                 get_episode_length(self.env_factory()),
                 last_episode_done,
             )
-            loss_checkpoint = evaluate_agent_losses(agent, rollout_buffer_true_loss)
+
+            agent_names = ["ppo"]
+            agent_specs = [self.agent_spec]
+            if self.alternate_agent_cfg is not None:
+                agent_names.append(self.alternate_agent_cfg.name)
+                agent_specs.append(
+                    HydraAgentSpec(
+                        self.alternate_agent_cfg,
+                        self.agent_spec.device,
+                        self.env_factory,
+                        self.agent_spec.checkpoint_path,
+                    )
+                )
+
+            losses_checkpoint = {
+                name: evaluate_agent_losses(agent_spec, rollout_buffer_true_loss)
+                for name, agent_spec in zip(agent_names, agent_specs)
+            }
 
             cliff_test_parameters = [
                 p + self.cliff_test_distance * g
                 for p, g in zip(agent.policy.parameters(), normalized_gradient)
             ]
-            cliff_test_agent_spec = self.agent_spec.copy_with_new_parameters(
-                cliff_test_parameters
-            )
             reward_cliff_test = evaluate_agent_returns(
-                cliff_test_agent_spec,
+                self.agent_spec.copy_with_new_parameters(cliff_test_parameters),
                 self.env_factory,
                 num_episodes=self.num_episodes_reward_eval,
             )
-            loss_cliff_test = evaluate_agent_losses(
-                cliff_test_agent_spec, rollout_buffer_true_loss
-            )
+            losses_cliff_test = {
+                name: evaluate_agent_losses(
+                    agent_spec.copy_with_new_parameters(cliff_test_parameters),
+                    rollout_buffer_true_loss,
+                )
+                for name, agent_spec in zip(agent_names, agent_specs)
+            }
 
             self.dump_pre_update_results(
                 env_step,
                 reward_checkpoint,
-                loss_checkpoint,
+                losses_checkpoint,
                 reward_cliff_test,
-                loss_cliff_test,
+                losses_cliff_test,
                 overwrite_results,
             )
 
@@ -157,17 +175,6 @@ class CliffAnalysis(Analysis):
             results[env_step] = {}
         curr_results = results[env_step]
 
-        agent_names = ["ppo"]
-        agent_specs = [self.agent_spec]
-        if self.alternate_agent_cfg is not None:
-            agent_names.append(self.alternate_agent_cfg.name)
-            agent_specs.append(
-                HydraAgentSpec(
-                    self.alternate_agent_cfg,
-                    self.agent_spec.device,
-                    self.agent_spec.checkpoint_path,
-                )
-            )
         for name, agent_spec in zip(agent_names, agent_specs):
             if name not in curr_results:
                 curr_results[name] = {}
@@ -199,7 +206,6 @@ class CliffAnalysis(Analysis):
         # TODO: Should probably also compute the performance gain for ground truth gradient steps
         # TODO: Dump agent config somewhere
         # TODO: Should be parallelized (at least put stuff on a separate process to avoid clogging the main process)
-        # TODO: Record also the loss of the alternate agent (at the checkpoint and test location?)
         # TODO: Missing the 10 trials of the paper
 
         # Dict env_step (maybe also store the parameters of the analysis somewhere?) -->
@@ -236,9 +242,9 @@ class CliffAnalysis(Analysis):
         self,
         env_step: int,
         reward_checkpoint: ReturnEvaluationResult,
-        loss_checkpoint: LossEvaluationResult,
+        losses_checkpoint: Dict[str, LossEvaluationResult],
         reward_cliff_test: ReturnEvaluationResult,
-        loss_cliff_test: LossEvaluationResult,
+        losses_cliff_test: Dict[str, LossEvaluationResult],
         override: bool,
     ):
         lock = filelock.FileLock(
@@ -261,18 +267,25 @@ class CliffAnalysis(Analysis):
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(reward_checkpoint).items()
             }
-            curr_results["loss_checkpoint"] = {
-                k: np.mean(v).item()
-                for k, v in dataclasses.asdict(loss_checkpoint).items()
+            curr_results["losses_checkpoint"] = {
+                name: {
+                    k: np.mean(v).item()
+                    for k, v in dataclasses.asdict(loss).items()
+                    if len(v) > 0
+                }
+                for name, loss in losses_checkpoint.items()
             }
             curr_results["reward_cliff_test"] = {
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(reward_cliff_test).items()
             }
             curr_results["loss_cliff_test"] = {
-                k: np.mean(v).item()
-                for k, v in dataclasses.asdict(loss_cliff_test).items()
-                if len(v) > 0
+                name: {
+                    k: np.mean(v).item()
+                    for k, v in dataclasses.asdict(loss).items()
+                    if len(v) > 0
+                }
+                for name, loss in losses_cliff_test.items()
             }
             with self.results_file.open("w") as f:
                 yaml.dump(results, f)

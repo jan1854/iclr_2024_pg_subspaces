@@ -1,6 +1,6 @@
 import abc
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Union, Type, TypeVar
+from typing import Any, Dict, Optional, Sequence, Union, Type, TypeVar, Callable
 
 import gym
 import hydra.utils
@@ -106,6 +106,7 @@ class HydraAgentSpec(AgentSpec):
         self,
         agent_cfg: omegaconf.DictConfig,
         device: Union[str, torch.device],
+        env_factory: Callable[[], gym.Env],
         weights_checkpoint_path: Optional[Path],
         override_weights: Optional[Sequence[torch.Tensor]] = None,
         agent_kwargs: Dict[str, Any] = None,
@@ -113,26 +114,15 @@ class HydraAgentSpec(AgentSpec):
         super().__init__(device, override_weights, agent_kwargs)
         self.agent_cfg = agent_cfg
         self.device = device
+        self.env_factory = env_factory
         self.weights_checkpoint_path = weights_checkpoint_path
 
     def _create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
     ) -> SB3Agent:
-        if self.weights_checkpoint_path is not None:
-            agent_class = hydra.utils.get_class(self.agent_cfg.algorithm["_target_"])
-            agent_checkpoint = agent_class.load(
-                self.weights_checkpoint_path, env, self.device
-            )
-        else:
-            agent_checkpoint = None
-
-        if env is None and agent_checkpoint is not None:
-            env = agent_checkpoint.env
-
-        assert (
-            env is not None
-        ), "To instantiate an agent either pass an environment or a checkpoint from which to extract the environment."
+        if env is None:
+            env = self.env_factory()
 
         agent = hydra.utils.instantiate(
             self.agent_cfg.algorithm,
@@ -141,7 +131,11 @@ class HydraAgentSpec(AgentSpec):
             device=self.device,
             **self.agent_kwargs
         )
-        if agent_checkpoint is not None:
+        if self.weights_checkpoint_path is not None:
+            agent_class = hydra.utils.get_class(self.agent_cfg.algorithm["_target_"])
+            agent_checkpoint = agent_class.load(
+                self.weights_checkpoint_path, env, self.device
+            )
             self._set_weights(agent, agent_checkpoint.policy.parameters())
 
         return agent
@@ -158,6 +152,7 @@ class HydraAgentSpec(AgentSpec):
         return HydraAgentSpec(
             self.agent_cfg,
             self.device,
+            self.env_factory,
             self.weights_checkpoint_path,
             weights,
             agent_kwargs,
