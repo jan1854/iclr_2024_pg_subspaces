@@ -1,7 +1,7 @@
 import argparse
 import csv
 from pathlib import Path
-from typing import Dict, Any, Sequence
+from typing import Any, Dict, Sequence
 
 import numpy as np
 import yaml
@@ -45,12 +45,12 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                 for algorithm_name, results_algo in results_id.items():
                     for config_str, results_config in results_algo.items():
                         reward_change_cliff = (
-                            np.mean(results_config["cliff"])
+                            f"{np.mean(results_config['cliff']):.6f}"
                             if len(results_config["cliff"]) > 0
                             else "N/A"
                         )
                         reward_change_no_cliff = (
-                            np.mean(results_config["no cliff"])
+                            f"{np.mean(results_config['no cliff']):.6f}"
                             if len(results_config["no cliff"]) > 0
                             else "N/A"
                         )
@@ -74,8 +74,13 @@ def append_sequence_dicts(dicts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         keys.update(d.keys())
     results = {}
     for key in keys:
-        if isinstance(dicts[0][key], Dict):
-            results[key] = append_sequence_dicts([d[key] for d in dicts])
+        value_type = None
+        for d in dicts:
+            if key in d:
+                value_type = type(d[key])
+                break
+        if value_type is dict:
+            results[key] = append_sequence_dicts([d[key] for d in dicts if key in d])
         else:
             new_result = []
             for d in dicts:
