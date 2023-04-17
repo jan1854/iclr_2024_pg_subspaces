@@ -1,6 +1,6 @@
+import concurrent.futures
 import functools
 import logging
-import multiprocessing.pool
 import re
 import subprocess
 from pathlib import Path
@@ -153,22 +153,20 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             )
             logs.log(summary_writers[log_dir])
     else:
-        with multiprocessing.pool.ThreadPool(cfg.num_workers) as pool:
+        with concurrent.futures.ProcessPoolExecutor(
+            cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
+        ) as pool:
             results = []
             for log_dir, agent_step in jobs:
                 results.append(
-                    pool.apply_async(
+                    pool.submit(
                         analysis_worker,
-                        args=(
-                            cfg.analysis,
-                            log_dir,
-                            agent_step,
-                            cfg.device,
-                            cfg.overwrite_results,
-                        ),
-                        kwds=dict(
-                            show_progress=False,
-                        ),
+                        cfg.analysis,
+                        log_dir,
+                        agent_step,
+                        cfg.device,
+                        cfg.overwrite_results,
+                        show_progress=False,
                     )
                 )
             for result, (log_dir, agent_step) in tqdm(
@@ -176,7 +174,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
                 total=len(jobs),
                 desc="Analyzing logs",
             ):
-                logs = result.get()
+                logs = result.result()
                 logs.log(summary_writers[log_dir])
 
     if cfg.sync_train_logs:

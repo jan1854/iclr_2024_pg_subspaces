@@ -57,7 +57,6 @@ class RewardSurfaceVisualization(Analysis):
             env_factory,
             agent_spec,
             run_dir,
-            num_processes,
         )
         self.grid_size = grid_size
         self.magnitude = magnitude
@@ -93,7 +92,6 @@ class RewardSurfaceVisualization(Analysis):
 
     def _do_analysis(
         self,
-        process_pool: torch.multiprocessing.Pool,
         env_step: int,
         logs: TensorboardLogs,
         overwrite_results: bool,
@@ -170,7 +168,10 @@ class RewardSurfaceVisualization(Analysis):
                     weights_offsets[offset1_idx][offset2_idx] = weights_curr_offsets
 
             agent_specs = [
-                [self.agent_spec.copy_with_new_parameters(weights) for weights in sublist]
+                [
+                    self.agent_spec.copy_with_new_parameters(weights)
+                    for weights in sublist
+                ]
                 for sublist in weights_offsets
             ]
 
@@ -178,39 +179,42 @@ class RewardSurfaceVisualization(Analysis):
                 agent_spec for sublist in agent_specs for agent_spec in sublist
             ]
 
-            reward_surface_results_iter = process_pool.imap(
-                functools.partial(
-                    evaluate_agent_returns,
-                    env_or_factory=self.env_factory,
-                    num_steps=self.num_steps,
-                ),
-                [[agent_spec] for agent_spec in agent_specs_flat],
-            )
-
-            loss_surface_results = evaluate_agent_losses(
-                agent_specs_flat, rollout_buffer_true_loss
-            ).reshape(self.grid_size, self.grid_size)
-
-            (
-                projected_optimizer_steps,
-                projected_sgd_steps,
-                projected_optimizer_steps_true_grad,
-                projected_sgd_steps_true_grad,
-            ) = self.sample_projected_update_trajectories(
-                direction1,
-                direction2,
-                max(10, self.max_gradient_trajectories),
-                rollout_buffer_true_loss,
-            )
-
-            reward_surface_results_flat = [
-                r
-                for r in tqdm(
-                    reward_surface_results_iter,
-                    disable=not show_progress,
-                    total=self.grid_size**2,
+            with torch.multiprocessing.get_context("spawn").Pool(
+                self.num_processes
+            ) as process_pool:
+                reward_surface_results_iter = process_pool.imap(
+                    functools.partial(
+                        evaluate_agent_returns,
+                        env_or_factory=self.env_factory,
+                        num_steps=self.num_steps,
+                    ),
+                    [[agent_spec] for agent_spec in agent_specs_flat],
                 )
-            ]
+
+                loss_surface_results = evaluate_agent_losses(
+                    agent_specs_flat, rollout_buffer_true_loss
+                ).reshape(self.grid_size, self.grid_size)
+
+                (
+                    projected_optimizer_steps,
+                    projected_sgd_steps,
+                    projected_optimizer_steps_true_grad,
+                    projected_sgd_steps_true_grad,
+                ) = self.sample_projected_update_trajectories(
+                    direction1,
+                    direction2,
+                    max(10, self.max_gradient_trajectories),
+                    rollout_buffer_true_loss,
+                )
+
+                reward_surface_results_flat = [
+                    r
+                    for r in tqdm(
+                        reward_surface_results_iter,
+                        disable=not show_progress,
+                        total=self.grid_size**2,
+                    )
+                ]
 
             plot_info = {
                 "env_name": agent.env.get_attr("spec")[0].id,
@@ -310,21 +314,16 @@ class RewardSurfaceVisualization(Analysis):
                     plot_info | {"data": -loss_surface_results.combined_losses}, f
                 )
 
-            # Plotting needs to happen in a separate process since matplotlib is not thread safe (see
-            # https://matplotlib.org/3.1.0/faq/howto_faq.html#working-with-threads)
             logs.update(
-                process_pool.apply(
-                    functools.partial(
-                        plot_results,
-                        self.out_dir,
-                        step=env_step,
-                        plot_num=plot_num,
-                        overwrite=overwrite_results,
-                        plot_sgd_steps=self.plot_sgd_steps,
-                        plot_true_gradient_steps=self.plot_true_gradient_steps,
-                        max_gradient_trajectories=self.max_gradient_trajectories,
-                        max_steps_per_gradient_trajectory=self.max_steps_per_gradient_trajectory,
-                    )
+                plot_results(
+                    self.out_dir,
+                    step=env_step,
+                    plot_num=plot_num,
+                    overwrite=overwrite_results,
+                    plot_sgd_steps=self.plot_sgd_steps,
+                    plot_true_gradient_steps=self.plot_true_gradient_steps,
+                    max_gradient_trajectories=self.max_gradient_trajectories,
+                    max_steps_per_gradient_trajectory=self.max_steps_per_gradient_trajectory,
                 )
             )
         return logs

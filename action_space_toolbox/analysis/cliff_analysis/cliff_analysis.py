@@ -40,7 +40,6 @@ class CliffAnalysis(Analysis):
         env_factory: Callable[[], gym.Env],
         agent_spec: AgentSpec,
         run_dir: Path,
-        num_processes: int,
         num_samples_true_gradient: int,
         num_trials: int,
         num_episodes_reward_eval: int,
@@ -55,7 +54,6 @@ class CliffAnalysis(Analysis):
             env_factory,
             agent_spec,
             run_dir,
-            num_processes,
         )
         self.num_samples_true_gradient = num_samples_true_gradient
         self.num_trials = num_trials
@@ -81,7 +79,6 @@ class CliffAnalysis(Analysis):
 
     def _do_analysis(
         self,
-        process_pool: torch.multiprocessing.Pool,
         env_step: int,
         logs: TensorboardLogs,
         overwrite_results: bool,
@@ -112,7 +109,6 @@ class CliffAnalysis(Analysis):
             self.agent_spec,
             rollout_buffer_true_loss,
             rollout_buffer_true_loss_no_value_bootstrap,
-            num_spawned_processes=self.num_processes,
         )
 
         results = self._read_results_file()
@@ -238,7 +234,6 @@ class CliffAnalysis(Analysis):
             agent_specs_after_update,
             self.env_factory,
             num_episodes=self.num_episodes_reward_eval,
-            num_spawned_processes=self.num_processes,
         )
 
         return loss_after_update, reward_after_update

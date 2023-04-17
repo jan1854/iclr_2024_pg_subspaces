@@ -1,6 +1,5 @@
 _target_: action_space_toolbox.analysis.cliff_analysis.cliff_analysis.CliffAnalysis
 analysis_run_id: default
-num_processes: 1
 num_samples_true_gradient: 1_000_000
 num_trials: 10
 num_episodes_reward_eval: 1_000

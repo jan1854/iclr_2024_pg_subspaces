@@ -50,7 +50,6 @@ class GradientAnalysis(Analysis):
             env_factory,
             agent_spec,
             run_dir,
-            num_processes=1,
         )
         samples_different_gradient_estimates = np.asarray(
             samples_different_gradient_estimates
@@ -80,18 +79,10 @@ class GradientAnalysis(Analysis):
 
     def _do_analysis(
         self,
-        process_pool: torch.multiprocessing.Pool,
         env_step: int,
         logs: TensorboardLogs,
         overwrite_results: bool,
         show_progress: bool,
-    ) -> TensorboardLogs:
-        return process_pool.apply(
-            functools.partial(self.analysis_worker, env_step, logs, show_progress)
-        )
-
-    def analysis_worker(
-        self, env_step: int, logs: TensorboardLogs, show_progress: bool
     ) -> TensorboardLogs:
         agent = self.agent_spec.create_agent(self.env_factory())
         env = DummyVecEnv([self.env_factory])

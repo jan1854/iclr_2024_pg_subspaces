@@ -44,7 +44,6 @@ class UpdateStepAnalysis(Analysis):
             env_factory,
             agent_spec,
             run_dir,
-            num_processes=1,
         )
         self.num_steps_true_loss = num_steps_true_loss
         self.num_steps_evaluation = num_updates_evaluation
@@ -53,7 +52,6 @@ class UpdateStepAnalysis(Analysis):
 
     def _do_analysis(
         self,
-        process_pool: torch.multiprocessing.Pool,
         env_step: int,
         logs: TensorboardLogs,
         overwrite_results: bool,
@@ -85,7 +83,6 @@ class UpdateStepAnalysis(Analysis):
             self.agent_spec,
             rollout_buffer_true_loss,
             rollout_buffer_curr_policy_eval,
-            self.num_processes,
         )
 
         len_update_trajectory = agent.n_steps * agent.n_envs // agent.batch_size
@@ -104,7 +101,6 @@ class UpdateStepAnalysis(Analysis):
             self.agent_spec,
             rollout_buffer_agent,
             None,
-            self.num_processes,
         )
 
         return_curr_policy = evaluate_returns_rollout_buffer(
@@ -140,61 +136,48 @@ class UpdateStepAnalysis(Analysis):
             repeat_data=True,
         )
 
-        analysis_results_agent = process_pool.apply_async(
-            self.update_step_analysis_worker,
-            (
-                self.num_updates_evaluation,
-                1,
-                self.agent_spec,
-                sample_update_trajectory_agent,
-                rollout_buffer_true_loss,
-                self.env_factory,
-            ),
-        )
-        analysis_results_random = process_pool.apply_async(
-            self.update_step_analysis_worker,
-            (
-                self.num_updates_evaluation,
-                1,
-                self.agent_spec,
-                sample_update_trajectory_random,
-                rollout_buffer_true_loss,
-                self.env_factory,
-            ),
-        )
-        # For the other agent and random configurations, we evaluate self.num_updates_evaluation updates for one
-        # episode. Since we only have one "true gradient" update, we evaluate this update for
-        # self.num_updates_evaluation episodes (to get the same total number of evaluation episodes).
-        analysis_results_true_loss = process_pool.apply_async(
-            self.update_step_analysis_worker,
-            (
-                1,
-                self.num_updates_evaluation,
-                self.agent_spec,
-                sample_update_trajectory_true_loss,
-                rollout_buffer_true_loss,
-                self.env_factory,
-            ),
-        )
-
         (
             loss_single_step_agent,
             returns_single_step_agent,
             loss_trajectory_agent,
             returns_trajectory_agent,
-        ) = analysis_results_agent.get()
+        ) = self.update_step_analysis_worker(
+            self.num_updates_evaluation,
+            1,
+            self.agent_spec,
+            sample_update_trajectory_agent,
+            rollout_buffer_true_loss,
+            self.env_factory,
+        )
         (
             loss_single_step_random,
             returns_single_step_random,
             loss_trajectory_random,
             returns_trajectory_random,
-        ) = analysis_results_random.get()
+        ) = self.update_step_analysis_worker(
+            self.num_updates_evaluation,
+            1,
+            self.agent_spec,
+            sample_update_trajectory_random,
+            rollout_buffer_true_loss,
+            self.env_factory,
+        )
+        # For the other agent and random configurations, we evaluate self.num_updates_evaluation updates for one
+        # episode. Since we only have one "true gradient" update, we evaluate this update for
+        # self.num_updates_evaluation episodes (to get the same total number of evaluation episodes).
         (
             loss_single_step_true_loss,
             returns_single_step_true_loss,
             loss_trajectory_true_loss,
             returns_trajectory_true_loss,
-        ) = analysis_results_true_loss.get()
+        ) = self.update_step_analysis_worker(
+            1,
+            self.num_updates_evaluation,
+            self.agent_spec,
+            sample_update_trajectory_true_loss,
+            rollout_buffer_true_loss,
+            self.env_factory,
+        )
 
         self.log_results(
             "single_update_step/random",

@@ -32,14 +32,12 @@ class Analysis(abc.ABC):
         env_factory: Callable[[], gym.Env],
         agent_spec: AgentSpec,
         run_dir: Path,
-        num_processes: int,
     ):
         self.analysis_name = analysis_name
         self.analysis_run_id = analysis_run_id
         self.env_factory = env_factory
         self.agent_spec = agent_spec
         self.run_dir = run_dir
-        self.num_processes = num_processes
         self._analyses_log_file = run_dir / ".analyses.yaml"
         if not self._analyses_log_file.exists():
             self._analyses_log_file.touch()
@@ -57,12 +55,7 @@ class Analysis(abc.ABC):
         analyses_logs = self._load_analysis_logs()
         curr_analysis_logs = analyses_logs[self.analysis_name][self.analysis_run_id]
         if env_step not in curr_analysis_logs or overwrite_results:
-            with torch.multiprocessing.get_context("spawn").Pool(
-                self.num_processes
-            ) as pool:
-                logs = self._do_analysis(
-                    pool, env_step, logs, overwrite_results, show_progress
-                )
+            logs = self._do_analysis(env_step, logs, overwrite_results, show_progress)
             if env_step not in curr_analysis_logs:
                 # Lock the analysis.yaml file to ensure sequential access
                 lock = filelock.FileLock(
@@ -97,7 +90,6 @@ class Analysis(abc.ABC):
     @abc.abstractmethod
     def _do_analysis(
         self,
-        process_pool: torch.multiprocessing.Pool,
         env_step: int,
         logs: TensorboardLogs,
         overwrite_results: bool,
