@@ -1,4 +1,3 @@
-import functools
 import logging
 import pickle
 from pathlib import Path
@@ -9,7 +8,7 @@ import numpy as np
 import stable_baselines3.common.callbacks
 import torch
 from stable_baselines3.common.buffers import RolloutBuffer
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.gradient_analysis.gradient_similarity_analysis import (

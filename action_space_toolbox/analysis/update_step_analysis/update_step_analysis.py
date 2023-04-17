@@ -1,6 +1,6 @@
 import functools
 from pathlib import Path
-from typing import Callable, Sequence, Tuple, Union
+from typing import Callable, Sequence, Tuple
 
 import gym
 import numpy as np
