@@ -130,6 +130,7 @@ class CliffAnalysis(Analysis):
                     self.agent_spec.device,
                     self.env_factory,
                     self.agent_spec.checkpoint_path,
+                    agent_kwargs={"tensorboard_log": None},
                 )
             )
 

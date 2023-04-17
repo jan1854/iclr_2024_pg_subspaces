@@ -40,7 +40,10 @@ def analysis_worker(
         run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps"
     )
     agent_spec = CheckpointAgentSpec(
-        stable_baselines3.ppo.PPO, agent_checkpoint, device
+        stable_baselines3.ppo.PPO,
+        agent_checkpoint,
+        device,
+        agent_kwargs={"tensorboard_logs": None},
     )
     analysis = hydra.utils.instantiate(
         analysis_cfg,
