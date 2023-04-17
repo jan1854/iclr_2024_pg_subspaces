@@ -153,6 +153,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             )
             logs.log(summary_writers[log_dir])
     else:
+        # In contrast to multiprocessing.Pool, concurrent.futures.ProcessPoolExecutor allows nesting processes
         with concurrent.futures.ProcessPoolExecutor(
             cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
         ) as pool:
