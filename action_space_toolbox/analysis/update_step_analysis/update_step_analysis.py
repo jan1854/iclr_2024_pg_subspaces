@@ -141,26 +141,22 @@ class UpdateStepAnalysis(Analysis):
             returns_single_step_agent,
             loss_trajectory_agent,
             returns_trajectory_agent,
-        ) = self.update_step_analysis_worker(
+        ) = self.evaluate_update(
             self.num_updates_evaluation,
             1,
-            self.agent_spec,
             sample_update_trajectory_agent,
             rollout_buffer_true_loss,
-            self.env_factory,
         )
         (
             loss_single_step_random,
             returns_single_step_random,
             loss_trajectory_random,
             returns_trajectory_random,
-        ) = self.update_step_analysis_worker(
+        ) = self.evaluate_update(
             self.num_updates_evaluation,
             1,
-            self.agent_spec,
             sample_update_trajectory_random,
             rollout_buffer_true_loss,
-            self.env_factory,
         )
         # For the other agent and random configurations, we evaluate self.num_updates_evaluation updates for one
         # episode. Since we only have one "true gradient" update, we evaluate this update for
@@ -170,13 +166,11 @@ class UpdateStepAnalysis(Analysis):
             returns_single_step_true_loss,
             loss_trajectory_true_loss,
             returns_trajectory_true_loss,
-        ) = self.update_step_analysis_worker(
+        ) = self.evaluate_update(
             1,
             self.num_updates_evaluation,
-            self.agent_spec,
             sample_update_trajectory_true_loss,
             rollout_buffer_true_loss,
-            self.env_factory,
         )
 
         self.log_results(
@@ -269,17 +263,12 @@ class UpdateStepAnalysis(Analysis):
             )
         return logs
 
-    @classmethod
-    def update_step_analysis_worker(
-        cls,
+    def evaluate_update(
+        self,
         num_update_trajectories: int,
         num_evaluation_episodes: int,
-        agent_spec: AgentSpec,
         update_trajectory_sampler: Callable[[], Sequence[torch.Tensor]],
         rollout_buffer_true_loss: stable_baselines3.common.buffers.RolloutBuffer,
-        env_factory: Callable[
-            [], Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]
-        ],
     ) -> Tuple[
         LossEvaluationResult,
         ReturnEvaluationResult,
@@ -290,14 +279,14 @@ class UpdateStepAnalysis(Analysis):
         results_loss_trajectory = []
         results_return_single_step = []
         results_return_trajectory = []
-        env = env_factory()
+        env = self.env_factory()
         for _ in range(num_update_trajectories):
             update_trajectory = update_trajectory_sampler()
-            agent_spec_single_step = agent_spec.copy_with_new_parameters(
+            agent_spec_single_step = self.agent_spec.copy_with_new_parameters(
                 update_trajectory[0]
             )
             agent_single_step = agent_spec_single_step.create_agent()
-            agent_spec_trajectory = agent_spec.copy_with_new_parameters(
+            agent_spec_trajectory = self.agent_spec.copy_with_new_parameters(
                 update_trajectory[-1]
             )
             agent_trajectory = agent_spec_trajectory.create_agent()
