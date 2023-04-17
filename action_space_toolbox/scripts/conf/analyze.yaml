@@ -20,6 +20,8 @@ log_dir: ${oc.env:ACTION_SPACE_TOOLBOX_LOG_DIR,logs}
 hydra:
   run:
     dir: ${train_logs}/analysis_output/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: true
   verbose: [
     __main__
   ]

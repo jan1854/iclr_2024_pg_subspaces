@@ -73,6 +73,13 @@ class CliffAnalysis(Analysis):
                 / "algorithm"
                 / (alternate_agent_cfg + ".yaml")
             )
+            assert self.alternate_agent_cfg.name != "ppo"
+            alternate_agent_cfg_dump_path = Path("alternate_agent_cfg.yaml")
+            # Dump the alternate_agent_cfg (due to the hack above this is not done automatically by hydra)
+            if not alternate_agent_cfg_dump_path.exists():
+                omegaconf.OmegaConf.save(
+                    self.alternate_agent_cfg, alternate_agent_cfg_dump_path
+                )
         else:
             self.alternate_agent_cfg = None
         self.algorithm_overrides = algorithm_overrides
@@ -201,9 +208,7 @@ class CliffAnalysis(Analysis):
                         curr_overrides,
                     )
 
-        # TODO: Should probably also compute the performance gain for ground truth gradient steps
         # TODO: Dump agent config somewhere
-        # TODO: Should be parallelized (at least put stuff on a separate process to avoid clogging the main process)
 
         return TensorboardLogs()
 
