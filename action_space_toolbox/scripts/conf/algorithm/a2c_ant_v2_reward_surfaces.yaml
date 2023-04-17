@@ -4,6 +4,7 @@ algorithm:
   _target_: stable_baselines3.A2C
   policy: "MlpPolicy"
   device: "auto"
+  tensorboard_log: tensorboard
   ent_coef: 0.0
   max_grad_norm: 0.5
   n_steps: 8

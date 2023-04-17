@@ -4,6 +4,7 @@ algorithm:
   _target_: stable_baselines3.PPO
   policy: "MlpPolicy"
   device: "auto"
+  tensorboard_log: tensorboard
   batch_size: 32
   n_steps: 512
   gamma: 0.98
