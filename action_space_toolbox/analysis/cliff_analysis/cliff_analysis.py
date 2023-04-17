@@ -130,7 +130,7 @@ class CliffAnalysis(Analysis):
                 )
             )
 
-        if overwrite_results or self._check_logs_complete(results, env_step):
+        if overwrite_results or not self._check_logs_complete(results, env_step):
             gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
             gradient_norm = torch.norm(flatten_parameters(gradient))
             normalized_gradient = [g / gradient_norm for g in gradient]
@@ -262,7 +262,7 @@ class CliffAnalysis(Analysis):
             curr_results = results[env_step]
             assert override or (
                 "reward_checkpoint" not in curr_results
-                and "loss_checkpoint" not in curr_results
+                and "losses_checkpoint" not in curr_results
             ), (
                 f"Override not set but checkpoint results are non-empty "
                 f"(step: {env_step}, results file: {self.results_file})."
@@ -284,7 +284,7 @@ class CliffAnalysis(Analysis):
                 k: np.mean(v).item()
                 for k, v in dataclasses.asdict(reward_cliff_test).items()
             }
-            curr_results["loss_cliff_test"] = {
+            curr_results["losses_cliff_test"] = {
                 name: {
                     k: np.mean(v).item()
                     for k, v in dataclasses.asdict(loss).items()
@@ -364,10 +364,9 @@ class CliffAnalysis(Analysis):
         if env_step in results:
             curr_results = results[env_step]
             return (
-                "checkpoint_is_cliff" in curr_results
-                and "reward_checkpoint" in curr_results
-                and "loss_checkpoint" in curr_results
-                and "loss_cliff_test" in curr_results
+                "reward_checkpoint" in curr_results
+                and "losses_checkpoint" in curr_results
+                and "losses_cliff_test" in curr_results
                 and "reward_cliff_test" in curr_results
             )
         else:
