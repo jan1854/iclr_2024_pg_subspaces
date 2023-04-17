@@ -361,11 +361,14 @@ class CliffAnalysis(Analysis):
     def _check_logs_complete(
         cls, results: Dict[int, Dict[str, Any]], env_step: int
     ) -> bool:
-        curr_results = results[env_step]
-        return (
-            "checkpoint_is_cliff" in curr_results
-            and "reward_checkpoint" in curr_results
-            and "loss_checkpoint" in curr_results
-            and "loss_cliff_test" in curr_results
-            and "reward_cliff_test" in curr_results
-        )
+        if env_step in results:
+            curr_results = results[env_step]
+            return (
+                "checkpoint_is_cliff" in curr_results
+                and "reward_checkpoint" in curr_results
+                and "loss_checkpoint" in curr_results
+                and "loss_cliff_test" in curr_results
+                and "reward_cliff_test" in curr_results
+            )
+        else:
+            return False
