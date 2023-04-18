@@ -47,32 +47,34 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                     ("default", results_algo["default"])
                 ] + sorted([r for r in results_algo.items() if r[0] != "default"])
                 for config_str, results_config in results_algo_items_sorted:
-                    reward_change_cliff = (
-                        f"{np.mean(results_config['cliff']):.6f}"
-                        if len(results_config["cliff"]) > 0
+                    results_cliff = results_config.get("cliff", [])
+                    results_no_cliff = results_config.get("no cliff", [])
+                    mean_reward_change_cliff = (
+                        f"{np.mean(results_cliff):.6f}"
+                        if len(results_cliff) > 0
                         else "N/A"
                     )
-                    reward_change_no_cliff = (
-                        f"{np.mean(results_config['no cliff']):.6f}"
-                        if len(results_config["no cliff"]) > 0
+                    mean_reward_change_no_cliff = (
+                        f"{np.mean(results_no_cliff):.6f}"
+                        if len(results_no_cliff) > 0
                         else "N/A"
                     )
                     std_reward_change_cliff = (
-                        f"{np.std(results_config['cliff']):.6f}"
-                        if len(results_config["cliff"]) > 0
+                        f"{np.std(results_cliff):.6f}"
+                        if len(results_cliff) > 0
                         else "N/A"
                     )
                     std_reward_change_no_cliff = (
-                        f"{np.std(results_config['no cliff']):.6f}"
-                        if len(results_config["no cliff"]) > 0
+                        f"{np.std(results_no_cliff):.6f}"
+                        if len(results_no_cliff) > 0
                         else "N/A"
                     )
                     csvwriter.writerow(
                         [
                             algorithm_name,
                             config_str,
-                            reward_change_cliff,
-                            reward_change_no_cliff,
+                            mean_reward_change_cliff,
+                            mean_reward_change_no_cliff,
                             std_reward_change_cliff,
                             std_reward_change_no_cliff,
                         ]
@@ -82,8 +84,8 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                 "w"
             ) as infofile:
                 infofile.write(
-                    f"Number of cliff locations: {len(results_config['cliff'])}\n"
-                    f"Number of non-cliff locations: {len(results_config['no cliff'])}\n\n"
+                    f"Number of cliff locations: {len(results_cliff)}\n"
+                    f"Number of non-cliff locations: {len(results_no_cliff)}\n\n"
                 )
 
 
@@ -145,9 +147,14 @@ def create_summary(experiment_dir: Path) -> None:
                     reward_cliff_test = env_step_results["reward_cliff_test"][
                         "rewards_undiscounted"
                     ]
-                    for algorithm_name, algorithm_results in env_step_results[
-                        "configs"
-                    ].items():
+                    is_cliff = cliff_criterion(
+                        reward_checkpoint,
+                        reward_cliff_test,
+                        global_reward_range,
+                    )
+                    for algorithm_name, algorithm_results in env_step_results.get(
+                        "configs", {}
+                    ).items():
                         if algorithm_name not in update_reward_changes_id:
                             update_reward_changes_id[algorithm_name] = {}
                         update_reward_changes_algo = update_reward_changes_id[
@@ -159,11 +166,6 @@ def create_summary(experiment_dir: Path) -> None:
                             update_reward_changes_config = update_reward_changes_algo[
                                 config_name
                             ]
-                            is_cliff = cliff_criterion(
-                                reward_checkpoint,
-                                reward_cliff_test,
-                                global_reward_range,
-                            )
                             is_cliff_str = "cliff" if is_cliff else "no cliff"
                             if is_cliff_str not in update_reward_changes_config:
                                 update_reward_changes_config[is_cliff_str] = []
