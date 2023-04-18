@@ -6,6 +6,7 @@ plot_in_gradient_direction: false
 num_samples_true_loss: 1_000_000
 num_steps: 200_000
 num_plots: 1
+num_processes: 1
 plot_sgd_steps: true
 plot_true_gradient_steps: true
 max_gradient_trajectories: 10
