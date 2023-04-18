@@ -221,8 +221,6 @@ class CliffAnalysis(Analysis):
                         curr_overrides,
                     )
 
-        # TODO: Dump agent config somewhere
-
         return TensorboardLogs()
 
     def evaluate_agent_overrides(
