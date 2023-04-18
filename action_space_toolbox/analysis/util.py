@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Callable, Iterable, Optional, Sequence, Union
+from typing import Callable, Iterable, List, Optional, Sequence, Union
 
 import gym
 import numpy as np
@@ -204,3 +204,38 @@ def evaluate_agent_losses(
 
 def flatten_parameters(seq: Sequence[torch.Tensor]) -> torch.Tensor:
     return torch.cat([s.flatten() for s in seq])
+
+
+def filter_normalize_direction(
+    direction: Sequence[torch.Tensor], parameters: Sequence[torch.Tensor]
+) -> List[torch.Tensor]:
+    return [normalize_filter(d, p) for d, p in zip(direction, parameters)]
+
+
+def normalize_filter(
+    filter_direction: torch.Tensor, filter_parameters: torch.Tensor
+) -> torch.Tensor:
+    ndims = len(filter_parameters.shape)
+    if ndims == 1 or ndims == 0:
+        # don't do any random direction for scalars
+        return torch.zeros_like(filter_parameters)
+    elif ndims == 2:
+        normalized_direction = filter_direction / torch.sqrt(
+            torch.sum(torch.square(filter_direction), dim=0, keepdim=True)
+        )
+        normalized_direction *= torch.sqrt(
+            torch.sum(torch.square(filter_parameters), dim=0, keepdim=True)
+        )
+        return normalized_direction
+    elif ndims == 4:
+        normalized_direction = filter_direction / torch.sqrt(
+            torch.sum(torch.square(filter_direction), dim=(0, 1, 2), keepdim=True)
+        )
+        normalized_direction *= torch.sqrt(
+            torch.sum(torch.square(filter_parameters), dim=(0, 1, 2), keepdim=True)
+        )
+        return normalized_direction
+    else:
+        raise ValueError(
+            f"Only 1, 2, 4 dimensional filters allowed, got {filter_parameters.shape}."
+        )

@@ -2,7 +2,7 @@ import functools
 import logging
 import pickle
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Sequence, Tuple
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
@@ -20,6 +20,7 @@ from action_space_toolbox.analysis.util import (
     flatten_parameters,
     evaluate_agent_returns,
     evaluate_agent_losses,
+    filter_normalize_direction,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.sb3_training import (
@@ -126,10 +127,9 @@ class RewardSurfaceVisualization(Analysis):
                 num_spawned_processes=self.num_processes,
             )
 
-            direction2 = [
-                self.sample_filter_normalized_direction(p.detach())
-                for p in agent.policy.parameters()
-            ]
+            direction2 = self.sample_filter_normalized_direction(
+                list(agent.policy.parameters())
+            )
 
             if self.plot_in_gradient_direction:
                 # Normalize the gradient to have the same length as the random direction vector (as described in
@@ -146,10 +146,9 @@ class RewardSurfaceVisualization(Analysis):
                 )
                 direction1 = [g / gradient_norm * direction2_norm for g in gradient]
             else:
-                direction1 = [
-                    self.sample_filter_normalized_direction(p.detach())
-                    for p in agent.policy.parameters()
-                ]
+                direction1 = self.sample_filter_normalized_direction(
+                    list(agent.policy.parameters())
+                )
 
             agent_weights = [p.detach().clone() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
@@ -329,31 +328,14 @@ class RewardSurfaceVisualization(Analysis):
         return logs
 
     @classmethod
-    def sample_filter_normalized_direction(cls, param: torch.Tensor) -> torch.Tensor:
-        ndims = len(param.shape)
-        if ndims == 1 or ndims == 0:
-            # don't do any random direction for scalars
-            return torch.zeros_like(param)
-        elif ndims == 2:
-            direction = torch.normal(0.0, 1.0, size=param.shape, device=param.device)
-            direction /= torch.sqrt(
-                torch.sum(torch.square(direction), dim=0, keepdim=True)
-            )
-            direction *= torch.sqrt(torch.sum(torch.square(param), dim=0, keepdim=True))
-            return direction
-        elif ndims == 4:
-            direction = torch.normal(0.0, 1.0, size=param.shape, device=param.device)
-            direction /= torch.sqrt(
-                torch.sum(torch.square(direction), dim=(0, 1, 2), keepdim=True)
-            )
-            direction *= torch.sqrt(
-                torch.sum(torch.square(param), dim=(0, 1, 2), keepdim=True)
-            )
-            return direction
-        else:
-            raise ValueError(
-                f"Only 1, 2, 4 dimensional filters allowed, got {param.shape}."
-            )
+    def sample_filter_normalized_direction(
+        cls,
+        param: Sequence[torch.Tensor],
+    ) -> List[torch.Tensor]:
+        direction = [
+            torch.normal(0.0, 1.0, size=p.shape, device=p.device) for p in param
+        ]
+        return filter_normalize_direction(direction, [p.detach() for p in param])
 
     def sample_projected_update_trajectories(
         self,

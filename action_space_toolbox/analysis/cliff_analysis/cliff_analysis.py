@@ -20,6 +20,7 @@ from action_space_toolbox.analysis.util import (
     ReturnEvaluationResult,
     evaluate_agent_losses,
     LossEvaluationResult,
+    filter_normalize_direction,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec, HydraAgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
@@ -44,6 +45,7 @@ class CliffAnalysis(Analysis):
         num_trials: int,
         num_episodes_reward_eval: int,
         num_env_steps_training: int,
+        original_gradient_normalization: bool,
         cliff_test_distance: float,
         alternate_agent_cfg: Optional[str],
         algorithm_overrides: Dict[str, Sequence[Dict[str, Any]]],
@@ -59,6 +61,7 @@ class CliffAnalysis(Analysis):
         self.num_trials = num_trials
         self.num_episodes_reward_eval = num_episodes_reward_eval
         self.num_env_steps_training = num_env_steps_training
+        self.original_gradient_normalization = original_gradient_normalization
         self.cliff_test_distance = cliff_test_distance
         self.results_dir = run_dir / "analyses" / "cliff_analysis" / analysis_run_id
         self.results_dir.mkdir(parents=True, exist_ok=True)
@@ -136,8 +139,17 @@ class CliffAnalysis(Analysis):
 
         if overwrite_results or not self._check_logs_complete(results, env_step):
             gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
-            gradient_norm = torch.norm(flatten_parameters(gradient))
-            normalized_gradient = [g / gradient_norm for g in gradient]
+            if self.original_gradient_normalization:
+                filter_normalized_gradient = filter_normalize_direction(
+                    gradient, [p.detach() for p in agent.policy.parameters()]
+                )
+                # This is not the L1 norm (missing the abs), not sure why the Cliff Diving authors use this
+                # normalization
+                grad_sum = torch.sum(flatten_parameters(filter_normalized_gradient))
+                normalized_gradient = [g / grad_sum for g in filter_normalized_gradient]
+            else:
+                gradient_norm = torch.norm(flatten_parameters(gradient))
+                normalized_gradient = [g / gradient_norm for g in gradient]
 
             reward_checkpoint = evaluate_returns_rollout_buffer(
                 rollout_buffer_true_loss_no_value_bootstrap,
@@ -152,7 +164,7 @@ class CliffAnalysis(Analysis):
             }
 
             cliff_test_parameters = [
-                p + self.cliff_test_distance * g
+                p - self.cliff_test_distance * g
                 for p, g in zip(agent.policy.parameters(), normalized_gradient)
             ]
             reward_cliff_test = evaluate_agent_returns(

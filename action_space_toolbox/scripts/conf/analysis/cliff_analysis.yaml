@@ -4,7 +4,8 @@ num_samples_true_gradient: 1_000_000
 num_trials: 10
 num_episodes_reward_eval: 1_000
 num_env_steps_training: 2048
-cliff_test_distance: 0.02     # TODO: Check that the original code actually uses 0.02 (as opposed to the paper, which says 0.04)
+original_gradient_normalization: false
+cliff_test_distance: 0.02
 alternate_agent_cfg: null
 algorithm_overrides:
   ppo:
