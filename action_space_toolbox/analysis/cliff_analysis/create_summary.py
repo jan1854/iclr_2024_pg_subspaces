@@ -29,7 +29,9 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
     out_dir = experiment_dir / "combined" / "cliff_analysis"
     out_dir.mkdir(parents=True, exist_ok=True)
     for analysis_run_id, results_id in results.items():
-        with (out_dir / f"results_{analysis_run_id}.csv").open("w") as csvfile:
+        curr_out_dir = out_dir / analysis_run_id
+        curr_out_dir.mkdir()
+        with (curr_out_dir / f"results.csv").open("w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(
                 [
@@ -80,9 +82,7 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                         ]
                     )
 
-            with (out_dir / f"additional_information_{analysis_run_id}.txt").open(
-                "w"
-            ) as infofile:
+            with (curr_out_dir / f"additional_information.txt").open("w") as infofile:
                 infofile.write(
                     f"Number of cliff locations: {len(results_cliff)}\n"
                     f"Number of non-cliff locations: {len(results_no_cliff)}\n\n"
