@@ -83,7 +83,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
     experiment_dir = train_logs.parent if train_logs.name.isnumeric() else train_logs
     assert re.match("[0-9]{2}-[0-9]{2}-[0-9]{2}", experiment_dir.name)
     train_logs_relative = train_logs.relative_to(experiment_dir.parents[3])
-    if Path(cfg.log_dir).absolute():
+    if Path(cfg.log_dir).is_absolute():
         log_dir = Path(cfg.log_dir)
     else:
         log_dir = Path(hydra.utils.get_original_cwd()) / cfg.log_dir
