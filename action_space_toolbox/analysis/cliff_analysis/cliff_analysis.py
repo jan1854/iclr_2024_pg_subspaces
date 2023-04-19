@@ -20,7 +20,6 @@ from action_space_toolbox.analysis.util import (
     ReturnEvaluationResult,
     evaluate_agent_losses,
     LossEvaluationResult,
-    filter_normalize_direction,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec, HydraAgentSpec
 from action_space_toolbox.util.get_episode_length import get_episode_length
@@ -140,13 +139,10 @@ class CliffAnalysis(Analysis):
         if overwrite_results or not self._check_logs_complete(results, env_step):
             gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
             if self.original_gradient_normalization:
-                filter_normalized_gradient = filter_normalize_direction(
-                    gradient, [p.detach() for p in agent.policy.parameters()]
-                )
                 # This is not the L1 norm (missing the abs), not sure why the Cliff Diving authors use this
                 # normalization
-                grad_sum = torch.sum(flatten_parameters(filter_normalized_gradient))
-                normalized_gradient = [g / grad_sum for g in filter_normalized_gradient]
+                grad_sum = torch.sum(flatten_parameters(gradient))
+                normalized_gradient = [g / grad_sum for g in gradient]
             else:
                 gradient_norm = torch.norm(flatten_parameters(gradient))
                 normalized_gradient = [g / gradient_norm for g in gradient]
