@@ -236,7 +236,7 @@ class CliffAnalysis(Analysis):
         agent_specs_after_update = []
         for _ in range(self.num_trials):
             agent = agent_spec_overrides.create_agent(self.env_factory())
-            agent.learn(self.num_env_steps_training)
+            agent.learn(self.num_env_steps_training, reset_num_timesteps=False)
             agent_specs_after_update.append(
                 agent_spec_overrides.copy_with_new_parameters(
                     weights=list(agent.policy.parameters())
