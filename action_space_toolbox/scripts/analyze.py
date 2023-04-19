@@ -78,7 +78,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
     )
     logger.info(f"Analyzing results in {cfg.train_logs}")
-    train_logs = Path(cfg.train_logs)
+    train_logs = Path(hydra.utils.get_original_cwd()) / cfg.train_logs
 
     experiment_dir = train_logs.parent if train_logs.name.isnumeric() else train_logs
     assert re.match("[0-9]{2}-[0-9]{2}-[0-9]{2}", experiment_dir.name)
