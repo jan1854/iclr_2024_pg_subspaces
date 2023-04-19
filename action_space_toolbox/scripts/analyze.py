@@ -78,12 +78,16 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
     )
     logger.info(f"Analyzing results in {cfg.train_logs}")
-    train_logs = Path(hydra.utils.get_original_cwd()) / cfg.train_logs
+    train_logs = Path(cfg.train_logs)
 
     experiment_dir = train_logs.parent if train_logs.name.isnumeric() else train_logs
     assert re.match("[0-9]{2}-[0-9]{2}-[0-9]{2}", experiment_dir.name)
     train_logs_relative = train_logs.relative_to(experiment_dir.parents[3])
-    train_logs_local = cfg.log_dir / train_logs_relative
+    if Path(cfg.log_dir).absolute():
+        log_dir = Path(cfg.log_dir)
+    else:
+        log_dir = Path(hydra.utils.get_original_cwd()) / cfg.log_dir
+    train_logs_local = log_dir / train_logs_relative
     if cfg.sync_train_logs:
         train_logs_local.mkdir(exist_ok=True, parents=True)
         logger.info(f"Syncing logs from {train_logs} to {train_logs_local.absolute()}.")
