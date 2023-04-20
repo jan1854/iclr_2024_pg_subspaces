@@ -26,18 +26,25 @@ logger = logging.getLogger(__name__)
 
 
 def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
+    def make_env(env_cfg, **kwargs):
+        env = gym.make(env_cfg, **kwargs)
+        # To get the training code working for environments not wrapped with a ControllerBaseWrapper.
+        if not hasattr(env, "base_env_timestep_factor"):
+            env.base_env_timestep_factor = 1
+        return env
+
     if cfg.algorithm.training.n_envs == 1:
         env = stable_baselines3.common.vec_env.DummyVecEnv(
             [
                 lambda: stable_baselines3.common.monitor.Monitor(
-                    gym.make(cfg.env, **cfg.env_args)
+                    make_env(cfg.env, **cfg.env_args)
                 )
             ]
         )
     else:
         env = stable_baselines3.common.vec_env.SubprocVecEnv(
             [
-                lambda: gym.make(cfg.env, **cfg.env_args)
+                lambda: make_env(cfg.env, **cfg.env_args)
                 for _ in range(cfg.algorithm.training.n_envs)
             ]
         )
@@ -73,10 +80,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )
-    try:
-        base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
-    except AttributeError:
-        base_env_timestep_factor = 1
+    base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
     algorithm.set_logger(
         SB3CustomLogger(
             "tensorboard",

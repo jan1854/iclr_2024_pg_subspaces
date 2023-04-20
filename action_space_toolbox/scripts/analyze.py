@@ -51,15 +51,8 @@ def analysis_worker(
         agent_spec=agent_spec,
         run_dir=run_dir,
     )
-    if hasattr(env, "base_env_timestep_factor"):
-        base_env_timestep_factor = env.base_env_timestep_factor
-    else:
-        logger.warning(
-            f"Environment does not have the base_env_timestep_factor attribute, assuming 1."
-        )
-        base_env_timestep_factor = 1
     return analysis.do_analysis(
-        agent_step * base_env_timestep_factor, overwrite_results, show_progress
+        agent_step * env.base_env_timestep_factor, overwrite_results, show_progress
     )
 
 
@@ -110,13 +103,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
     # Determine the base_env_timestep_factor to load the correct checkpoints
     train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
     env = gym.make(train_cfg.env, **train_cfg.env_args)
-    if hasattr(env, "base_env_timestep_factor"):
-        base_env_timestep_factor = env.base_env_timestep_factor
-    else:
-        logger.warning(
-            f"Environment does not have the base_env_timestep_factor attribute, assuming 1."
-        )
-        base_env_timestep_factor = 1
+    base_env_timestep_factor = env.base_env_timestep_factor
 
     jobs = []
     summary_writers = {}
