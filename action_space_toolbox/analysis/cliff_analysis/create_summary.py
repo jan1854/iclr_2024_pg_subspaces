@@ -30,7 +30,7 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for analysis_run_id, results_id in results.items():
         curr_out_dir = out_dir / analysis_run_id
-        curr_out_dir.mkdir()
+        curr_out_dir.mkdir(exist_ok=True)
         with (curr_out_dir / f"results.csv").open("w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(
