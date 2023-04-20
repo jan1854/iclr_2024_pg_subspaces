@@ -18,4 +18,4 @@ algorithm:
   tensorboard_log: tensorboard
 
 training:
-  steps: 600000
+  steps: 100_000
