@@ -73,11 +73,15 @@ def train(cfg: omegaconf.DictConfig) -> None:
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )
+    try:
+        base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
+    except AttributeError:
+        base_env_timestep_factor = 1
     algorithm.set_logger(
         SB3CustomLogger(
             "tensorboard",
             [tb_output_format],
-            env.get_attr("base_env_timestep_factor")[0],
+            base_env_timestep_factor,
         )
     )
     checkpoints_path = Path("checkpoints")
@@ -92,9 +96,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         FixEpInfoBufferCallback(),
         AdditionalTrainingMetricsCallback(),
     ]
-    training_steps = (
-        cfg.algorithm.training.steps // env.get_attr("base_env_timestep_factor")[0]
-    )
+    training_steps = cfg.algorithm.training.steps // base_env_timestep_factor
     try:
         algorithm.learn(
             total_timesteps=training_steps,
