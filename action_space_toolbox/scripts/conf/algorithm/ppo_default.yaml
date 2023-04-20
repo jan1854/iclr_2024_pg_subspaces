@@ -9,3 +9,4 @@ algorithm:
 
 training:
   steps: 1000000
+  n_envs: 1

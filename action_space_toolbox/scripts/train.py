@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
-    if cfg.num_parallel_envs == 1:
+    if cfg.algorithm.training.n_envs == 1:
         env = stable_baselines3.common.vec_env.DummyVecEnv(
             [
                 lambda: stable_baselines3.common.monitor.Monitor(
@@ -38,7 +38,7 @@ def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecE
         env = stable_baselines3.common.vec_env.SubprocVecEnv(
             [
                 lambda: gym.make(cfg.env, **cfg.env_args)
-                for _ in range(cfg.num_parallel_envs)
+                for _ in range(cfg.algorithm.training.n_envs)
             ]
         )
         env = stable_baselines3.common.vec_env.VecMonitor(env)
