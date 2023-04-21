@@ -51,8 +51,12 @@ def analysis_worker(
         agent_spec=agent_spec,
         run_dir=run_dir,
     )
+    if hasattr(env, "base_env_timestep_factor"):
+        base_env_timestep_factor = env.base_env_timestep_factor
+    else:
+        base_env_timestep_factor = 1
     return analysis.do_analysis(
-        agent_step * env.base_env_timestep_factor, overwrite_results, show_progress
+        agent_step * base_env_timestep_factor, overwrite_results, show_progress
     )
 
 
@@ -103,7 +107,10 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
     # Determine the base_env_timestep_factor to load the correct checkpoints
     train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
     env = gym.make(train_cfg.env, **train_cfg.env_args)
-    base_env_timestep_factor = env.base_env_timestep_factor
+    if hasattr(env, "base_env_timestep_factor"):
+        base_env_timestep_factor = env.base_env_timestep_factor
+    else:
+        base_env_timestep_factor = 1
 
     jobs = []
     summary_writers = {}

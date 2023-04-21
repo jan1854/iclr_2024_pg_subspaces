@@ -189,8 +189,13 @@ def collect_complete_episodes(
 
     episode_length = get_episode_length(env)
     arr_len = min_num_env_steps + episode_length + 1
-    observations = np.empty((arr_len, *env.observation_space.shape), dtype=np.float32)
-    actions = np.empty((arr_len, *env.action_space.shape), dtype=np.float32)
+    observations = np.empty(
+        (arr_len, *get_space_shape(env.observation_space)),
+        dtype=env.observation_space.dtype,
+    )
+    actions = np.empty(
+        (arr_len, *get_space_shape(env.action_space)), dtype=env.action_space.dtype
+    )
     rewards = np.empty(arr_len, dtype=np.float32)
     rewards_no_bootstrap = np.empty(arr_len, dtype=np.float32)
     dones = np.empty(arr_len, dtype=bool)
@@ -482,3 +487,12 @@ def maybe_create_env(
         return env_or_factory
     else:
         return env_or_factory()
+
+
+def get_space_shape(space: gym.spaces.Space) -> Tuple[int]:
+    if isinstance(space, gym.spaces.Discrete):
+        return (1,)
+    elif isinstance(space, gym.spaces.Box):
+        return space.shape
+    else:
+        raise ValueError(f"Unknown space {type(space)}.")
