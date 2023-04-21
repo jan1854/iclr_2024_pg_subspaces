@@ -190,12 +190,10 @@ def collect_complete_episodes(
     episode_length = get_episode_length(env)
     arr_len = min_num_env_steps + episode_length + 1
     observations = np.empty(
-        (arr_len, *get_space_shape(env.observation_space)),
+        (arr_len, *env.observation_space.shape),
         dtype=env.observation_space.dtype,
     )
-    actions = np.empty(
-        (arr_len, *get_space_shape(env.action_space)), dtype=env.action_space.dtype
-    )
+    actions = np.empty((arr_len, *env.action_space.shape), dtype=env.action_space.dtype)
     rewards = np.empty(arr_len, dtype=np.float32)
     rewards_no_bootstrap = np.empty(arr_len, dtype=np.float32)
     dones = np.empty(arr_len, dtype=bool)
@@ -260,8 +258,8 @@ def collect_complete_episodes(
 
         # This is for the next step (we add the first observation before the loop); the last observation of each episode
         # is not added to observations since it is not needed for filling a RolloutBuffer.
-        observations[n_steps + 1, :] = obs
-        actions[n_steps, :] = action
+        observations[n_steps + 1] = obs
+        actions[n_steps] = action
         rewards[n_steps] = reward
         rewards_no_bootstrap[n_steps] = reward_no_bootstrap
         dones[n_steps] = done
@@ -295,7 +293,7 @@ def ppo_loss(
     :param rollout_data:
     :return:
     """
-    assert isinstance(agent, stable_baselines3.ppo.PPO)  # TODO: Put this back in!
+    assert isinstance(agent, stable_baselines3.ppo.PPO)
 
     # Compute current clip range
     clip_range = agent.clip_range(agent._current_progress_remaining)
