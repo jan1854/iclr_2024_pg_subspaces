@@ -11,9 +11,12 @@ algorithm:
   gae_lambda: 0.9
   vf_coef: 0.4
   gamma: 0.99
-  use_rms_prop: True
-  normalize_advantage: False
-  learning_rate: 1.90609e-05 # TODO: Should be: lin_0.00096 (current value is copied from PPO)
+  use_rms_prop: true
+  normalize_advantage: false
+  learning_rate:
+    _target_: action_space_toolbox.training.schedules.LinearSchedule
+    start: 0.00096
+    end: 0.0
 
 training:
   steps: 10_000_000

@@ -1,0 +1,12 @@
+name: "a2c"
+
+algorithm:
+  _target_: stable_baselines3.A2C
+  policy: "MlpPolicy"
+  device: "auto"
+  tensorboard_log: tensorboard
+  ent_coef: 0.0
+
+training:
+  steps: 500_000
+  n_envs: 8
