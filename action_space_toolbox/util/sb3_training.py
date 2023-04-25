@@ -375,7 +375,9 @@ def a2c_loss(
     rollout_data: stable_baselines3.common.buffers.RolloutBufferSamples,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     actions = rollout_data.actions
-
+    if isinstance(agent.action_space, gym.spaces.Discrete):
+        # Convert discrete action from float to long
+        actions = rollout_data.actions.long().flatten()
     values, log_prob, entropy = agent.policy.evaluate_actions(
         rollout_data.observations, actions
     )
