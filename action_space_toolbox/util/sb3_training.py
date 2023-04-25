@@ -128,12 +128,13 @@ def fill_rollout_buffer(
             # This is not how stable-baselines3's RolloutBuffer is intended to be used, but this is way faster than
             # adding each element individually.
             next_pos = rb.pos + elements_to_add
+            # Reshape is needed to handle discrete action spaces
             rb.observations[rb.pos : next_pos, 0, :] = curr_env_steps.observations[
                 :elements_to_add
-            ]
+            ].reshape((elements_to_add,) + rb.obs_shape)
             rb.actions[rb.pos : next_pos, 0, :] = curr_env_steps.actions[
                 :elements_to_add
-            ]
+            ].reshape(elements_to_add, rb.action_dim)
             rb.rewards[rb.pos : next_pos, 0] = rew[:elements_to_add]
             rb.episode_starts[rb.pos : next_pos, 0] = episode_starts[:elements_to_add]
             rb.values[rb.pos : next_pos, 0] = curr_env_steps.values[:elements_to_add]
