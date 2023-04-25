@@ -114,7 +114,6 @@ def evaluate_agent_returns(
             evaluate_returns_rollout_buffer(
                 rollout_buffer_no_value_bootstrap,
                 agent.gamma,
-                get_episode_length(env),
                 last_episode_done,
             )
         )
@@ -125,7 +124,6 @@ def evaluate_agent_returns(
 def evaluate_returns_rollout_buffer(
     rollout_buffer_no_value_bootstrap: stable_baselines3.common.buffers.RolloutBuffer,
     discount_factor: float,
-    episode_length: Optional[int],
     last_episode_done: bool,
 ) -> ReturnEvaluationResult:
     episode_rewards_undiscounted = []

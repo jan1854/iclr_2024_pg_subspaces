@@ -106,7 +106,6 @@ class UpdateStepAnalysis(Analysis):
         return_curr_policy = evaluate_returns_rollout_buffer(
             rollout_buffer_curr_policy_eval,
             agent.gamma,
-            get_episode_length(agent.env),
             last_episode_done,
         )
         loss_curr_policy = evaluate_agent_losses(agent, rollout_buffer_true_loss)

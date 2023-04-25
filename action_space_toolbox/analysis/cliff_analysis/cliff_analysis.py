@@ -150,7 +150,6 @@ class CliffAnalysis(Analysis):
             reward_checkpoint = evaluate_returns_rollout_buffer(
                 rollout_buffer_true_loss_no_value_bootstrap,
                 agent.gamma,
-                get_episode_length(self.env_factory()),
                 last_episode_done,
             )
 
