@@ -1,7 +1,7 @@
 import argparse
 import csv
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, List
 
 import numpy as np
 import yaml
@@ -25,7 +25,12 @@ def cliff_criterion(
     )
 
 
-def dump_results(experiment_dir: Path, results: Dict) -> None:
+def dump_results(
+    experiment_dir: Path,
+    results: Dict,
+    cliff_locations: Dict[str, Dict[int, List[int]]],
+    no_cliff_locations: Dict[str, Dict[int, List[int]]],
+) -> None:
     out_dir = experiment_dir / "combined" / "cliff_analysis"
     out_dir.mkdir(parents=True, exist_ok=True)
     for analysis_run_id, results_id in results.items():
@@ -85,13 +90,16 @@ def dump_results(experiment_dir: Path, results: Dict) -> None:
                             ]
                         )
 
-                with (curr_out_dir / f"additional_information.txt").open(
+                with (curr_out_dir / f"additional_information.yaml").open(
                     "w"
                 ) as infofile:
-                    infofile.write(
-                        f"Number of cliff locations: {len(results_cliff)}\n"
-                        f"Number of non-cliff locations: {len(results_no_cliff)}\n\n"
-                    )
+                    additional_info = {
+                        "num_cliff_locations": len(results_cliff),
+                        "num_non_cliff_locations": len(results_no_cliff),
+                        "cliff_locations": cliff_locations[analysis_run_id],
+                        "no_cliff_locations": no_cliff_locations[analysis_run_id],
+                    }
+                    yaml.dump(additional_info, infofile)
 
 
 def append_sequence_dicts(dicts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
@@ -122,12 +130,21 @@ def create_summary(experiment_dir: Path) -> None:
     ]
     if len(run_dirs) > 0:
         update_reward_changes = []
+        cliff_locations = {}
+        no_cliff_locations = {}
         for run_dir in run_dirs:
             update_reward_changes.append({})
             analyses_dir = run_dir / "analyses" / "cliff_analysis"
             for analysis_run_id in [d.name for d in analyses_dir.iterdir()]:
                 if analysis_run_id not in update_reward_changes:
                     update_reward_changes[-1][analysis_run_id] = {}
+                if analysis_run_id not in cliff_locations:
+                    cliff_locations[analysis_run_id] = {
+                        int(run_dir.name): [] for run_dir in run_dirs
+                    }
+                    no_cliff_locations[analysis_run_id] = {
+                        int(run_dir.name): [] for run_dir in run_dirs
+                    }
                 update_reward_changes_id = update_reward_changes[-1][analysis_run_id]
                 results_path = analyses_dir / analysis_run_id / "results.yaml"
                 with results_path.open("r") as f:
@@ -158,6 +175,14 @@ def create_summary(experiment_dir: Path) -> None:
                             reward_cliff_test,
                             global_reward_range,
                         )
+                        if is_cliff:
+                            cliff_locations[analysis_run_id][int(run_dir.name)].append(
+                                env_step
+                            )
+                        else:
+                            no_cliff_locations[analysis_run_id][
+                                int(run_dir.name)
+                            ].append(env_step)
                         for algorithm_name, algorithm_results in env_step_results.get(
                             "configs", {}
                         ).items():
@@ -190,7 +215,9 @@ def create_summary(experiment_dir: Path) -> None:
                                     curr_reward_change
                                 )
         update_reward_changes = append_sequence_dicts(update_reward_changes)
-        dump_results(experiment_dir, update_reward_changes)
+        dump_results(
+            experiment_dir, update_reward_changes, cliff_locations, no_cliff_locations
+        )
 
 
 if __name__ == "__main__":
