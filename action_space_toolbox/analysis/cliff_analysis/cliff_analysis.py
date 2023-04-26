@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Literal
 
 import filelock
 import gym
@@ -22,7 +22,6 @@ from action_space_toolbox.analysis.util import (
     LossEvaluationResult,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec, HydraAgentSpec
-from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.sb3_training import (
     ppo_gradient,
     fill_rollout_buffer,
@@ -44,7 +43,7 @@ class CliffAnalysis(Analysis):
         num_trials: int,
         num_episodes_reward_eval: int,
         num_env_steps_training: int,
-        original_gradient_normalization: bool,
+        gradient_normalization: Literal["original", "l1", "l2"],
         cliff_test_distance: float,
         alternate_agent_cfg: Optional[str],
         algorithm_overrides: Dict[str, Sequence[Dict[str, Any]]],
@@ -60,7 +59,7 @@ class CliffAnalysis(Analysis):
         self.num_trials = num_trials
         self.num_episodes_reward_eval = num_episodes_reward_eval
         self.num_env_steps_training = num_env_steps_training
-        self.original_gradient_normalization = original_gradient_normalization
+        self.gradient_normalization = gradient_normalization
         self.cliff_test_distance = cliff_test_distance
         self.results_dir = run_dir / "analyses" / "cliff_analysis" / analysis_run_id
         self.results_dir.mkdir(parents=True, exist_ok=True)
@@ -138,13 +137,18 @@ class CliffAnalysis(Analysis):
 
         if overwrite_results or not self._check_logs_complete(results, env_step):
             gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
-            if self.original_gradient_normalization:
+            if self.gradient_normalization == "original":
                 # This is not the L1 norm (missing the abs), not sure why the Cliff Diving authors use this
                 # normalization
                 grad_sum = torch.sum(flatten_parameters(gradient))
                 normalized_gradient = [g / grad_sum for g in gradient]
+            elif self.gradient_normalization == "l1":
+                grad_sum = torch.linalg.vector_norm(flatten_parameters(gradient), ord=1)
+                normalized_gradient = [g / grad_sum for g in gradient]
             else:
-                gradient_norm = torch.norm(flatten_parameters(gradient))
+                gradient_norm = torch.linalg.vector_norm(
+                    flatten_parameters(gradient), ord=2
+                )
                 normalized_gradient = [g / gradient_norm for g in gradient]
 
             reward_checkpoint = evaluate_returns_rollout_buffer(
