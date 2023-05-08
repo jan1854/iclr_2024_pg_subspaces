@@ -90,10 +90,7 @@ class HessianEigenCachedCalculator:
                 with self.cache_path.open("rb") as cache_file:
                     cache = pickle.load(cache_file)
             cached_eigen = read_dict_recursive(cache, ("ppo", env_step))
-            if cached_eigen is not None:
-                return cached_eigen
-            else:
-                return None
+            return cached_eigen
 
     def cache_eigen(self, result: HessianEigenResult, env_step: int) -> None:
         cache = self.read_cached_eigen(env_step)
