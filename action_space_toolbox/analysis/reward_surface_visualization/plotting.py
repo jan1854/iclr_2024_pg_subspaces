@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Union
+from typing import Callable, Optional, Sequence, Union, Literal, Tuple
 
 import PIL.Image
 import numpy as np
@@ -108,7 +108,7 @@ def plot_results(
                     results["env_step"],
                     results["plot_num"],
                     plot_descr,
-                    results.get("gradient_direction"),
+                    results.get("direction_types"),
                     optimizer_steps,
                     sgd_steps,
                     optimizer_steps_true_grad,
@@ -135,7 +135,7 @@ def plot_results(
             results["env_step"],
             results["plot_num"],
             "policy ratio",
-            results.get("gradient_direction"),
+            results.get("direction_types"),
             None,
             None,
             None,
@@ -156,7 +156,9 @@ def plot_surface(
     env_step: int,
     plot_nr: int,
     descr: str,
-    gradient_direction: Optional[int],
+    direction_types: Tuple[
+        Literal["rand", "grad", "hess_ev"], Literal["rand", "grad", "hess_ev"]
+    ],
     projected_optimizer_steps: Optional[np.ndarray],
     projected_sgd_steps: Optional[np.ndarray],
     projected_optimizer_steps_true_grad: Optional[np.ndarray],
@@ -170,12 +172,14 @@ def plot_surface(
 
     coords = np.linspace(-magnitude, magnitude, num=results.shape[0])
 
-    if gradient_direction is not None:
-        yaxis_title = "gradient dir." if gradient_direction == 0 else "random dir."
-        xaxis_title = "gradient dir." if gradient_direction == 1 else "random dir."
-    else:
-        yaxis_title = "random dir. 1"
-        xaxis_title = "random dir. 2"
+    axis_titles = []
+    for dir_type in direction_types:
+        if dir_type == "rand":
+            axis_titles.append("random dir.")
+        elif dir_type == "grad":
+            axis_titles.append("gradient dir.")
+        else:
+            axis_titles.append("top Hessian ev.")
     margins = PLOT_MARGINS_WITHOUT_TITLE if disable_title else PLOT_MARGINS_WITH_TITLE
     axis_label_fontsize = 26
     ticks_fontsize = 14
@@ -185,13 +189,13 @@ def plot_surface(
             scene={
                 "aspectmode": "cube",
                 "xaxis": {
-                    "title": xaxis_title,
+                    "title": axis_titles[0],
                     "title_font": {"size": axis_label_fontsize},
                     "tickfont": {"size": ticks_fontsize},
                     "range": [-magnitude * 1.15, magnitude * 1.15],
                 },
                 "yaxis": {
-                    "title": yaxis_title,
+                    "title": axis_titles[1],
                     "title_font": {"size": axis_label_fontsize},
                     "tickfont": {"size": ticks_fontsize},
                     "range": [-magnitude * 1.15, magnitude * 1.15],

@@ -2,7 +2,7 @@ import functools
 import logging
 import pickle
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Iterable, List, Literal, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
@@ -13,6 +13,9 @@ import torch
 from tqdm import tqdm
 
 from action_space_toolbox.analysis.analysis import Analysis
+from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
+    HessianEigenCachedCalculator,
+)
 from action_space_toolbox.analysis.reward_surface_visualization.plotting import (
     plot_results,
 )
@@ -42,7 +45,7 @@ class RewardSurfaceVisualization(Analysis):
         run_dir: Path,
         grid_size: int,
         magnitude: float,
-        plot_in_gradient_direction: bool,
+        direction_types: Sequence[Literal["rand", "grad", "hess_ev"]],
         num_samples_true_loss: int,
         num_steps: int,
         num_plots: int,
@@ -61,7 +64,9 @@ class RewardSurfaceVisualization(Analysis):
         )
         self.grid_size = grid_size
         self.magnitude = magnitude
-        self.plot_in_gradient_direction = plot_in_gradient_direction
+        self.direction_types = tuple(direction_types)
+        assert len(self.direction_types) == 2
+        assert self.direction_types[0] != "grad" or self.direction_types[1] != "grad"
         self.num_samples_true_loss = num_samples_true_loss
         self.num_steps = num_steps
         self.num_plots = num_plots
@@ -127,28 +132,47 @@ class RewardSurfaceVisualization(Analysis):
                 num_spawned_processes=self.num_processes,
             )
 
-            direction2 = self.sample_filter_normalized_direction(
-                list(agent.policy.parameters())
-            )
+            rand_dir_norm = flatten_parameters(
+                self.sample_filter_normalized_direction(list(agent.policy.parameters()))
+            ).norm()
 
-            if self.plot_in_gradient_direction:
-                # Normalize the gradient to have the same length as the random direction vector (as described in
-                # appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in Reinforcement Learning
-                # Environments))
-                gradient, _, _ = ppo_gradient(
-                    agent, next(rollout_buffer_true_loss.get())
-                )
-                gradient_norm = torch.linalg.norm(
-                    torch.cat([g.flatten() for g in gradient])
-                )
-                direction2_norm = torch.linalg.norm(
-                    torch.cat([g.flatten() for g in direction2])
-                )
-                direction1 = [g / gradient_norm * direction2_norm for g in gradient]
-            else:
-                direction1 = self.sample_filter_normalized_direction(
-                    list(agent.policy.parameters())
-                )
+            hess_eigen_calc = HessianEigenCachedCalculator(self.run_dir)
+
+            directions = []
+            for dir_type in self.direction_types:
+                if dir_type == "grad":
+                    gradient, _, _ = ppo_gradient(
+                        agent, next(rollout_buffer_true_loss.get())
+                    )
+                    # Normalize the gradient to have the same length as the random direction vector (as described in
+                    # appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in Reinforcement Learning
+                    # Environments))
+                    gradient_norm = torch.linalg.norm(
+                        torch.cat([g.flatten() for g in gradient])
+                    )
+                    directions.append(
+                        [g / gradient_norm * rand_dir_norm for g in gradient]
+                    )
+                elif dir_type == "hess_ev":
+                    hess_evs = hess_eigen_calc.get_eigen(
+                        agent, next(rollout_buffer_true_loss.get()), env_step
+                    )
+                    curr_ev = hess_evs.eigenvectors[0]
+                    # Normalize the Hessian eigenvector to have the same length as the random direction vector (as
+                    # described in appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in
+                    # Reinforcement Learning Environments))
+                    curr_ev_norm = torch.linalg.norm(
+                        torch.cat([g.flatten() for g in curr_ev])
+                    )
+                    directions.append(
+                        [ev / curr_ev_norm * rand_dir_norm for ev in curr_ev]
+                    )
+                else:
+                    directions.append(
+                        self.sample_filter_normalized_direction(
+                            list(agent.policy.parameters())
+                        )
+                    )
 
             agent_weights = [p.detach().clone() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
@@ -157,12 +181,12 @@ class RewardSurfaceVisualization(Analysis):
             for offset1_idx, offset1_scalar in enumerate(coords):
                 weights_curr_offset1 = [
                     a_weight + off * offset1_scalar
-                    for a_weight, off in zip(agent_weights, direction1)
+                    for a_weight, off in zip(agent_weights, directions[0])
                 ]
                 for offset2_idx, offset2_scalar in enumerate(coords):
                     weights_curr_offsets = [
                         a_weight + off * offset2_scalar
-                        for a_weight, off in zip(weights_curr_offset1, direction2)
+                        for a_weight, off in zip(weights_curr_offset1, directions[1])
                     ]
                     weights_offsets[offset1_idx][offset2_idx] = weights_curr_offsets
 
@@ -200,8 +224,8 @@ class RewardSurfaceVisualization(Analysis):
                     projected_optimizer_steps_true_grad,
                     projected_sgd_steps_true_grad,
                 ) = self.sample_projected_update_trajectories(
-                    direction1,
-                    direction2,
+                    directions[0],
+                    directions[1],
                     max(10, self.max_gradient_trajectories),
                     rollout_buffer_true_loss,
                 )
@@ -221,10 +245,10 @@ class RewardSurfaceVisualization(Analysis):
                 "plot_num": plot_num,
                 "magnitude": self.magnitude,
                 "directions": (
-                    [d.cpu().numpy() for d in direction1],
-                    [d.cpu().numpy() for d in direction2],
+                    [d.cpu().numpy() for d in directions[0]],
+                    [d.cpu().numpy() for d in directions[1]],
                 ),
-                "gradient_direction": 0 if self.plot_in_gradient_direction else None,
+                "direction_types": self.direction_types,
                 "num_samples_true_loss": self.num_samples_true_loss,
                 "sampled_projected_optimizer_steps": projected_optimizer_steps,
                 "sampled_projected_sgd_steps": projected_sgd_steps,

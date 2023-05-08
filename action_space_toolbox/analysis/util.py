@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Callable, Iterable, List, Optional, Sequence, Union
+from typing import Callable, Iterable, List, Optional, Sequence, Union, Dict, Any
 
 import gym
 import numpy as np
@@ -237,3 +237,19 @@ def normalize_filter(
         raise ValueError(
             f"Only 1, 2, 4 dimensional filters allowed, got {filter_parameters.shape}."
         )
+
+
+def read_dict_recursive(d: Dict, keys: Sequence, default: Any = None) -> Any:
+    for key in keys:
+        if key in d:
+            d = d[key]
+        else:
+            return default
+
+
+def write_dict_recursive(d: Dict, keys: Sequence, value: Any) -> None:
+    for key in keys[:-1]:
+        if key not in d:
+            d[key] = {}
+        d = d[key]
+    d[keys[-1]] = value
