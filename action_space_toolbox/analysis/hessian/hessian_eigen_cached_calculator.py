@@ -31,7 +31,7 @@ class HessianEigenCachedCalculator:
         self,
         run_dir: Path,
         num_eigen: int = 20,
-        tol: float = 1e-4,
+        tol: float = 1e-3,
         max_iter: int = 10000,
     ):
         self.cache_path = run_dir / "cashed_results" / "hessian_eigenvalues.pkl"
