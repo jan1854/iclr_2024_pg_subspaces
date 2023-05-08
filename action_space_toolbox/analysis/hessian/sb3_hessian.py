@@ -38,12 +38,9 @@ class SB3Hessian:
         self.loss = ppo_loss
 
         loss, _, _, _ = self.loss(self.agent, self.data)
-        loss.backward(create_graph=True)
         # this step is used to extract the parameters from the model
-        params, gradsH = get_params_grad(self.agent.policy)
-        self.agent.policy.zero_grad()
-        self.params = params
-        self.gradsH = gradsH  # gradient used for Hessian computation
+        self.params, _ = get_params_grad(self.agent.policy)
+        self.gradsH = torch.autograd.grad(loss, self.params, create_graph=True)
 
     def dataloader_hv_product(self, v):
 
