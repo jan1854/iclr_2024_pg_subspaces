@@ -245,6 +245,7 @@ def read_dict_recursive(d: Dict, keys: Sequence, default: Any = None) -> Any:
             d = d[key]
         else:
             return default
+    return d
 
 
 def write_dict_recursive(d: Dict, keys: Sequence, value: Any) -> None:
