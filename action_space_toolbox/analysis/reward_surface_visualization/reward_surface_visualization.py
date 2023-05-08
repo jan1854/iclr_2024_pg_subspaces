@@ -157,7 +157,9 @@ class RewardSurfaceVisualization(Analysis):
                     hess_evs = hess_eigen_calc.get_eigen(
                         agent, next(rollout_buffer_true_loss.get()), env_step
                     )
-                    curr_ev = hess_evs.eigenvectors[0]
+                    # TODO: Add a proper way for plotting along the other Hessian eigenvectors, dont abuse plot_num for
+                    #  this
+                    curr_ev = hess_evs.eigenvectors[plot_num]
                     # Normalize the Hessian eigenvector to have the same length as the random direction vector (as
                     # described in appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in
                     # Reinforcement Learning Environments))
