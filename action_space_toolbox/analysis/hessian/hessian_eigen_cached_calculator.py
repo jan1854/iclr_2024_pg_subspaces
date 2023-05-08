@@ -51,7 +51,7 @@ class HessianEigenCachedCalculator:
         if (
             not overwrite_cache
             and cached_evs is not None
-            and len(cached_evs[0]) >= self.num_eigen
+            and len(cached_evs.eigenvalues) >= self.num_eigen
         ):
             return cached_evs
         else:
