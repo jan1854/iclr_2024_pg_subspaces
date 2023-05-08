@@ -23,6 +23,7 @@ dependencies = [
     "omegaconf",
     "Pillow",
     "plotly",
+    "pyhessian",
     "rich",
     "scipy",
     "scikit-image",
