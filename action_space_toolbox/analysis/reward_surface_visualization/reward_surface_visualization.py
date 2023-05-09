@@ -109,7 +109,7 @@ class RewardSurfaceVisualization(Analysis):
                 and (
                     self.out_dir
                     / "loss_surface"
-                    / f"{self._result_filename('loss_surface', env_step, plot_num)}.png"
+                    / f"{self._result_filename('loss', env_step, plot_num)}.png"
                 ).exists()
             ):
                 continue
