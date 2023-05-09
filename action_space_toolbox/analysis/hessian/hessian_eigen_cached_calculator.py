@@ -46,6 +46,7 @@ class HessianEigenCachedCalculator:
         data: RolloutBufferSamples,
         env_step: int,
         overwrite_cache: bool = False,
+        show_progress: bool = False,
     ) -> HessianEigenResult:
         cached_evs = self.read_cached_eigen(env_step)
         if (
@@ -57,7 +58,7 @@ class HessianEigenCachedCalculator:
         else:
             hessian_comp = SB3Hessian(agent, data, agent.device)
             eigenvalues, eigenvectors = hessian_comp.eigenvalues(
-                self.max_iter, self.tol, self.num_eigen
+                self.max_iter, self.tol, self.num_eigen, show_progress
             )
             # Sometimes the eigenvalues are not sorted properly, so sort eigenvalues and eigenvectors according to the
             # absolute value of the eigenvalues

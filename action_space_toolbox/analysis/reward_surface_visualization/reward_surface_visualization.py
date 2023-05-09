@@ -155,7 +155,10 @@ class RewardSurfaceVisualization(Analysis):
                     )
                 elif dir_type == "hess_ev":
                     hess_evs = hess_eigen_calc.get_eigen(
-                        agent, next(rollout_buffer_true_loss.get()), env_step
+                        agent,
+                        next(rollout_buffer_true_loss.get()),
+                        env_step,
+                        show_progress=True,
                     )
                     # TODO: Add a proper way for plotting along the other Hessian eigenvectors, dont abuse plot_num for
                     #  this

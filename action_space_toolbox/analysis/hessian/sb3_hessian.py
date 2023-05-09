@@ -10,6 +10,7 @@ from pyhessian import (
     group_add,
 )
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
+from tqdm import trange
 
 from action_space_toolbox.util.sb3_training import ppo_loss
 
@@ -67,7 +68,7 @@ class SB3Hessian:
         eigenvalue = group_product(THv, v).cpu().item()
         return eigenvalue, THv
 
-    def eigenvalues(self, maxIter=100, tol=1e-3, top_n=1):
+    def eigenvalues(self, maxIter=100, tol=1e-3, top_n=1, show_progress: bool = False):
         """
         compute the top_n eigenvalues using power iteration method
         maxIter: maximum iterations used to compute each single eigenvalue
@@ -82,9 +83,11 @@ class SB3Hessian:
         eigenvalues = []
         eigenvectors = []
 
-        computed_dim = 0
-
-        while computed_dim < top_n:
+        for _ in trange(
+            top_n,
+            disable=not show_progress,
+            desc="Computing eigenvalues / eigenvectors.",
+        ):
             eigenvalue = None
             v = [
                 torch.randn(p.size()).to(device) for p in self.params
@@ -111,7 +114,6 @@ class SB3Hessian:
                         eigenvalue = tmp_eigenvalue
             eigenvalues.append(eigenvalue)
             eigenvectors.append(v)
-            computed_dim += 1
 
         return eigenvalues, eigenvectors
 
