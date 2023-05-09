@@ -26,7 +26,7 @@ class HessianEigenspectrum(Analysis):
         num_eigen_spectrum: int,
     ):
         super().__init__(
-            "high_curvature_subspace_analysis",
+            "hessian_eigenspectrum",
             analysis_run_id,
             env_factory,
             agent_spec,
@@ -34,7 +34,7 @@ class HessianEigenspectrum(Analysis):
         )
         self.num_samples_true_loss = num_samples_true_loss
         self.num_eigen_spectrum = num_eigen_spectrum
-        self.results_dir = run_dir / "analyses" / "cliff_analysis" / analysis_run_id
+        self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.eigenspectrum_dir = self.results_dir / "eigenspectrum"
         self.eigenspectrum_dir.mkdir(exist_ok=True)

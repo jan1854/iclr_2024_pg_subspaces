@@ -1,0 +1,4 @@
+_target_: action_space_toolbox.analysis.high_curvature_subspace_analysis.hessian_eigenspectrum.HessianEigenspectrum
+analysis_run_id: default
+num_samples_true_loss: 1_000_000
+num_eigen_spectrum: 1_000
