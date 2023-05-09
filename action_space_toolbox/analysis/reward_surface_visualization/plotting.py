@@ -100,6 +100,13 @@ def plot_results(
                 else:
                     sgd_steps_true_grad = None
 
+                if "direction_types" in results:
+                    direction_types = results["direction_types"]
+                elif "gradient_direction" in results:
+                    direction_types = ("grad", "rand")
+                else:
+                    direction_types = ("rand", "rand")
+
                 plot_surface(
                     results["magnitude"],
                     data,
@@ -108,7 +115,7 @@ def plot_results(
                     results["env_step"],
                     results["plot_num"],
                     plot_descr,
-                    results.get("direction_types"),
+                    direction_types,
                     optimizer_steps,
                     sgd_steps,
                     optimizer_steps_true_grad,
@@ -126,6 +133,14 @@ def plot_results(
     )
     with results_path.open("rb") as results_file:
         results = pickle.load(results_file)
+
+    if "direction_types" in results:
+        direction_types = results["direction_types"]
+    elif "gradient_direction" in results:
+        direction_types = ("grad", "rand")
+    else:
+        direction_types = ("rand", "rand")
+
     if "policy_ratio" in results:
         plot_surface(
             results["magnitude"],
@@ -135,7 +150,7 @@ def plot_results(
             results["env_step"],
             results["plot_num"],
             "policy ratio",
-            results.get("direction_types"),
+            direction_types,
             None,
             None,
             None,
