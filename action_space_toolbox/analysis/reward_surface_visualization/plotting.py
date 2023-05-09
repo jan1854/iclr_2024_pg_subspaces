@@ -179,7 +179,8 @@ def plot_surface(
         elif dir_type == "grad":
             axis_titles.append("gradient dir.")
         else:
-            axis_titles.append("top Hessian ev.")
+            # TODO: This axis should also include the number of the ev (top-k ev)
+            axis_titles.append("Hessian ev.")
     margins = PLOT_MARGINS_WITHOUT_TITLE if disable_title else PLOT_MARGINS_WITH_TITLE
     axis_label_fontsize = 26
     ticks_fontsize = 14
@@ -189,13 +190,13 @@ def plot_surface(
             scene={
                 "aspectmode": "cube",
                 "xaxis": {
-                    "title": axis_titles[0],
+                    "title": axis_titles[1],
                     "title_font": {"size": axis_label_fontsize},
                     "tickfont": {"size": ticks_fontsize},
                     "range": [-magnitude * 1.15, magnitude * 1.15],
                 },
                 "yaxis": {
-                    "title": axis_titles[1],
+                    "title": axis_titles[0],
                     "title_font": {"size": axis_label_fontsize},
                     "tickfont": {"size": ticks_fontsize},
                     "range": [-magnitude * 1.15, magnitude * 1.15],
