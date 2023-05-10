@@ -1,9 +1,11 @@
+import logging
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable
 
 import gym
 import stable_baselines3
 import stable_baselines3.common.buffers
+import torch
 from matplotlib import pyplot as plt
 
 from action_space_toolbox.analysis.analysis import Analysis
@@ -13,6 +15,9 @@ from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator impor
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+
+
+logger = logging.Logger(__name__)
 
 
 class HessianEigenspectrum(Analysis):
@@ -61,24 +66,24 @@ class HessianEigenspectrum(Analysis):
             rollout_buffer_true_loss,
         )
 
-        # TODO: Remove the low_budget_evs hack below
-        hess_eigen_calc = HessianEigenCachedCalculator(
-            self.run_dir / "low_budget_evs",
-            self.num_eigen_spectrum,
-            max_iter=100,
-            tol=1e-3,
+        hess_eigen_calculator = HessianEigenCachedCalculator(self.run_dir)
+        eigenvalues, eigenvectors = hess_eigen_calculator.get_eigen(
+            agent, next(rollout_buffer_true_loss.get()), env_step, None
         )
-        hess_eigen = hess_eigen_calc.get_eigen(
-            agent, next(rollout_buffer_true_loss.get()), env_step, show_progress=True
-        )
-        self._plot_eigenspectrum(hess_eigen.eigenvalues, env_step)
+        self._plot_eigenspectrum(eigenvalues, env_step)
         return logs
 
-    def _plot_eigenspectrum(self, eigenvalues: List[float], env_step: int) -> None:
-        eigenvalues = sorted(eigenvalues)
-        plt.title(
-            f"Spectrum of the top-{self.num_eigen_spectrum} (absolute value) eigenvalues."
-        )
+    def _plot_eigenspectrum(self, eigenvalues: torch.Tensor, env_step: int) -> None:
+        plt.title(f"Spectrum of the Hessian eigenvalues.")
         plt.scatter(range(len(eigenvalues)), eigenvalues)
         plt.savefig(self.eigenspectrum_dir / f"{env_step}.pdf")
+        plt.close()
+        plt.title(f"Spectrum of the positive Hessian eigenvalues.")
+        eigenvalues_pos = eigenvalues[eigenvalues > 0]
+        plt.scatter(
+            range(len(eigenvalues_pos)),
+            eigenvalues_pos,
+        )
+        plt.yscale("log")
+        plt.savefig(self.eigenspectrum_dir / f"logscale_{env_step}.pdf")
         plt.close()

@@ -1,105 +1,79 @@
-import dataclasses
-import pickle
 from pathlib import Path
-from typing import List, Optional
+from typing import Literal, Optional, Tuple, Union
 
 import filelock
 import stable_baselines3
 import torch
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
 
-from action_space_toolbox.analysis.hessian.sb3_hessian import SB3Hessian
-from action_space_toolbox.analysis.util import read_dict_recursive, write_dict_recursive
-
-
-@dataclasses.dataclass
-class ComputationParameters:
-    tol: float
-    max_iter: int
-    num_samples: int
-
-
-@dataclasses.dataclass
-class HessianEigenResult:
-    eigenvalues: List[float]
-    eigenvectors: List[List[torch.Tensor]]
-    computation_params: ComputationParameters
+from action_space_toolbox.analysis.hessian.calculate_hessian import calculate_hessian
+from action_space_toolbox.analysis.util import flatten_parameters
+from action_space_toolbox.util.sb3_training import ppo_loss
 
 
 class HessianEigenCachedCalculator:
     def __init__(
         self,
         run_dir: Path,
-        num_eigen: int = 50,
-        tol: float = 1e-4,
-        max_iter: int = 10000,
+        num_eigenvectors_to_cache: int = 100,
     ):
-        self.cache_path = run_dir / "cached_results" / "hessian_eigenvalues.pkl"
-        self.cache_path.parent.mkdir(exist_ok=True, parents=True)
-        self.num_eigen = num_eigen
-        self.tol = tol
-        self.max_iter = max_iter
+        self.cache_path = run_dir / "cached_results" / "eigen"
+        self.cache_path.mkdir(exist_ok=True, parents=True)
+        self.num_eigenvectors_to_cache = num_eigenvectors_to_cache
 
     def get_eigen(
         self,
         agent: stable_baselines3.ppo.PPO,
         data: RolloutBufferSamples,
         env_step: int,
+        num_eigenvectors: Union[int, Literal["all"], None],
         overwrite_cache: bool = False,
-        show_progress: bool = False,
-    ) -> HessianEigenResult:
-        cached_evs = self.read_cached_eigen(env_step)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if num_eigenvectors == "all":
+            num_eigenvectors = len(flatten_parameters(agent.policy.parameters()))
+        elif num_eigenvectors is None:
+            num_eigenvectors = 0
+        cached_eigen = self.read_cached_eigen(env_step)
         if (
             not overwrite_cache
-            and cached_evs is not None
-            and len(cached_evs.eigenvalues) >= self.num_eigen
+            and cached_eigen is not None
+            and cached_eigen[1].shape[0] >= num_eigenvectors
         ):
-            return cached_evs
+            return cached_eigen
         else:
-            hessian_comp = SB3Hessian(agent, data, agent.device)
-            eigenvalues, eigenvectors = hessian_comp.eigenvalues(
-                self.max_iter, self.tol, self.num_eigen, show_progress
-            )
-            # Sometimes the eigenvalues are not sorted properly, so sort eigenvalues and eigenvectors according to the
-            # absolute value of the eigenvalues
-            eigenvalues, eigenvectors = (
-                list(t)
-                for t in zip(
-                    *sorted(
-                        zip(eigenvalues, eigenvectors),
-                        key=lambda x: abs(x[0]),
-                        reverse=True,
-                    )
-                )
-            )
+            hess = calculate_hessian(agent, lambda a: ppo_loss(a, data)[0])
+            eigenvalues, eigenvectors = torch.linalg.eigh(hess)
+            self.cache_eigen(eigenvalues, eigenvectors, env_step)
+            return eigenvalues, eigenvectors
 
-            result = HessianEigenResult(
-                eigenvalues,
-                eigenvectors,
-                ComputationParameters(self.tol, self.max_iter, data.actions.shape[0]),
-            )
-            self.cache_eigen(result, env_step)
-            return result
-
-    def read_cached_eigen(self, env_step: int) -> Optional[HessianEigenResult]:
-        if not self.cache_path.exists():
+    def read_cached_eigen(
+        self, env_step: int
+    ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
+        eigenval_cache_path, eigenvec_cache_path = self._get_cache_paths(env_step)
+        if not eigenval_cache_path.exists():
             return None
         else:
             with filelock.FileLock(
-                self.cache_path.with_suffix(self.cache_path.suffix + ".lock")
+                eigenval_cache_path.with_suffix(eigenval_cache_path.suffix + ".lock")
             ):
-                with self.cache_path.open("rb") as cache_file:
-                    cache = pickle.load(cache_file)
-            cached_eigen = read_dict_recursive(cache, ("ppo", env_step))
-            return cached_eigen
+                eigenvalues = torch.load(eigenval_cache_path)
+                eigenvectors = torch.load(eigenvec_cache_path)
+            return eigenvalues, eigenvectors
 
-    def cache_eigen(self, result: HessianEigenResult, env_step: int) -> None:
-        cache = self.read_cached_eigen(env_step)
-        if cache is None:
-            cache = {}
+    def cache_eigen(
+        self, eigenvalues: torch.Tensor, eigenvectors: torch.Tensor, env_step: int
+    ) -> None:
+        eigenval_cache_path, eigenvec_cache_path = self._get_cache_paths(env_step)
         with filelock.FileLock(
-            self.cache_path.with_suffix(self.cache_path.suffix + ".lock")
+            eigenval_cache_path.with_suffix(eigenval_cache_path.suffix + ".lock")
         ):
-            with self.cache_path.open("wb") as cache_file:
-                write_dict_recursive(cache, ("ppo", env_step), result)
-                pickle.dump(cache, cache_file)
+            torch.save(eigenvalues, eigenval_cache_path)
+            torch.save(
+                eigenvectors[: self.num_eigenvectors_to_cache], eigenvec_cache_path
+            )
+
+    def _get_cache_paths(self, env_step: int) -> Tuple[Path, Path]:
+        return (
+            self.cache_path / f"eigenvalues_{env_step:07d}.pt",
+            self.cache_path / f"eigenvectors_{env_step:07d}.pt",
+        )
