@@ -10,7 +10,7 @@ def calculate_hessian(
     agent: stable_baselines3.common.base_class.BaseAlgorithm,
     loss: Callable[[stable_baselines3.common.base_class.BaseAlgorithm], torch.Tensor],
 ):
-    def loss_reparmeterized(*params):
+    def loss_reparametrized(*params):
         names = [n for n, _ in agent.policy.named_parameters()]
         with _stateless.reparametrize_module(
             agent.policy, {n: p for n, p in zip(names, params)}
@@ -18,7 +18,7 @@ def calculate_hessian(
             return loss(agent)
 
     hess = hessian(
-        loss_reparmeterized,
+        loss_reparametrized,
         tuple(agent.policy.parameters()),
     )
     return torch.cat(
