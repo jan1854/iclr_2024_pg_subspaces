@@ -4,6 +4,7 @@ from typing import Callable, Iterable, List, Optional, Sequence, Union, Dict, An
 import gym
 import numpy as np
 import stable_baselines3.common.buffers
+import stable_baselines3.common.base_class
 import torch
 
 from action_space_toolbox.util.agent_spec import AgentSpec
@@ -200,8 +201,24 @@ def evaluate_agent_losses(
     )
 
 
-def flatten_parameters(seq: Sequence[torch.Tensor]) -> torch.Tensor:
-    return torch.cat([s.flatten() for s in seq])
+def flatten_parameters(param_seq: Sequence[torch.Tensor]) -> torch.Tensor:
+    return torch.cat([s.flatten() for s in param_seq])
+
+
+def unflatten_parameters_for_agent(
+    param_vec: torch.Tensor,
+    agent: stable_baselines3.common.base_class.BaseAlgorithm,
+) -> List[torch.Tensor]:
+    param_seq = []
+    vec_idx = 0
+    for layer_weights in agent.policy.parameters():
+        param_seq.append(
+            param_vec[vec_idx : vec_idx + layer_weights.numel()].reshape_as(
+                layer_weights
+            )
+        )
+        vec_idx += layer_weights.numel()
+    return param_seq
 
 
 def filter_normalize_direction(
@@ -254,3 +271,16 @@ def write_dict_recursive(d: Dict, keys: Sequence, value: Any) -> None:
             d[key] = {}
         d = d[key]
     d[keys[-1]] = value
+
+
+def project(
+    vec: torch.Tensor, subspace: torch.Tensor, result_in_orig_space: bool
+) -> torch.Tensor:
+    # Projection matrix: (subspace^T @ subspace)^(-1) @ subspace^T
+    vec_subspace = torch.linalg.solve(subspace.T @ subspace, subspace.T @ vec).to(
+        torch.float32
+    )
+    if result_in_orig_space:
+        return subspace @ vec_subspace
+    else:
+        return vec_subspace

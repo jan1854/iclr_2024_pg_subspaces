@@ -24,6 +24,8 @@ from action_space_toolbox.analysis.util import (
     evaluate_agent_returns,
     evaluate_agent_losses,
     filter_normalize_direction,
+    project,
+    unflatten_parameters_for_agent,
 )
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.sb3_training import (
@@ -162,15 +164,16 @@ class RewardSurfaceVisualization(Analysis):
                     )
                     # TODO: Add a proper way for plotting along the other Hessian eigenvectors, dont abuse plot_num for
                     #  this
-                    curr_ev = hess_eigenvectors[:, -plot_num - 1].T
+                    curr_ev = hess_eigenvectors[:, -plot_num - 1]
                     # Normalize the Hessian eigenvector to have the same length as the random direction vector (as
                     # described in appendix I of (Sullivan, 2022: Cliff Diving: Exploring Reward Surfaces in
                     # Reinforcement Learning Environments))
-                    curr_ev_norm = torch.linalg.norm(
-                        torch.cat([g.flatten() for g in curr_ev])
-                    )
+                    curr_ev_norm = torch.linalg.norm(curr_ev)
                     directions.append(
-                        [ev / curr_ev_norm * rand_dir_norm for ev in curr_ev]
+                        [
+                            ev / curr_ev_norm * rand_dir_norm
+                            for ev in unflatten_parameters_for_agent(curr_ev, agent)
+                        ]
                     )
                 else:
                     directions.append(
@@ -467,11 +470,11 @@ class RewardSurfaceVisualization(Analysis):
             )
             optimizer.step()
             new_optimizer_parameters = flatten_parameters(agent.policy.parameters())
-            # Projection matrix: (directions^T @ directions)^(-1) @ directions^T
-            curr_proj_params = torch.linalg.solve(
-                directions.T @ directions,
-                directions.T @ (new_optimizer_parameters - old_parameters).double(),
-            ).to(torch.float32)
+            curr_proj_params = project(
+                (new_optimizer_parameters - old_parameters).double(),
+                directions,
+                result_in_orig_space=False,
+            )
             projected_parameters.append(curr_proj_params.detach().cpu().numpy())
         return np.stack(projected_parameters)
 
