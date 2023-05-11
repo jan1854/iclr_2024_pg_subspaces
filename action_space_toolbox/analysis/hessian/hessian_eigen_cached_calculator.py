@@ -69,7 +69,7 @@ class HessianEigenCachedCalculator:
         ):
             torch.save(eigenvalues, eigenval_cache_path)
             torch.save(
-                eigenvectors[: self.num_eigenvectors_to_cache], eigenvec_cache_path
+                eigenvectors[:, : self.num_eigenvectors_to_cache], eigenvec_cache_path
             )
 
     def _get_cache_paths(self, env_step: int) -> Tuple[Path, Path]:
