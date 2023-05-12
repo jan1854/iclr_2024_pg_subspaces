@@ -193,4 +193,4 @@ def test_flatten_unflatten():
     params_flattened = flatten_parameters(agent.policy.parameters())
     params_unflattened = unflatten_parameters_for_agent(params_flattened, agent)
     for p_unfl, p_orig in zip(params_unflattened, agent.policy.parameters()):
-        assert p_unfl.detach() == pytest.approx(p_orig.detach())
+        assert torch.all(p_unfl == p_orig)
