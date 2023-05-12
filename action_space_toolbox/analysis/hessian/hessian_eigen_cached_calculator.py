@@ -1,7 +1,9 @@
+import re
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Sequence, Tuple, Union
 
 import filelock
+import numpy as np
 import stable_baselines3
 import torch
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
@@ -11,15 +13,51 @@ from action_space_toolbox.analysis.util import flatten_parameters
 from action_space_toolbox.util.sb3_training import ppo_loss
 
 
+def _get_cache_paths(cache_path: Path, env_step: int) -> Tuple[Path, Path]:
+    return (
+        cache_path / f"eigenvalues_{env_step:07d}.npy",
+        cache_path / f"eigenvectors_{env_step:07d}.npy",
+    )
+
+
+class CachedEigenIterator:
+    def __init__(
+        self,
+        cache_path: Path,
+        env_steps: Sequence[int],
+        device: Union[str, torch.device],
+    ):
+        self.cache_path = cache_path
+        self.env_steps = tuple(env_steps)
+        self.device = device
+        self._idx = 0
+
+    def __iter__(self) -> "CachedEigenIterator":
+        return self
+
+    def __next__(self) -> Tuple[int, torch.Tensor, torch.Tensor]:
+        if self._idx < len(self.env_steps):
+            env_step = self.env_steps[self._idx]
+            eigenvals_path, eigenvecs_path = _get_cache_paths(self.cache_path, env_step)
+            eigenvals = torch.tensor(np.load(str(eigenvals_path)), device=self.device)
+            eigenvecs = torch.tensor(np.load(str(eigenvecs_path)), device=self.device)
+            self._idx += 1
+            return env_step, eigenvals, eigenvecs
+        else:
+            raise StopIteration
+
+
 class HessianEigenCachedCalculator:
     def __init__(
         self,
         run_dir: Path,
-        num_eigenvectors_to_cache: int = 100,
+        num_eigenvectors_to_cache: int = 1000,
+        device: Union[str, torch.device] = "cpu",
     ):
         self.cache_path = run_dir / "cached_results" / "eigen"
         self.cache_path.mkdir(exist_ok=True, parents=True)
         self.num_eigenvectors_to_cache = num_eigenvectors_to_cache
+        self.device = device
 
     def get_eigen(
         self,
@@ -49,31 +87,40 @@ class HessianEigenCachedCalculator:
     def read_cached_eigen(
         self, env_step: int
     ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
-        eigenval_cache_path, eigenvec_cache_path = self._get_cache_paths(env_step)
+        eigenval_cache_path, eigenvec_cache_path = _get_cache_paths(
+            self.cache_path, env_step
+        )
         if not eigenval_cache_path.exists():
             return None
         else:
             with filelock.FileLock(
                 eigenval_cache_path.with_suffix(eigenval_cache_path.suffix + ".lock")
             ):
-                eigenvalues = torch.load(eigenval_cache_path)
-                eigenvectors = torch.load(eigenvec_cache_path)
-            return eigenvalues, eigenvectors
+                eigenvalues = np.load(str(eigenval_cache_path))
+                eigenvectors = np.load(str(eigenvec_cache_path))
+            return torch.tensor(eigenvalues, device=self.device), torch.tensor(
+                eigenvectors, device=self.device
+            )
 
     def cache_eigen(
         self, eigenvalues: torch.Tensor, eigenvectors: torch.Tensor, env_step: int
     ) -> None:
-        eigenval_cache_path, eigenvec_cache_path = self._get_cache_paths(env_step)
+        eigenval_cache_path, eigenvec_cache_path = _get_cache_paths(
+            self.cache_path, env_step
+        )
         with filelock.FileLock(
             eigenval_cache_path.with_suffix(eigenval_cache_path.suffix + ".lock")
         ):
-            torch.save(eigenvalues, eigenval_cache_path)
-            torch.save(
-                eigenvectors[:, : self.num_eigenvectors_to_cache], eigenvec_cache_path
+            np.save(str(eigenval_cache_path), eigenvalues.cpu().numpy())
+            np.save(
+                str(eigenvec_cache_path),
+                eigenvectors[:, : self.num_eigenvectors_to_cache].cpu().numpy(),
             )
 
-    def _get_cache_paths(self, env_step: int) -> Tuple[Path, Path]:
-        return (
-            self.cache_path / f"eigenvalues_{env_step:07d}.pt",
-            self.cache_path / f"eigenvectors_{env_step:07d}.pt",
-        )
+    def iter_cached_eigen(self) -> "CachedEigenIterator":
+        env_steps = [
+            int(cache_file.name[len("eigenvalues") + 1 : -4])
+            for cache_file in self.cache_path.iterdir()
+            if re.fullmatch("eigenvalues_[0-9]+.npy", cache_file.name)
+        ]
+        return CachedEigenIterator(self.cache_path, sorted(env_steps), self.device)

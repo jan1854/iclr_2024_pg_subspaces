@@ -11,7 +11,12 @@ from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from action_space_toolbox.analysis.util import evaluate_agent_returns
+from action_space_toolbox.analysis.util import (
+    evaluate_agent_returns,
+    project,
+    flatten_parameters,
+    unflatten_parameters_for_agent,
+)
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.angles import normalize_angle
 from action_space_toolbox.util.sb3_training import fill_rollout_buffer
@@ -162,3 +167,30 @@ def test_evaluate_agent_returns():
     assert eval_result_episodes.rewards_discounted.item() == pytest.approx(
         gt_value_discounted
     )
+
+
+def test_projection():
+    vec = torch.tensor([[1.0, 1.0, 1.0]]).T
+    subspace = torch.tensor([[1.0, 0.0, 0.0], [0.0, 2.0, 0.0]]).T
+    vec_subspace = project(vec, subspace, result_in_orig_space=False)
+    assert vec_subspace == pytest.approx(torch.tensor([[1.0, 0.5]]).T)
+    vec_orig_space = project(vec, subspace, result_in_orig_space=True)
+    assert vec_orig_space == pytest.approx(torch.tensor([[1.0, 1.0, 0.0]]).T)
+
+    vecs = torch.tensor([[1.0, 0.0, 1.0], [0.0, 1.0, 1.0]]).T
+    vecs_subspace = project(vecs, subspace, result_in_orig_space=False)
+    assert vecs_subspace == pytest.approx(torch.tensor([[1.0, 0.0], [0.0, 0.5]]).T)
+    vecs_orig_space = project(vecs, subspace, result_in_orig_space=True)
+    assert vecs_orig_space == pytest.approx(
+        torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).T
+    )
+
+
+def test_flatten_unflatten():
+    agent = stable_baselines3.ppo.PPO(
+        "MlpPolicy", gym.make("Pendulum-v1"), device="cpu"
+    )
+    params_flattened = flatten_parameters(agent.policy.parameters())
+    params_unflattened = unflatten_parameters_for_agent(params_flattened, agent)
+    for p_unfl, p_orig in zip(params_unflattened, agent.policy.parameters()):
+        assert p_unfl.detach() == pytest.approx(p_orig.detach())
