@@ -51,7 +51,7 @@ class HessianEigenCachedCalculator:
     def __init__(
         self,
         run_dir: Path,
-        num_eigenvectors_to_cache: int = 1000,
+        num_eigenvectors_to_cache: int = 200,
         device: Union[str, torch.device] = "cpu",
     ):
         self.cache_path = run_dir / "cached_results" / "eigen"
