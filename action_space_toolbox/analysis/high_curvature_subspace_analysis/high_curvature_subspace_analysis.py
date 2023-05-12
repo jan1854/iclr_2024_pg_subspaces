@@ -33,7 +33,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         agent_spec: AgentSpec,
         run_dir: Path,
         num_samples_true_loss: int,
-        num_eigen_spectrum: int,
         top_eigenvec_levels: Sequence[int],
         eigenvec_overlap_checkpoints: Sequence[int],
     ):
@@ -45,7 +44,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             run_dir,
         )
         self.num_samples_true_loss = num_samples_true_loss
-        self.num_eigen_spectrum = num_eigen_spectrum
         self.top_eigenvec_levels = top_eigenvec_levels
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id

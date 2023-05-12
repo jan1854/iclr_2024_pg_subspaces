@@ -1,6 +1,5 @@
 _target_: action_space_toolbox.analysis.high_curvature_subspace_analysis.high_curvature_subspace_analysis.HighCurvatureSubspaceAnalysis
 analysis_run_id: default
 num_samples_true_loss: 1_000_000
-num_eigen_spectrum: 1_000
 top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
 eigenvec_overlap_checkpoints: [0, 10_000, 50_000, 100_000, 200_000]
