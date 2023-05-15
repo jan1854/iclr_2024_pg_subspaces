@@ -48,6 +48,7 @@ class RewardSurfaceVisualization(Analysis):
         grid_size: int,
         magnitude: float,
         direction_types: Sequence[Literal["rand", "grad", "hess_ev"]],
+        fix_rand_dirs_at_checkpoint: bool,
         num_samples_true_loss: int,
         num_steps: int,
         num_plots: int,
@@ -67,6 +68,17 @@ class RewardSurfaceVisualization(Analysis):
         self.grid_size = grid_size
         self.magnitude = magnitude
         self.direction_types = tuple(direction_types)
+        self.fix_rand_dirs_at_checkpoint = fix_rand_dirs_at_checkpoint
+        if (
+            self.direction_types == ("rand", "rand")
+            and self.fix_rand_dirs_at_checkpoint
+        ):
+            logger.warning(
+                f"fix_rand_dirs_at_checkpoint is set but both directions are set to random; "
+                f"changing fix_rand_dirs_at_checkpoint to False"
+            )
+            self.fix_rand_dirs_at_checkpoint = False
+
         assert len(self.direction_types) == 2
         assert self.direction_types[0] != "grad" or self.direction_types[1] != "grad"
         self.num_samples_true_loss = num_samples_true_loss
@@ -141,6 +153,7 @@ class RewardSurfaceVisualization(Analysis):
             hess_eigen_calc = HessianEigenCachedCalculator(self.run_dir)
 
             directions = []
+            last_rand_dir = None
             for dir_type in self.direction_types:
                 if dir_type == "grad":
                     gradient, _, _ = ppo_gradient(
@@ -176,11 +189,15 @@ class RewardSurfaceVisualization(Analysis):
                         ]
                     )
                 else:
-                    directions.append(
-                        self.sample_filter_normalized_direction(
-                            list(agent.policy.parameters())
+                    if self.fix_rand_dirs_at_checkpoint and last_rand_dir is not None:
+                        directions.append(last_rand_dir)
+                    else:
+                        directions.append(
+                            self.sample_filter_normalized_direction(
+                                list(agent.policy.parameters())
+                            )
                         )
-                    )
+                        last_rand_dir = directions[-1]
 
             agent_weights = [p.detach().clone() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]

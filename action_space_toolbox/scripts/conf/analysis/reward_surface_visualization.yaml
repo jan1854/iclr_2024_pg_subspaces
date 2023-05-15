@@ -3,6 +3,7 @@ analysis_run_id: default
 grid_size: 31
 magnitude: 1.0
 direction_types: [rand, rand]
+fix_rand_dirs_at_checkpoint: false
 num_samples_true_loss: 1_000_000
 num_steps: 200_000
 num_plots: 1
