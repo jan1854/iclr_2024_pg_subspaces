@@ -88,7 +88,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             keys.append(curr_key)
             logs.add_scalar(curr_key, subspace_frac, env_step)
         logs.add_multiline_scalar(
-            f"estimated_gradient/gradient_subspace_fraction/estimated_gradient", keys
+            f"gradient_subspace_fraction/estimated_gradient", keys
         )
         subspace_fracs_true_grad = self._calculate_gradient_subspace_fraction(
             eigenvectors, rollout_buffer_true_loss.get()
