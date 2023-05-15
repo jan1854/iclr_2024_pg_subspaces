@@ -116,7 +116,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
     def _calculate_eigenvectors_overlap(
         cls, eigenvectors1: torch.Tensor, eigenvectors2: torch.Tensor
     ) -> float:
-        projected_evs = project(eigenvectors1, eigenvectors2, result_in_orig_space=True)
+        projected_evs = project(eigenvectors2, eigenvectors1, result_in_orig_space=True)
         return torch.mean(torch.norm(projected_evs, dim=0) ** 2).item()
 
     def _plot_eigenspectrum(self, eigenvalues: torch.Tensor, env_step: int) -> None:
