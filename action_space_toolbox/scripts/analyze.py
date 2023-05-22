@@ -122,13 +122,21 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             for checkpoint in checkpoints_dir.iterdir()
         ]
         checkpoint_steps.sort()
+        checkpoints_to_analyze = []
         if cfg.checkpoints_to_analyze is not None:
-            checkpoints_to_analyze = [
-                (log_dir, int(checkpoint) // base_env_timestep_factor)
-                for checkpoint in cfg.checkpoints_to_analyze
-            ]
+            for checkpoint in cfg.checkpoints_to_analyze:
+                checkpoint_no_action_repeat = (
+                    int(checkpoint) // base_env_timestep_factor
+                )
+                if checkpoint_no_action_repeat in checkpoint_steps:
+                    checkpoints_to_analyze.append(
+                        (log_dir, checkpoint_no_action_repeat)
+                    )
+                else:
+                    logger.warning(
+                        f"Did not find checkpoint {checkpoint} in {checkpoints_dir}, skipping."
+                    )
         else:
-            checkpoints_to_analyze = []
             for agent_step in checkpoint_steps:
                 env_step = agent_step * base_env_timestep_factor
 
