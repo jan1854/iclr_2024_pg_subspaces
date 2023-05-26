@@ -2,7 +2,7 @@ import collections
 import functools
 import itertools
 import math
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Union, Literal
 
 import gym
 import numpy as np
@@ -441,8 +441,8 @@ def sample_update_trajectory(
     agent_spec: AgentSpec,
     rollout_buffer: stable_baselines3.common.buffers.RolloutBuffer,
     batch_size: Optional[int],
-    max_num_steps: Optional[int],
-    repeat_data: bool = False,
+    max_num_steps: Optional[int] = None,
+    n_epochs: Union[int, Literal["inf"]] = 1,
     alternative_optimizer_factory: Optional[
         Callable[[Iterable[torch.nn.Parameter]], torch.optim.Optimizer]
     ] = None,
@@ -453,21 +453,22 @@ def sample_update_trajectory(
     else:
         optimizer = agent.policy.optimizer
     parameters = []
-    assert max_num_steps is not None or not repeat_data
-    data_iter = (
-        itertools.cycle(rollout_buffer.get(batch_size))
-        if repeat_data
-        else rollout_buffer.get(batch_size)
-    )
-    for step, batch in enumerate(data_iter):
-        if max_num_steps is not None and step >= max_num_steps:
-            break
-        loss, _, _, _ = ppo_loss(agent, batch)
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(agent.policy.parameters(), agent.max_grad_norm)
-        optimizer.step()
-        parameters.append([p.detach().clone() for p in agent.policy.parameters()])
+    assert max_num_steps is not None or n_epochs != "inf"
+    epochs_iter = range(n_epochs) if n_epochs != "inf" else itertools.count()
+    step = 0
+    for _ in epochs_iter:
+        for batch in rollout_buffer.get(batch_size):
+            loss, _, _, _ = ppo_loss(agent, batch)
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                agent.policy.parameters(), agent.max_grad_norm
+            )
+            optimizer.step()
+            parameters.append([p.detach().clone() for p in agent.policy.parameters()])
+            step += 1
+            if max_num_steps is not None and step >= max_num_steps:
+                return parameters
     return parameters
 
 

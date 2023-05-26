@@ -173,7 +173,7 @@ class RewardSurfaceVisualization(Analysis):
                         agent,
                         next(rollout_buffer_true_loss.get()),
                         env_step,
-                        self.num_plots,
+                        num_eigenvectors=self.num_plots,
                     )
                     # TODO: Add a proper way for plotting along the other Hessian eigenvectors, dont abuse plot_num for
                     #  this

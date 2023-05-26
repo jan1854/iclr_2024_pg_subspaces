@@ -85,7 +85,9 @@ class UpdateStepAnalysis(Analysis):
             rollout_buffer_curr_policy_eval,
         )
 
-        len_update_trajectory = agent.n_steps * agent.n_envs // agent.batch_size
+        len_update_trajectory = (
+            agent.n_steps * agent.n_envs // agent.batch_size * agent.n_epochs
+        )
 
         rollout_buffer_agent = stable_baselines3.common.buffers.RolloutBuffer(
             self.num_samples_agent_updates,
@@ -115,7 +117,7 @@ class UpdateStepAnalysis(Analysis):
             self.agent_spec,
             rollout_buffer_agent,
             agent.batch_size,
-            len_update_trajectory,
+            n_epochs=agent.n_epochs,
         )
         avg_update_step_length = self.get_average_update_step_length(
             sample_update_trajectory_agent
@@ -132,7 +134,7 @@ class UpdateStepAnalysis(Analysis):
             rollout_buffer_true_loss,
             None,
             len_update_trajectory,
-            repeat_data=True,
+            n_epochs="inf",
         )
 
         (

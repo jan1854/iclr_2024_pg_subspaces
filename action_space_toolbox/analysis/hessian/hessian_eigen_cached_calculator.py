@@ -13,11 +13,22 @@ from action_space_toolbox.analysis.util import flatten_parameters
 from action_space_toolbox.util.sb3_training import ppo_loss
 
 
-def _get_cache_paths(cache_path: Path, env_step: int) -> Tuple[Path, Path]:
-    return (
-        cache_path / f"eigenvalues_{env_step:07d}.npy",
-        cache_path / f"eigenvectors_{env_step:07d}.npy",
+def _get_cache_paths(
+    cache_path: Path, env_step: int, num_grad_steps_additional_training: int
+) -> Tuple[Path, Path]:
+    paths_without_suffix = (
+        cache_path / f"eigenvalues_{env_step:07d}",
+        cache_path / f"eigenvectors_{env_step:07d}",
     )
+    if num_grad_steps_additional_training > 0:
+        paths_without_suffix = tuple(
+            p.with_name(
+                p.name
+                + f"_additional_grad_steps_{num_grad_steps_additional_training:05d}"
+            )
+            for p in paths_without_suffix
+        )
+    return tuple(p.with_suffix(".npy") for p in paths_without_suffix)  # type: ignore
 
 
 class CachedEigenIterator:
@@ -25,10 +36,12 @@ class CachedEigenIterator:
         self,
         cache_path: Path,
         env_steps: Sequence[int],
+        num_grad_steps_additional_training: int,
         device: Union[str, torch.device],
     ):
         self.cache_path = cache_path
         self.env_steps = tuple(env_steps)
+        self.num_grad_steps_additional_training = num_grad_steps_additional_training
         self.device = device
         self._idx = 0
 
@@ -38,7 +51,9 @@ class CachedEigenIterator:
     def __next__(self) -> Tuple[int, torch.Tensor, torch.Tensor]:
         if self._idx < len(self.env_steps):
             env_step = self.env_steps[self._idx]
-            eigenvals_path, eigenvecs_path = _get_cache_paths(self.cache_path, env_step)
+            eigenvals_path, eigenvecs_path = _get_cache_paths(
+                self.cache_path, env_step, self.num_grad_steps_additional_training
+            )
             eigenvals = torch.tensor(np.load(str(eigenvals_path)), device=self.device)
             eigenvecs = torch.tensor(np.load(str(eigenvecs_path)), device=self.device)
             self._idx += 1
@@ -64,14 +79,17 @@ class HessianEigenCachedCalculator:
         agent: stable_baselines3.ppo.PPO,
         data: RolloutBufferSamples,
         env_step: int,
-        num_eigenvectors: Union[int, Literal["all"], None],
+        num_grad_steps_additional_training: int = 0,
+        num_eigenvectors: Union[int, Literal["all"], None] = None,
         overwrite_cache: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         if num_eigenvectors == "all":
             num_eigenvectors = len(flatten_parameters(agent.policy.parameters()))
         elif num_eigenvectors is None:
             num_eigenvectors = 0
-        cached_eigen = self.read_cached_eigen(env_step)
+        cached_eigen = self.read_cached_eigen(
+            env_step, num_grad_steps_additional_training
+        )
         if (
             not overwrite_cache
             and cached_eigen is not None
@@ -81,14 +99,16 @@ class HessianEigenCachedCalculator:
         else:
             hess = calculate_hessian(agent, lambda a: ppo_loss(a, data)[0])
             eigenvalues, eigenvectors = torch.linalg.eigh(hess)
-            self.cache_eigen(eigenvalues, eigenvectors, env_step)
+            self.cache_eigen(
+                eigenvalues, eigenvectors, env_step, num_grad_steps_additional_training
+            )
             return eigenvalues, eigenvectors
 
     def read_cached_eigen(
-        self, env_step: int
+        self, env_step: int, num_grad_steps_additional_training: int
     ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
         eigenval_cache_path, eigenvec_cache_path = _get_cache_paths(
-            self.cache_path, env_step
+            self.cache_path, env_step, num_grad_steps_additional_training
         )
         if not eigenval_cache_path.exists():
             return None
@@ -103,10 +123,14 @@ class HessianEigenCachedCalculator:
             )
 
     def cache_eigen(
-        self, eigenvalues: torch.Tensor, eigenvectors: torch.Tensor, env_step: int
+        self,
+        eigenvalues: torch.Tensor,
+        eigenvectors: torch.Tensor,
+        env_step: int,
+        num_grad_steps_additional_training: int,
     ) -> None:
         eigenval_cache_path, eigenvec_cache_path = _get_cache_paths(
-            self.cache_path, env_step
+            self.cache_path, env_step, num_grad_steps_additional_training
         )
         with filelock.FileLock(
             eigenval_cache_path.with_suffix(eigenval_cache_path.suffix + ".lock")
@@ -117,10 +141,22 @@ class HessianEigenCachedCalculator:
                 eigenvectors[:, : self.num_eigenvectors_to_cache].cpu().numpy(),
             )
 
-    def iter_cached_eigen(self) -> "CachedEigenIterator":
+    def iter_cached_eigen(
+        self, num_grad_steps_additional_training: int = 0
+    ) -> "CachedEigenIterator":
+        if num_grad_steps_additional_training == 0:
+            pattern = "eigenvalues_[0-9]+.npy"
+        else:
+            pattern = f"eigenvalues_[0-9]+_additional_grad_steps_{num_grad_steps_additional_training:05d}.npy"
         env_steps = [
-            int(cache_file.name[len("eigenvalues") + 1 : -4])
+            # TODO: Does not work if the number of env_steps is > 10000000 --> Use re again
+            int(cache_file.name[len("eigenvalues") + 1 : len("eigenvalues") + 8])
             for cache_file in self.cache_path.iterdir()
-            if re.fullmatch("eigenvalues_[0-9]+.npy", cache_file.name)
+            if re.fullmatch(pattern, cache_file.name)
         ]
-        return CachedEigenIterator(self.cache_path, sorted(env_steps), self.device)
+        return CachedEigenIterator(
+            self.cache_path,
+            sorted(env_steps),
+            num_grad_steps_additional_training,
+            self.device,
+        )
