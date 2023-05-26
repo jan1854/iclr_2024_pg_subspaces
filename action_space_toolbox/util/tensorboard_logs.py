@@ -164,8 +164,12 @@ def calculate_mean_std_sequence(
     assert len(event_accumulators) > 0
     scalars = []
     for ea in event_accumulators:
-        scalars_curr_ea = read_scalar(ea, key)
-        scalars.append(scalars_curr_ea)
+        if key in ea.Tags()["scalars"]:
+            scalars_curr_ea = read_scalar(ea, key)
+            scalars.append(scalars_curr_ea)
+        else:
+            logger.warning(f"Key {key} not found in the log directory {ea.path}.")
+    assert len(scalars) > 0, f"Key {key} is in none of the given log directories."
     # Sort data and check whether the steps match
     scalars = sorted([list(s.values()) for s in scalars], key=lambda s: len(s))
     steps = set([s.step for s in scalars[-1]])
@@ -196,7 +200,7 @@ def calculate_mean_std_sequence(
         np.array(steps),
         np.mean(wall_time, axis=0),
         np.mean(values, axis=0),
-        np.std(values, axis=0),
+        np.std(values, axis=0) if values.shape[0] > 1 else None,
     )
 
 
