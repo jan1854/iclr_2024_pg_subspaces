@@ -188,7 +188,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             for num_eigenvecs in self.top_eigenvec_levels:
                 gradient_projected = project(
                     gradient,
-                    eigenvectors[:, -num_eigenvecs:],
+                    eigenvectors[:, :num_eigenvecs],
                     result_in_orig_space=True,
                 )
                 sub_frac = (
@@ -222,8 +222,8 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                     curr_overlaps[checkpoint_env_step][
                         env_step
                     ] = self._calculate_eigenvectors_overlap(
-                        checkpoint_evs[:, -num_eigenvecs:],
-                        eigenvecs[:, -num_eigenvecs:],
+                        checkpoint_evs[:, :num_eigenvecs],
+                        eigenvecs[:, :num_eigenvecs],
                     )
                 if env_step in self.eigenvec_overlap_checkpoints:
                     curr_start_checkpoints_eigenvecs[env_step] = eigenvecs
