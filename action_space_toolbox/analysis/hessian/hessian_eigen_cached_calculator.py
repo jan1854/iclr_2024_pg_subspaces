@@ -85,24 +85,33 @@ class HessianEigenCachedCalculator:
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         if num_eigenvectors == "all":
             num_eigenvectors = len(flatten_parameters(agent.policy.parameters()))
-        elif num_eigenvectors is None:
-            num_eigenvectors = 0
         cached_eigen = self.read_cached_eigen(
             env_step, num_grad_steps_additional_training
         )
         if (
             not overwrite_cache
             and cached_eigen is not None
-            and cached_eigen[1].shape[0] >= num_eigenvectors
+            and (
+                num_eigenvectors is None or cached_eigen[1].shape[0] >= num_eigenvectors
+            )
+            # Legacy: Make sure that the eigenvalues are sorted in descending order (to make sure that the eigenvectors
+            #         w.r.t. the largest eigenvalues are cached)
+            and torch.all(cached_eigen[0][:-1] > cached_eigen[0][1:])
         ):
-            return cached_eigen
+            eigenvalues, eigenvectors = cached_eigen
         else:
+
             hess = calculate_hessian(agent, lambda a: ppo_loss(a, data)[0])
             eigenvalues, eigenvectors = torch.linalg.eigh(hess)
+            indices_sorted = eigenvalues.argsort(descending=True)
+            eigenvalues = eigenvalues[indices_sorted]
+            eigenvectors = eigenvectors[:, indices_sorted]
             self.cache_eigen(
                 eigenvalues, eigenvectors, env_step, num_grad_steps_additional_training
             )
-            return eigenvalues, eigenvectors
+        if num_eigenvectors is not None:
+            eigenvectors = eigenvectors[:, :num_eigenvectors]
+        return eigenvalues, eigenvectors
 
     def read_cached_eigen(
         self, env_step: int, num_grad_steps_additional_training: int

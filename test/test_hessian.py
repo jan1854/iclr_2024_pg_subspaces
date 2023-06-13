@@ -96,12 +96,12 @@ def test_hessian_ev_calculation():
         eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen(
             agent, next(rollout_buffer.get()), 0, num_eigenvectors="all"
         )
-        assert torch.all(eigenvals_calc[:-1] < eigenvals_calc[1:])
+        assert torch.all(eigenvals_calc[:-1] > eigenvals_calc[1:])
         for eigenval, eigenvec in zip(eigenvals_calc, eigenvecs_calc.T):
             eigenvec = eigenvec.unsqueeze(1)
             assert eigenval * eigenvec == pytest.approx(hess @ eigenvec, abs=1e-3)
         eigenvals_cache, eigenvecs_cache = hess_eigen_comp.get_eigen(
-            agent, next(rollout_buffer.get()), 0, num_eigenvectors=100
+            agent, next(rollout_buffer.get()), 0, num_eigenvectors=25
         )
         assert eigenvals_cache == pytest.approx(eigenvals_calc, abs=1e-3)
-        assert eigenvecs_cache == pytest.approx(eigenvecs_calc[:100], abs=1e-3)
+        assert eigenvecs_cache == pytest.approx(eigenvecs_calc[:, :25], abs=1e-3)

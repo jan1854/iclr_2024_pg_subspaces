@@ -141,8 +141,8 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         keys_update = []
         for k in self.top_eigenvec_levels:
             overlap = self._calculate_eigenvectors_overlap(
-                eigenvectors[:, -k:],
-                eigenvectors_after_update[:, -k:],
+                eigenvectors[:, :k],
+                eigenvectors_after_update[:, :k],
             )
             curr_key = f"overlaps_update_top{k:03d}"
             logs.add_scalar(curr_key, overlap, env_step)
@@ -166,7 +166,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         plt.title(f"Spectrum of the positive Hessian eigenvalues")
         eigenvalues_pos = eigenvalues[eigenvalues > 0]
         plt.scatter(
-            range(len(eigenvalues_pos)),
+            reversed(range(len(eigenvalues_pos))),
             eigenvalues_pos,
         )
         plt.yscale("log")
