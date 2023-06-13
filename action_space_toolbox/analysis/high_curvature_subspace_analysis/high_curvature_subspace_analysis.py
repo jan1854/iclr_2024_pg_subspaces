@@ -160,13 +160,13 @@ class HighCurvatureSubspaceAnalysis(Analysis):
 
     def _plot_eigenspectrum(self, eigenvalues: torch.Tensor, env_step: int) -> None:
         plt.title(f"Spectrum of the Hessian eigenvalues")
-        plt.scatter(range(len(eigenvalues)), eigenvalues)
+        plt.scatter(list(reversed(range(len(eigenvalues)))), eigenvalues)
         plt.savefig(self.eigenspectrum_dir / f"{env_step}.pdf")
         plt.close()
         plt.title(f"Spectrum of the positive Hessian eigenvalues")
         eigenvalues_pos = eigenvalues[eigenvalues > 0]
         plt.scatter(
-            reversed(range(len(eigenvalues_pos))),
+            list(reversed(range(len(eigenvalues_pos)))),
             eigenvalues_pos,
         )
         plt.yscale("log")
