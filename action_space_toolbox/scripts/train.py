@@ -8,6 +8,7 @@ import hydra
 import numpy as np
 import omegaconf
 
+import rl_subspace_optimization
 import stable_baselines3.common.logger
 import stable_baselines3.common.monitor
 import stable_baselines3.common.vec_env
