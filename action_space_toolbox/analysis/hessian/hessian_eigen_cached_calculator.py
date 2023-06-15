@@ -100,7 +100,6 @@ class HessianEigenCachedCalculator:
         ):
             eigenvalues, eigenvectors = cached_eigen
         else:
-
             hess = calculate_hessian(agent, lambda a: ppo_loss(a, data)[0])
             eigenvalues, eigenvectors = torch.linalg.eigh(hess)
             indices_sorted = eigenvalues.argsort(descending=True)
