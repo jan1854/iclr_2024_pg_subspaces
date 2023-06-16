@@ -11,6 +11,8 @@ from action_space_toolbox.analysis.hessian.calculate_hessian import calculate_he
 from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
     HessianEigenCachedCalculator,
 )
+from action_space_toolbox.analysis.hessian.sb3_hessian import SB3Hessian
+from action_space_toolbox.analysis.util import flatten_parameters
 from action_space_toolbox.util.sb3_training import ppo_loss, fill_rollout_buffer
 
 
@@ -152,3 +154,53 @@ def test_hessian_ev_calculation():
         for evs in [eigenvecs_calc, eigenvecs_pol, eigenvecs_vf]:
             for i in range(evs.shape[1]):
                 assert torch.sum(torch.all(evs == evs[:, i].unsqueeze(1), dim=0)) == 1
+
+
+def test_compare_power_method_to_explicit():
+    env = gym.make("Pendulum-v1")
+    agent = stable_baselines3.ppo.PPO(
+        "MlpPolicy",
+        env,
+        device="cpu",
+        policy_kwargs={"net_arch": {"pi": [2, 3], "vf": [2, 3]}},
+    )
+    rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
+        1000, env.observation_space, env.action_space, device="cpu"
+    )
+    fill_rollout_buffer(env, agent, rollout_buffer)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir))
+        (
+            eigenvals_explicit,
+            eigenvecs_explicit,
+        ) = hess_eigen_comp.get_eigen_combined_loss(
+            agent,
+            next(rollout_buffer.get()),
+            0,
+            num_eigenvectors=len(flatten_parameters(agent.policy.parameters())),
+        )
+
+    num_evs = 10
+    power_method = SB3Hessian(agent, next(rollout_buffer.get()))
+    eigenvals_power, eigenvecs_power = power_method.eigenvalues(
+        tol=1e-5, maxIter=1000, top_n=num_evs
+    )
+    sort_indices_explicit = eigenvals_explicit.abs().argsort(descending=True)
+    eigenvals_explicit = eigenvals_explicit[sort_indices_explicit]
+    eigenvecs_explicit = eigenvecs_explicit[:, sort_indices_explicit]
+
+    for val_power, vec_power in zip(eigenvals_power, eigenvecs_power):
+        diffs = torch.abs(eigenvals_explicit - val_power)
+        closest_idx = diffs.argmin()
+        assert val_power == pytest.approx(eigenvals_explicit[closest_idx], rel=0.1)
+        # The eigenvectors have norm 1, but they could still have a different sign
+        vec_power = flatten_parameters(vec_power)
+        # TODO: These bounds are too loose...
+        assert vec_power == pytest.approx(
+            eigenvecs_explicit[:, closest_idx], rel=0.1, abs=1e-2
+        ) or -vec_power == pytest.approx(
+            eigenvecs_explicit[:, closest_idx], rel=0.1, abs=1e-2
+        )
+        # The estimated eigenvalues should roughly correspond to the top true eigenvalues but the order does not always
+        # seem 100% correct, so give some leeway
+        assert closest_idx <= 1.2 * num_evs

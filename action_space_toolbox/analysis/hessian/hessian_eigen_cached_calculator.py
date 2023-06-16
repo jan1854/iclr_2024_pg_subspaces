@@ -112,6 +112,10 @@ class HessianEigenCachedCalculator:
         num_eigenvectors: Optional[int] = None,
         overwrite_cache: bool = False,
     ) -> EigenAgent:
+        # Check that the there is no parameter sharing between policy and value function
+        assert (
+            sum(["shared" in name for name, _ in agent.policy.named_parameters()]) == 0
+        )
         cached_eigen = self.read_cached_eigen(
             env_step, num_grad_steps_additional_training
         )
@@ -188,7 +192,15 @@ class HessianEigenCachedCalculator:
         if num_eigenvectors is None:
             num_eigenvectors = eigen.num_eigenvectors
 
-        assert num_eigenvectors <= eigen.num_eigenvectors
+        # Make sure that eigen either contains the required number of eigenvectors from both the policy and value
+        # function or all eigenvectors (otherwise we cannot ensure that the eigenvectors that we collected are the top
+        # eigenvectors of the combined loss).
+        assert (
+            num_eigenvectors <= eigen.num_eigenvectors
+            or eigen.policy.eigenvectors.shape[1]
+            + eigen.value_function.eigenvectors.shape[1]
+            == len(flatten_parameters(agent.policy.parameters()))
+        )
 
         # Select the eigenvectors with the largest eigenvalues from the eigenvectors for the policy and value function.
         for _ in range(num_eigenvectors):

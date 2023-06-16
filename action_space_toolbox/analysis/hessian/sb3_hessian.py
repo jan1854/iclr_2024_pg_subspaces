@@ -25,7 +25,6 @@ class SB3Hessian:
         self,
         agent: stable_baselines3.ppo.PPO,
         data: RolloutBufferSamples,
-        device: torch.device,
     ):
         """
         model: the model that needs Hessian information
@@ -35,7 +34,6 @@ class SB3Hessian:
         """
         self.agent = agent
         self.data = data
-        self.device = device
         self.loss = ppo_loss
 
         loss, _, _, _ = self.loss(self.agent, self.data)
@@ -45,7 +43,7 @@ class SB3Hessian:
 
     def dataloader_hv_product(self, v):
 
-        device = self.device
+        device = self.agent.device
         num_data = 0  # count the number of datum points in the dataloader
 
         THv = [
@@ -78,7 +76,7 @@ class SB3Hessian:
 
         assert top_n >= 1
 
-        device = self.device
+        device = self.agent.device
 
         eigenvalues = []
         eigenvectors = []
@@ -124,7 +122,7 @@ class SB3Hessian:
         tol: the relative tolerance
         """
 
-        device = self.device
+        device = self.agent.device
         trace_vhv = []
         trace = 0.0
 
@@ -151,7 +149,7 @@ class SB3Hessian:
         n_v: number of SLQ runs
         """
 
-        device = self.device
+        device = self.agent.device
         eigen_list_full = []
         weight_list_full = []
 
