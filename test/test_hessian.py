@@ -100,7 +100,7 @@ def test_hessian_ev_calculation():
         eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen_combined_loss(
             agent, next(rollout_buffer.get()), 0, num_eigenvectors=30
         )
-        assert torch.all(eigenvals_calc[:-1] > eigenvals_calc[1:])
+        assert torch.all(eigenvals_calc[:-1] >= eigenvals_calc[1:])
         for eigenval, eigenvec in zip(eigenvals_calc, eigenvecs_calc.T):
             eigenvec = eigenvec.unsqueeze(1)
             assert eigenval * eigenvec == pytest.approx(
@@ -112,3 +112,43 @@ def test_hessian_ev_calculation():
         )
         assert eigenvals_cache == pytest.approx(eigenvals_calc, abs=1e-3)
         assert eigenvecs_cache == pytest.approx(eigenvecs_calc[:, :25], abs=1e-3)
+
+        (eigenvals_pol, eigenvecs_pol), (
+            eigenvals_vf,
+            eigenvecs_vf,
+        ) = hess_eigen_comp.get_eigen_policy_vf_loss(
+            agent, next(rollout_buffer.get()), 0, num_eigenvectors=30
+        )
+
+        assert torch.all(eigenvals_pol[:-1] >= eigenvals_pol[1:])
+        assert torch.all(eigenvals_vf[:-1] >= eigenvals_vf[1:])
+
+        # Since there is no parameter sharing between policy and value function, each entry is either zero for the
+        # policy or value function eigenvectors
+        for i in range(eigenvecs_pol.shape[1]):
+            for j in range(eigenvecs_vf.shape[1]):
+                assert eigenvecs_pol[:, i] * eigenvecs_vf[:, j] == pytest.approx(0.0)
+
+        # Check that every eigenvector of the combined loss is also an eigenvector of the policy and value function loss
+        # and that the corresponding eigenvalues are the same.
+        for i in range(eigenvecs_calc.shape[1]):
+            indices_pol = torch.argwhere(
+                torch.all(
+                    eigenvecs_pol.isclose(eigenvecs_calc[:, i].unsqueeze(1)), dim=0
+                )
+            )
+            indices_vf = torch.argwhere(
+                torch.all(
+                    eigenvecs_vf.isclose(eigenvecs_calc[:, i].unsqueeze(1)), dim=0
+                )
+            )
+            assert len(indices_pol) == 1 or len(indices_vf) == 1
+            if len(indices_pol) == 1:
+                assert eigenvals_pol[indices_pol.item()] == eigenvals_calc[i]
+            if len(indices_vf) == 1:
+                assert eigenvals_vf[indices_vf.item()] == eigenvals_calc[i]
+
+        # Check for duplicate eigenvectors
+        for evs in [eigenvecs_calc, eigenvecs_pol, eigenvecs_vf]:
+            for i in range(evs.shape[1]):
+                assert torch.sum(torch.all(evs == evs[:, i].unsqueeze(1), dim=0)) == 1

@@ -359,6 +359,11 @@ class HessianEigenCachedCalculator:
             if policy_parameters is not None
             else value_function_parameters.device
         )
+        shape = (
+            policy_parameters.shape[1:]
+            if policy_parameters is not None
+            else value_function_parameters.shape[1:]
+        )
         parameters = []
         for name, params in agent.policy.named_parameters():
             if "action_net" in name or "policy_net" in name or name == "log_std":
@@ -368,7 +373,9 @@ class HessianEigenCachedCalculator:
                     )
                     policy_idx += params.numel()
                 else:
-                    parameters.append(torch.zeros(params.numel(), device=device))
+                    parameters.append(
+                        torch.zeros((params.numel(),) + shape, device=device)
+                    )
             elif "value_net" in name:
                 if value_function_parameters is not None:
                     parameters.append(
@@ -376,7 +383,9 @@ class HessianEigenCachedCalculator:
                     )
                     vf_idx += params.numel()
                 else:
-                    parameters.append(torch.zeros(params.numel(), device=device))
+                    parameters.append(
+                        torch.zeros((params.numel(),) + shape, device=device)
+                    )
             else:
                 raise ValueError(f"Encountered invalid parameter: {name}")
         return torch.cat(parameters, dim=0)

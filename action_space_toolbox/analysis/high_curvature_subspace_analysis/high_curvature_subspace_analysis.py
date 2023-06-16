@@ -83,7 +83,24 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             env_step,
             overwrite_cache=self.overwrite_cached_eigen,
         )
-        self._plot_eigenspectrum(eigenvalues, env_step)
+        (eigenvalues_policy, eigenvectors_policy), (
+            eigenvalues_vf,
+            eigenvectors_vf,
+        ) = hess_eigen_calculator.get_eigen_policy_vf_loss(
+            agent,
+            next(rollout_buffer_true_loss.get()),
+            env_step,
+            overwrite_cache=self.overwrite_cached_eigen,
+        )
+        self._plot_eigenspectrum(
+            eigenvalues, env_step, "combined loss", "combined_loss"
+        )
+        self._plot_eigenspectrum(
+            eigenvalues_policy, env_step, "policy loss", "policy_loss"
+        )
+        self._plot_eigenspectrum(
+            eigenvalues_vf, env_step, "value function", "value_function_loss"
+        )
 
         rollout_buffer_gradient_estimates = (
             stable_baselines3.common.buffers.RolloutBuffer(
@@ -164,19 +181,23 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         projected_evs = project(eigenvectors2, eigenvectors1, result_in_orig_space=True)
         return torch.mean(torch.norm(projected_evs, dim=0) ** 2).item()
 
-    def _plot_eigenspectrum(self, eigenvalues: torch.Tensor, env_step: int) -> None:
-        plt.title(f"Spectrum of the Hessian eigenvalues")
+    def _plot_eigenspectrum(
+        self, eigenvalues: torch.Tensor, env_step: int, title: str, directory_name: str
+    ) -> None:
+        plt.title(f"Spectrum of the Hessian eigenvalues ({title})")
         plt.scatter(list(reversed(range(len(eigenvalues)))), eigenvalues)
-        plt.savefig(self.eigenspectrum_dir / f"{env_step}.pdf")
+        plt.savefig(self.eigenspectrum_dir / directory_name / f"{env_step}.pdf")
         plt.close()
-        plt.title(f"Spectrum of the positive Hessian eigenvalues")
+        plt.title(f"Spectrum of the positive Hessian eigenvalues ({title})")
         eigenvalues_pos = eigenvalues[eigenvalues > 0]
         plt.scatter(
             list(reversed(range(len(eigenvalues_pos)))),
             eigenvalues_pos,
         )
         plt.yscale("log")
-        plt.savefig(self.eigenspectrum_dir / f"logscale_{env_step}.pdf")
+        plt.savefig(
+            self.eigenspectrum_dir / directory_name / f"logscale_{env_step}.pdf"
+        )
         plt.close()
 
     def _calculate_gradient_subspace_fraction(
