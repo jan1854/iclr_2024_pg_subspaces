@@ -357,16 +357,34 @@ def ppo_loss(
 
 
 def ppo_gradient(
-    agent: stable_baselines3.ppo.PPO, rollout_data: RolloutBufferSamples
+    agent: stable_baselines3.ppo.PPO,
+    rollout_data: RolloutBufferSamples,
+    all_gradients_fullsize: bool = False,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
-    loss, _, _, _ = ppo_loss(agent, rollout_data)
+    combined_loss, policy_loss, value_function_loss, _ = ppo_loss(agent, rollout_data)
     agent.policy.zero_grad()
-    loss.backward()
+    # TODO: This is not efficient for the gradients_fullsize=True case, combined_gradient is the sum of policy and
+    #  value_function gradients (just need to be extended to the full length)
+    combined_loss.backward(retain_graph=True)
     combined_gradient = [p.grad.clone() for p in agent.policy.parameters()]
-    policy_gradient = [p.grad.clone() for p in get_policy_parameters(agent)]
-    value_function_gradient = [
-        p.grad.clone() for p in get_value_function_parameters(agent)
-    ]
+    if all_gradients_fullsize:
+        agent.policy.zero_grad()
+        policy_loss.backward()
+        policy_gradient = [
+            p.grad.clone() if p.grad is not None else torch.zeros_like(p)
+            for p in agent.policy.parameters()
+        ]
+        agent.policy.zero_grad()
+        value_function_loss.backward()
+        value_function_gradient = [
+            p.grad.clone() if p.grad is not None else torch.zeros_like(p)
+            for p in agent.policy.parameters()
+        ]
+    else:
+        policy_gradient = [p.grad.clone() for p in get_policy_parameters(agent)]
+        value_function_gradient = [
+            p.grad.clone() for p in get_value_function_parameters(agent)
+        ]
     return combined_gradient, policy_gradient, value_function_gradient
 
 
