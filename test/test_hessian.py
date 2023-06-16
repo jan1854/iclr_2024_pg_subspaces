@@ -82,25 +82,32 @@ def test_calculate_hessian_dimension():
 def test_hessian_ev_calculation():
     env = gym.make("Pendulum-v1")
     agent = stable_baselines3.ppo.PPO(
-        "MlpPolicy", env, device="cpu", policy_kwargs={"net_arch": [2, 3]}
+        "MlpPolicy",
+        env,
+        device="cpu",
+        policy_kwargs={"net_arch": {"pi": [2, 6], "vf": [4, 5]}},
     )
     rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
         1000, env.observation_space, env.action_space, device="cpu"
     )
     fill_rollout_buffer(env, agent, rollout_buffer)
+    parameter_names = [n for n, _ in agent.policy.named_parameters()]
     hess = calculate_hessian(
-        agent, lambda a: ppo_loss(a, next(rollout_buffer.get()))[0]
+        agent, lambda a: ppo_loss(a, next(rollout_buffer.get()))[0], parameter_names
     )
     with tempfile.TemporaryDirectory() as tmpdir:
         hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir))
-        eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen(
-            agent, next(rollout_buffer.get()), 0, num_eigenvectors="all"
+        eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen_combined_loss(
+            agent, next(rollout_buffer.get()), 0, num_eigenvectors=30
         )
         assert torch.all(eigenvals_calc[:-1] > eigenvals_calc[1:])
         for eigenval, eigenvec in zip(eigenvals_calc, eigenvecs_calc.T):
             eigenvec = eigenvec.unsqueeze(1)
-            assert eigenval * eigenvec == pytest.approx(hess @ eigenvec, abs=1e-3)
-        eigenvals_cache, eigenvecs_cache = hess_eigen_comp.get_eigen(
+            assert eigenval * eigenvec == pytest.approx(
+                hess @ eigenvec, abs=1e-3, rel=1e-3
+            )
+            assert torch.norm(eigenvec) == pytest.approx(1.0)
+        eigenvals_cache, eigenvecs_cache = hess_eigen_comp.get_eigen_combined_loss(
             agent, next(rollout_buffer.get()), 0, num_eigenvectors=25
         )
         assert eigenvals_cache == pytest.approx(eigenvals_calc, abs=1e-3)
