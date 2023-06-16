@@ -36,6 +36,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         num_samples_true_loss: int,
         top_eigenvec_levels: Sequence[int],
         eigenvec_overlap_checkpoints: Sequence[int],
+        overwrite_cached_eigen: bool,
     ):
         super().__init__(
             "high_curvature_subspace_analysis",
@@ -47,6 +48,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         self.num_samples_true_loss = num_samples_true_loss
         self.top_eigenvec_levels = top_eigenvec_levels
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
+        self.overwrite_cached_eigen = overwrite_cached_eigen
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.eigenspectrum_dir = self.results_dir / "eigenspectrum"
@@ -75,8 +77,11 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         )
 
         hess_eigen_calculator = HessianEigenCachedCalculator(self.run_dir)
-        eigenvalues, eigenvectors = hess_eigen_calculator.get_eigen(
-            agent, next(rollout_buffer_true_loss.get()), env_step
+        eigenvalues, eigenvectors = hess_eigen_calculator.get_eigen_combined_loss(
+            agent,
+            next(rollout_buffer_true_loss.get()),
+            env_step,
+            overwrite_cache=self.overwrite_cached_eigen,
         )
         self._plot_eigenspectrum(eigenvalues, env_step)
 
@@ -131,11 +136,12 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         agent_spec_after_update = self.agent_spec.copy_with_new_parameters(
             update_trajectory[-1]
         )
-        _, eigenvectors_after_update = hess_eigen_calculator.get_eigen(
+        _, eigenvectors_after_update = hess_eigen_calculator.get_eigen_combined_loss(
             agent_spec_after_update.create_agent(self.env_factory()),
             next(rollout_buffer_true_loss.get()),
             env_step,
             len(update_trajectory),
+            overwrite_cache=self.overwrite_cached_eigen,
         )
 
         keys_update = []
@@ -209,7 +215,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels
         }
         overlaps = {num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels}
-        for env_step, _, eigenvecs in hess_eigen_calculator.iter_cached_eigen():
+        for env_step, _, eigenvecs in hess_eigen_calculator.iter_cached_eigen(
+            self.agent_spec.create_agent()
+        ):
             for num_eigenvecs in self.top_eigenvec_levels:
                 curr_start_checkpoints_eigenvecs = start_checkpoints_eigenvecs[
                     num_eigenvecs

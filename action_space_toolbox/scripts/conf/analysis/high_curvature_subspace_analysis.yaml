@@ -3,3 +3,4 @@ analysis_run_id: default
 num_samples_true_loss: 1_000_000
 top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
 eigenvec_overlap_checkpoints: [0, 10_000, 50_000, 100_000, 200_000, 500_000, 1_000_000]
+overwrite_cached_eigen: false
