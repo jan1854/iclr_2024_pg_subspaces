@@ -6,13 +6,13 @@ import pytest
 import stable_baselines3
 import stable_baselines3.common.buffers
 import torch
-from analysis.util import flatten_parameters
 
 from action_space_toolbox.analysis.hessian.calculate_hessian import calculate_hessian
 from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
     HessianEigenCachedCalculator,
 )
 from action_space_toolbox.analysis.hessian.sb3_hessian import SB3Hessian
+from action_space_toolbox.analysis.util import flatten_parameters
 from action_space_toolbox.util.sb3_training import ppo_loss, fill_rollout_buffer
 
 
@@ -102,7 +102,7 @@ def test_hessian_ev_calculation():
         eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen_combined_loss(
             agent, next(rollout_buffer.get()), 0, num_eigenvectors=30
         )
-        assert torch.all(eigenvals_calc[:-1] > eigenvals_calc[1:])
+        assert torch.all(eigenvals_calc[:-1] >= eigenvals_calc[1:])
         for eigenval, eigenvec in zip(eigenvals_calc, eigenvecs_calc.T):
             eigenvec = eigenvec.unsqueeze(1)
             assert eigenval * eigenvec == pytest.approx(
@@ -115,11 +115,54 @@ def test_hessian_ev_calculation():
         assert eigenvals_cache == pytest.approx(eigenvals_calc, abs=1e-3)
         assert eigenvecs_cache == pytest.approx(eigenvecs_calc[:, :25], abs=1e-3)
 
+        (eigenvals_pol, eigenvecs_pol), (
+            eigenvals_vf,
+            eigenvecs_vf,
+        ) = hess_eigen_comp.get_eigen_policy_vf_loss(
+            agent, next(rollout_buffer.get()), 0, num_eigenvectors=30
+        )
+
+        assert torch.all(eigenvals_pol[:-1] >= eigenvals_pol[1:])
+        assert torch.all(eigenvals_vf[:-1] >= eigenvals_vf[1:])
+
+        # Since there is no parameter sharing between policy and value function, each entry is either zero for the
+        # policy or value function eigenvectors
+        for i in range(eigenvecs_pol.shape[1]):
+            for j in range(eigenvecs_vf.shape[1]):
+                assert eigenvecs_pol[:, i] * eigenvecs_vf[:, j] == pytest.approx(0.0)
+
+        # Check that every eigenvector of the combined loss is also an eigenvector of the policy and value function loss
+        # and that the corresponding eigenvalues are the same.
+        for i in range(eigenvecs_calc.shape[1]):
+            indices_pol = torch.argwhere(
+                torch.all(
+                    eigenvecs_pol.isclose(eigenvecs_calc[:, i].unsqueeze(1)), dim=0
+                )
+            )
+            indices_vf = torch.argwhere(
+                torch.all(
+                    eigenvecs_vf.isclose(eigenvecs_calc[:, i].unsqueeze(1)), dim=0
+                )
+            )
+            assert len(indices_pol) == 1 or len(indices_vf) == 1
+            if len(indices_pol) == 1:
+                assert eigenvals_pol[indices_pol.item()] == eigenvals_calc[i]
+            if len(indices_vf) == 1:
+                assert eigenvals_vf[indices_vf.item()] == eigenvals_calc[i]
+
+        # Check for duplicate eigenvectors
+        for evs in [eigenvecs_calc, eigenvecs_pol, eigenvecs_vf]:
+            for i in range(evs.shape[1]):
+                assert torch.sum(torch.all(evs == evs[:, i].unsqueeze(1), dim=0)) == 1
+
 
 def test_compare_power_method_to_explicit():
     env = gym.make("Pendulum-v1")
     agent = stable_baselines3.ppo.PPO(
-        "MlpPolicy", env, device="cpu", policy_kwargs={"net_arch": [2, 3]}
+        "MlpPolicy",
+        env,
+        device="cpu",
+        policy_kwargs={"net_arch": {"pi": [2, 3], "vf": [2, 3]}},
     )
     rollout_buffer = stable_baselines3.common.buffers.RolloutBuffer(
         1000, env.observation_space, env.action_space, device="cpu"
@@ -127,8 +170,14 @@ def test_compare_power_method_to_explicit():
     fill_rollout_buffer(env, agent, rollout_buffer)
     with tempfile.TemporaryDirectory() as tmpdir:
         hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir))
-        eigenvals_explicit, eigenvecs_explicit = hess_eigen_comp.get_eigen(
-            agent, next(rollout_buffer.get()), 0, num_eigenvectors="all"
+        (
+            eigenvals_explicit,
+            eigenvecs_explicit,
+        ) = hess_eigen_comp.get_eigen_combined_loss(
+            agent,
+            next(rollout_buffer.get()),
+            0,
+            num_eigenvectors=len(flatten_parameters(agent.policy.parameters())),
         )
 
     num_evs = 10
@@ -146,16 +195,10 @@ def test_compare_power_method_to_explicit():
         assert val_power == pytest.approx(eigenvals_explicit[closest_idx], rel=0.1)
         # The eigenvectors have norm 1, but they could still have a different sign
         vec_power = flatten_parameters(vec_power)
-        vec_power = (
-            -vec_power
-            if (
-                torch.sign(vec_power[0])
-                != torch.sign(eigenvecs_explicit[0, closest_idx])
-            )
-            else vec_power
-        )
         # TODO: These bounds are too loose...
         assert vec_power == pytest.approx(
+            eigenvecs_explicit[:, closest_idx], rel=0.1, abs=1e-2
+        ) or -vec_power == pytest.approx(
             eigenvecs_explicit[:, closest_idx], rel=0.1, abs=1e-2
         )
         # The estimated eigenvalues should roughly correspond to the top true eigenvalues but the order does not always
