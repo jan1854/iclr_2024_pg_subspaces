@@ -108,9 +108,10 @@ class HessianEigenCachedCalculator:
         agent: stable_baselines3.ppo.PPO,
         data: RolloutBufferSamples,
         env_step: int,
-        num_grad_steps_additional_training: int = 0,
-        num_eigenvectors: Optional[int] = None,
-        overwrite_cache: bool = False,
+        num_grad_steps_additional_training: int,
+        num_eigenvectors: Optional[int],
+        overwrite_cache: bool,
+        calculate_if_no_cached_value: bool,
     ) -> EigenAgent:
         # Check that the there is no parameter sharing between policy and value function
         assert (
@@ -130,6 +131,8 @@ class HessianEigenCachedCalculator:
         ):
             eigen = cached_eigen
         else:
+            if not calculate_if_no_cached_value:
+                raise FileNotFoundError(f"Did not find cache file.")
             names_policy = self._policy_parameter_names(agent.policy.named_parameters())
             names_vf = self._value_function_parameter_names(
                 agent.policy.named_parameters()
@@ -168,6 +171,7 @@ class HessianEigenCachedCalculator:
         num_grad_steps_additional_training: int = 0,
         num_eigenvectors: Optional[int] = None,
         overwrite_cache: bool = False,
+        calculate_if_no_cached_value: bool = True,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         eigen = self._get_eigen(
             agent,
@@ -176,8 +180,39 @@ class HessianEigenCachedCalculator:
             num_grad_steps_additional_training,
             num_eigenvectors,
             overwrite_cache,
+            calculate_if_no_cached_value,
         )
         return self.collect_top_eigenvectors(agent, eigen, num_eigenvectors)
+
+    def get_eigen_policy_vf_loss(
+        self,
+        agent: stable_baselines3.ppo.PPO,
+        data: RolloutBufferSamples,
+        env_step: int,
+        num_grad_steps_additional_training: int = 0,
+        num_eigenvectors: Optional[int] = None,
+        overwrite_cache: bool = False,
+        calculate_if_no_cached_value: bool = True,
+    ) -> Tuple[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor]]:
+        eigen = self._get_eigen(
+            agent,
+            data,
+            env_step,
+            num_grad_steps_additional_training,
+            num_eigenvectors,
+            overwrite_cache,
+            calculate_if_no_cached_value,
+        )
+        policy_eigenvectors_all_parameters = self.combine_policy_vf_parameter_vectors(
+            eigen.policy.eigenvectors, None, agent
+        )
+        vf_eigenvectors_all_parameters = self.combine_policy_vf_parameter_vectors(
+            None, eigen.value_function.eigenvectors, agent
+        )
+        return (eigen.policy.eigenvalues, policy_eigenvectors_all_parameters), (
+            eigen.value_function.eigenvalues,
+            vf_eigenvectors_all_parameters,
+        )
 
     @classmethod
     def collect_top_eigenvectors(
@@ -232,34 +267,6 @@ class HessianEigenCachedCalculator:
             .values
         )
         return eigenvalues, eigenvectors
-
-    def get_eigen_policy_vf_loss(
-        self,
-        agent: stable_baselines3.ppo.PPO,
-        data: RolloutBufferSamples,
-        env_step: int,
-        num_grad_steps_additional_training: int = 0,
-        num_eigenvectors: Optional[int] = None,
-        overwrite_cache: bool = False,
-    ) -> Tuple[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor]]:
-        eigen = self._get_eigen(
-            agent,
-            data,
-            env_step,
-            num_grad_steps_additional_training,
-            num_eigenvectors,
-            overwrite_cache,
-        )
-        policy_eigenvectors_all_parameters = self.combine_policy_vf_parameter_vectors(
-            eigen.policy.eigenvectors, None, agent
-        )
-        vf_eigenvectors_all_parameters = self.combine_policy_vf_parameter_vectors(
-            None, eigen.value_function.eigenvectors, agent
-        )
-        return (eigen.policy.eigenvalues, policy_eigenvectors_all_parameters), (
-            eigen.value_function.eigenvalues,
-            vf_eigenvectors_all_parameters,
-        )
 
     def read_cached_eigen(
         self, env_step: int, num_grad_steps_additional_training: int
