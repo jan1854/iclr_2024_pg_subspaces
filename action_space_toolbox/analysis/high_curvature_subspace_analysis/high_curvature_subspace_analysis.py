@@ -169,7 +169,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             )
 
             subspace_fracs_est_grad = self._calculate_gradient_subspace_fraction(
-                eigenvecs_combined,
+                eigenvecs,
                 gradient_func,
                 rollout_buffer_gradient_estimates.get(agent.batch_size),
             )
@@ -182,7 +182,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                 f"gradient_subspace_fraction/estimated_gradient/{loss_name}", keys
             )
             subspace_fracs_true_grad = self._calculate_gradient_subspace_fraction(
-                eigenvecs_combined, gradient_func, rollout_buffer_true_loss.get()
+                eigenvecs, gradient_func, rollout_buffer_true_loss.get()
             )
             keys = []
             for num_evs, subspace_frac in subspace_fracs_true_grad.items():
