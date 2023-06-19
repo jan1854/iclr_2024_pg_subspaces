@@ -141,8 +141,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
 
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         gradient_funcs = [
-            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[i]
-            for i in range(3)
+            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[0],
+            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[1],
+            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[2],
         ]
         eigenvals_params = [eigenvals_combined, eigenvals_policy, eigenvals_vf]
         eigenvecs_params = [eigenvecs_combined, eigenvecs_policy, eigenvecs_vf]
