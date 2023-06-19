@@ -19,7 +19,7 @@ from action_space_toolbox.analysis.util import (
 )
 from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.angles import normalize_angle
-from action_space_toolbox.util.sb3_training import fill_rollout_buffer
+from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_gradient
 from action_space_toolbox.util.tensorboard_logs import merge_dicts
 
 
@@ -194,3 +194,20 @@ def test_flatten_unflatten():
     params_unflattened = unflatten_parameters_for_agent(params_flattened, agent)
     for p_unfl, p_orig in zip(params_unflattened, agent.policy.parameters()):
         assert torch.all(p_unfl == p_orig)
+
+
+def test_ppo_gradient():
+    env = gym.make("Pendulum-v1")
+    agent = stable_baselines3.ppo.PPO(
+        "MlpPolicy", DummyVecEnv([lambda: env]), device="cpu"
+    )
+    rollout_buffer = RolloutBuffer(
+        5000, env.observation_space, env.action_space, device="cpu"
+    )
+    fill_rollout_buffer(env, agent, rollout_buffer)
+    combined_gradient_not_full, _, _ = ppo_gradient(agent, next(rollout_buffer.get()))
+    combined_gradient_full, _, _ = ppo_gradient(
+        agent, next(rollout_buffer.get()), all_gradients_fullsize=True
+    )
+    for g_nf, g_f in zip(combined_gradient_not_full, combined_gradient_full):
+        assert g_nf == pytest.approx(g_f, rel=1e-5, abs=1e-5)

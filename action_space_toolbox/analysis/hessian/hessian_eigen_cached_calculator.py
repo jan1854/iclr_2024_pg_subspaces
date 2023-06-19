@@ -49,13 +49,13 @@ class CachedEigenIterator:
         self,
         hessian_calc: "HessianEigenCachedCalculator",
         agent: stable_baselines3.ppo.PPO,
-        loss: Literal["policy", "value_function", "combined"],
+        loss_name: Literal["policy_loss", "value_function_loss", "combined_loss"],
         env_steps: Sequence[int],
         num_grad_steps_additional_training: int,
     ):
         self.hessian_calc = hessian_calc
         self.agent = agent
-        self.loss = loss
+        self.loss_name = loss_name
         self.env_steps = tuple(env_steps)
         self.num_grad_steps_additional_training = num_grad_steps_additional_training
         self._idx = 0
@@ -69,22 +69,22 @@ class CachedEigenIterator:
             eigen = self.hessian_calc.read_cached_eigen(
                 env_step, self.num_grad_steps_additional_training
             )
-            if self.loss == "combined":
+            if self.loss_name == "combined_loss":
                 eigenvals, eigenvecs = self.hessian_calc.collect_top_eigenvectors(
                     self.agent, eigen
                 )
-            elif self.loss == "policy":
-                eigenvals, eigenvecs = eigen.policy
+            elif self.loss_name == "policy_loss":
+                eigenvals = eigen.policy.eigenvalues
                 eigenvecs = self.hessian_calc.combine_policy_vf_parameter_vectors(
-                    eigenvecs, None, self.agent
+                    eigen.policy.eigenvectors, None, self.agent
                 )
-            elif self.loss == "value_function":
-                eigenvals, eigenvecs = eigen.value_function
+            elif self.loss_name == "value_function_loss":
+                eigenvals = eigen.value_function.eigenvalues
                 eigenvecs = self.hessian_calc.combine_policy_vf_parameter_vectors(
-                    None, eigenvecs, self.agent
+                    None, eigen.value_function.eigenvectors, self.agent
                 )
             else:
-                raise ValueError(f"Unknown loss: {self.loss}.")
+                raise ValueError(f"Unknown loss: {self.loss_name}.")
             self._idx += 1
             return env_step, eigenvals, eigenvecs
         else:
@@ -321,7 +321,9 @@ class HessianEigenCachedCalculator:
         self,
         agent: stable_baselines3.ppo.PPO,
         num_grad_steps_additional_training: int = 0,
-        loss: Literal["policy", "value_function", "combined"] = "combined",
+        loss_name: Literal[
+            "policy_loss", "value_function_loss", "combined_loss"
+        ] = "combined_loss",
     ) -> "CachedEigenIterator":
         if num_grad_steps_additional_training == 0:
             pattern = "eigen_[0-9]+.npz"
@@ -336,7 +338,7 @@ class HessianEigenCachedCalculator:
         return CachedEigenIterator(
             self,
             agent,
-            loss,
+            loss_name,
             sorted(env_steps),
             num_grad_steps_additional_training,
         )
