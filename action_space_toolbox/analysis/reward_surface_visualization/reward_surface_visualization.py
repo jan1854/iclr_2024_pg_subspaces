@@ -169,7 +169,7 @@ class RewardSurfaceVisualization(Analysis):
                         [g / gradient_norm * rand_dir_norm for g in gradient]
                     )
                 elif dir_type == "hess_ev":
-                    _, hess_eigenvectors = hess_eigen_calc.get_eigen(
+                    _, hess_eigenvectors = hess_eigen_calc.get_eigen_combined_loss(
                         agent,
                         next(rollout_buffer_true_loss.get()),
                         env_step,
