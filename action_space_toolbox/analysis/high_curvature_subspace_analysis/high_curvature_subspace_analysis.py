@@ -89,7 +89,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         )
         fill_rollout_buffer(self.env_factory, agent, rollout_buffer_gradient_estimates)
 
-        hess_eigen_calculator = HessianEigenCachedCalculator(self.run_dir)
+        hess_eigen_calculator = HessianEigenCachedCalculator(
+            self.run_dir, device=agent.device
+        )
         (
             eigenvals_combined,
             eigenvecs_combined,
