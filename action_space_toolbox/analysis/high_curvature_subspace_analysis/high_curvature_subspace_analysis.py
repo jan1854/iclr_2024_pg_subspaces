@@ -235,14 +235,14 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         loss_descr: str,
     ) -> None:
         plt.title(f"Spectrum of the Hessian eigenvalues ({loss_descr})")
-        plt.scatter(list(reversed(range(len(eigenvalues)))), eigenvalues)
+        plt.scatter(list(reversed(range(len(eigenvalues)))), eigenvalues.cpu().numpy())
         plt.savefig(self.eigenspectrum_dir / directory_name / f"{env_step}.pdf")
         plt.close()
         plt.title(f"Spectrum of the positive Hessian eigenvalues ({loss_descr})")
         eigenvalues_pos = eigenvalues[eigenvalues > 0]
         plt.scatter(
             list(reversed(range(len(eigenvalues_pos)))),
-            eigenvalues_pos,
+            eigenvalues_pos.cpu().numpy(),
         )
         plt.yscale("log")
         plt.savefig(
