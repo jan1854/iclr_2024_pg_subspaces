@@ -144,12 +144,13 @@ class HessianEigenCachedCalculator:
                 agent, lambda a: ppo_loss(a, data)[0], names_vf
             )
 
-            eigenvalues_policy, eigenvectors_policy = torch.linalg.eigh(hess_policy)
-            eigenvalues_policy = torch.flip(eigenvalues_policy, dims=(0,))
-            eigenvectors_policy = torch.flip(eigenvectors_policy, dims=(1,))
-            eigenvalues_vf, eigenvectors_vf = torch.linalg.eigh(hess_value_function)
-            eigenvalues_vf = torch.flip(eigenvalues_vf, dims=(0,))
-            eigenvectors_vf = torch.flip(eigenvectors_vf, dims=(1,))
+            with torch.no_grad():
+                eigenvalues_policy, eigenvectors_policy = torch.linalg.eigh(hess_policy)
+                eigenvalues_policy = torch.flip(eigenvalues_policy, dims=(0,))
+                eigenvectors_policy = torch.flip(eigenvectors_policy, dims=(1,))
+                eigenvalues_vf, eigenvectors_vf = torch.linalg.eigh(hess_value_function)
+                eigenvalues_vf = torch.flip(eigenvalues_vf, dims=(0,))
+                eigenvectors_vf = torch.flip(eigenvectors_vf, dims=(1,))
 
             eigen = EigenAgent(
                 EigenEntry(eigenvalues_policy, eigenvectors_policy),
