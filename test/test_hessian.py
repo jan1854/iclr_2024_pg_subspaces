@@ -100,7 +100,10 @@ def test_hessian_ev_calculation():
     with tempfile.TemporaryDirectory() as tmpdir:
         hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir))
         eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen_combined_loss(
-            agent, next(rollout_buffer.get()), 0, num_eigenvectors=30
+            agent,
+            next(rollout_buffer.get()),
+            0,
+            num_eigenvectors=30,
         )
         assert torch.all(eigenvals_calc[:-1] >= eigenvals_calc[1:])
         for eigenval, eigenvec in zip(eigenvals_calc, eigenvecs_calc.T):
@@ -110,7 +113,11 @@ def test_hessian_ev_calculation():
             )
             assert torch.norm(eigenvec) == pytest.approx(1.0)
         eigenvals_cache, eigenvecs_cache = hess_eigen_comp.get_eigen_combined_loss(
-            agent, next(rollout_buffer.get()), 0, num_eigenvectors=25
+            agent,
+            next(rollout_buffer.get()),
+            0,
+            num_eigenvectors=25,
+            calculate_if_no_cached_value=False,
         )
         assert eigenvals_cache == pytest.approx(eigenvals_calc, abs=1e-3)
         assert eigenvecs_cache == pytest.approx(eigenvecs_calc[:, :25], abs=1e-3)
