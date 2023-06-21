@@ -141,6 +141,8 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             overwrite_cache=self.overwrite_cached_eigen,
         )
 
+        self._plot_eigenspectrum(eigenvals_policy, eigenvals_vf, env_step)
+
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         gradient_funcs = [
             lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[0],
@@ -167,10 +169,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             eigenvecs_params,
             eigenvecs_after_update_params,
         ):
-            self._plot_eigenspectrum(
-                eigenvals, env_step, loss_name, loss_name.replace("_", " ")
-            )
-
             subspace_fracs_est_grad = self._calculate_gradient_subspace_fraction(
                 eigenvecs,
                 gradient_func,
@@ -229,25 +227,56 @@ class HighCurvatureSubspaceAnalysis(Analysis):
 
     def _plot_eigenspectrum(
         self,
-        eigenvalues: torch.Tensor,
+        eigenvalues_policy: torch.Tensor,
+        eigenvalues_vf: torch.Tensor,
         env_step: int,
-        directory_name: str,
-        loss_descr: str,
     ) -> None:
-        plt.title(f"Spectrum of the Hessian eigenvalues ({loss_descr})")
-        plt.scatter(list(reversed(range(len(eigenvalues)))), eigenvalues.cpu().numpy())
-        plt.savefig(self.eigenspectrum_dir / directory_name / f"{env_step}.pdf")
-        plt.close()
-        plt.title(f"Spectrum of the positive Hessian eigenvalues ({loss_descr})")
-        eigenvalues_pos = eigenvalues[eigenvalues > 0]
+        plt.title(f"Spectrum of the Hessian eigenvalues (policy loss)")
         plt.scatter(
-            list(reversed(range(len(eigenvalues_pos)))),
-            eigenvalues_pos.cpu().numpy(),
+            list(reversed(range(len(eigenvalues_policy)))),
+            eigenvalues_policy.cpu().numpy(),
         )
-        plt.yscale("log")
-        plt.savefig(
-            self.eigenspectrum_dir / directory_name / f"logscale_{env_step}.pdf"
+        plt.savefig(self.eigenspectrum_dir / "policy_loss" / f"{env_step}.pdf")
+        plt.close()
+        plt.title(f"Spectrum of the Hessian eigenvalues (value function loss)")
+        plt.scatter(
+            list(reversed(range(len(eigenvalues_vf)))), eigenvalues_vf.cpu().numpy()
         )
+        plt.savefig(self.eigenspectrum_dir / "value_function_loss" / f"{env_step}.pdf")
+        plt.close()
+        indices_pol = []
+        indices_vf = []
+        pol_idx = 0
+        vf_idx = 0
+        num_eigenvals = len(eigenvalues_policy) + len(eigenvalues_vf)
+        while pol_idx < len(eigenvalues_policy) or vf_idx < len(eigenvalues_vf):
+            if pol_idx < len(eigenvalues_policy) and (
+                vf_idx >= len(eigenvalues_vf)
+                or eigenvalues_policy[pol_idx] > eigenvalues_vf[vf_idx]
+            ):
+                indices_pol.append(num_eigenvals - 1 - (pol_idx + vf_idx))
+                pol_idx += 1
+            else:
+                indices_vf.append(num_eigenvals - 1 - (pol_idx + vf_idx))
+                vf_idx += 1
+
+        plt.title(f"Spectrum of the Hessian eigenvalues (combined loss)")
+        plt.scatter(
+            indices_pol,
+            eigenvalues_policy.cpu().numpy(),
+            label="Policy eigenvalues",
+            marker="x",
+            s=10,
+        )
+        plt.scatter(
+            indices_vf,
+            eigenvalues_vf.cpu().numpy(),
+            label="Value function eigenvalues",
+            marker="x",
+            s=10,
+        )
+        plt.legend()
+        plt.savefig(self.eigenspectrum_dir / "combined_loss" / f"{env_step}.pdf")
         plt.close()
 
     def _calculate_gradient_subspace_fraction(
