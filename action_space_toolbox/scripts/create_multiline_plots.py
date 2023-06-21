@@ -41,6 +41,7 @@ def create_multiline_plots(
     keys: Sequence[str],
     smoothing_weight: float,
     separate_legend: bool,
+    num_same_color_plots: int,
     out: Path,
 ) -> None:
     plt.rc("font", size=12)
@@ -52,7 +53,9 @@ def create_multiline_plots(
     if len(run_dirs) > 0:
         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
         event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
-        for key in keys:
+        color = None  # To make PyLint happy
+        linestyles = ["-", "--", "-.", ":"]
+        for i, key in enumerate(keys):
             (
                 steps,
                 _,
@@ -67,8 +70,14 @@ def create_multiline_plots(
             if xaxis_log:
                 steps = 10**steps
                 plt.xscale("log")
-            color = next(ax._get_lines.prop_cycler)["color"]
-            plt.plot(steps, value_mean, color=color)
+            if i % num_same_color_plots == 0:
+                color = next(ax._get_lines.prop_cycler)["color"]
+            plt.plot(
+                steps,
+                value_mean,
+                color=color,
+                linestyle=linestyles[i % num_same_color_plots],
+            )
             if value_std is not None:
                 plt.fill_between(
                     steps,
@@ -167,6 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
     parser.add_argument("--separate-legend", action="store_true")
+    parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
@@ -186,5 +196,6 @@ if __name__ == "__main__":
         args.keys,
         args.smoothing_weight,
         args.separate_legend,
+        args.num_same_color_plots,
         out,
     )
