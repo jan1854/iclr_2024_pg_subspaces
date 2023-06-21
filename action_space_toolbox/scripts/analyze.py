@@ -165,9 +165,10 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             logs.log(summary_writers[log_dir])
     else:
         # In contrast to multiprocessing.Pool, concurrent.futures.ProcessPoolExecutor allows nesting processes
-        with concurrent.futures.ProcessPoolExecutor(
+        pool = concurrent.futures.ProcessPoolExecutor(
             cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
-        ) as pool:
+        )
+        try:
             results = []
             for log_dir, agent_step in jobs:
                 results.append(
@@ -188,6 +189,10 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             ):
                 logs = result.result()
                 logs.log(summary_writers[log_dir])
+        finally:
+            # We cannot use a with statement here since this would not cancel the tasks (calls
+            # pool.shutdown(wait=True, cancel_futures=False)
+            pool.shutdown(wait=False, cancel_futures=True)
 
     if cfg.sync_train_logs:
         logger.info(
