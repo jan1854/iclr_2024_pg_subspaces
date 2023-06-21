@@ -1,6 +1,7 @@
 import concurrent.futures
 import functools
 import logging
+import multiprocessing
 import re
 import subprocess
 from pathlib import Path
@@ -189,9 +190,10 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             ):
                 logs = result.result()
                 logs.log(summary_writers[log_dir])
+        except:
+            for process in multiprocessing.active_children():
+                process.terminate()
         finally:
-            # We cannot use a with statement here since this would not cancel the tasks (calls
-            # pool.shutdown(wait=True, cancel_futures=False)
             pool.shutdown(wait=False, cancel_futures=True)
 
     if cfg.sync_train_logs:
