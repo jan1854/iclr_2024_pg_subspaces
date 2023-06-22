@@ -20,6 +20,9 @@ class AdditionalTrainingMetricsCallback(
     def _on_rollout_end(self) -> None:
         algorithm = self.locals["self"]
         if len(algorithm.ep_info_buffer) > 0:
+            # Log the current values since we are logging later with the number of gradient steps instead of the number
+            # of environment steps (otherwise all metrics would be logged with the number of gradient steps).
+            self.logger.dump(algorithm.num_timesteps)
             self.logger.record(
                 "rollout/ep_rew_mean_gradient_steps",
                 safe_mean([ep_info["r"] for ep_info in algorithm.ep_info_buffer]),
