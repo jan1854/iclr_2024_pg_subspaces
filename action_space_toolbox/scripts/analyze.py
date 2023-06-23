@@ -4,6 +4,7 @@ import logging
 import multiprocessing
 import re
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -17,8 +18,8 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import action_space_toolbox
-from action_space_toolbox.util.agent_spec import CheckpointAgentSpec
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+from sb3_utils.common.agent_spec import CheckpointAgentSpec
 
 logger = logging.getLogger(__name__)
 
@@ -190,9 +191,12 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             ):
                 logs = result.result()
                 logs.log(summary_writers[log_dir])
-        except:
+        except Exception as e:
+            # TODO: Need to terminate the children's children as well
             for process in multiprocessing.active_children():
                 process.terminate()
+            time.sleep(1)
+            raise e
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
 

@@ -3,18 +3,15 @@ from typing import Callable, Iterable, List, Optional, Sequence, Union, Dict, An
 
 import gym
 import numpy as np
+
+from sb3_utils.a2c.a2c_loss import a2c_loss
+from sb3_utils.common.agent_spec import AgentSpec
+from sb3_utils.common.buffer import get_episode_length, fill_rollout_buffer
+from sb3_utils.common.training import maybe_create_agent
+from sb3_utils.ppo.ppo_loss import ppo_loss
 import stable_baselines3.common.buffers
 import stable_baselines3.common.base_class
 import torch
-
-from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.get_episode_length import get_episode_length
-from action_space_toolbox.util.sb3_training import (
-    ppo_loss,
-    fill_rollout_buffer,
-    maybe_create_agent,
-    a2c_loss,
-)
 
 
 @dataclasses.dataclass
@@ -199,26 +196,6 @@ def evaluate_agent_losses(
         np.array(combined_losses, dtype=np.float32),
         np.array(policy_ratios, dtype=np.float32),
     )
-
-
-def flatten_parameters(param_seq: Sequence[torch.Tensor]) -> torch.Tensor:
-    return torch.cat([s.flatten() for s in param_seq])
-
-
-def unflatten_parameters_for_agent(
-    param_vec: torch.Tensor,
-    agent: stable_baselines3.common.base_class.BaseAlgorithm,
-) -> List[torch.Tensor]:
-    param_seq = []
-    vec_idx = 0
-    for layer_weights in agent.policy.parameters():
-        param_seq.append(
-            param_vec[vec_idx : vec_idx + layer_weights.numel()].reshape_as(
-                layer_weights
-            )
-        )
-        vec_idx += layer_weights.numel()
-    return param_seq
 
 
 def filter_normalize_direction(

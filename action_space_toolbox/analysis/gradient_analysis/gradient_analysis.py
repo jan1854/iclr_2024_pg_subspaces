@@ -19,10 +19,9 @@ from action_space_toolbox.analysis.gradient_analysis.value_function import (
     ValueFunction,
 )
 from action_space_toolbox.util import metrics
-from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.get_episode_length import get_episode_length
-from action_space_toolbox.util.sb3_training import fill_rollout_buffer
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+from sb3_utils.common.agent_spec import AgentSpec
+from sb3_utils.common.buffer import fill_rollout_buffer, get_episode_length
 
 logger = logging.getLogger(__name__)
 

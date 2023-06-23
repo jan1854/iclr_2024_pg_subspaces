@@ -6,8 +6,8 @@ import stable_baselines3
 import torch
 from stable_baselines3.common.buffers import RolloutBuffer
 
-from action_space_toolbox.util.sb3_training import ppo_gradient
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+from sb3_utils.ppo.ppo_gradient import ppo_gradient
 
 
 class GradientSimilarityAnalysis:

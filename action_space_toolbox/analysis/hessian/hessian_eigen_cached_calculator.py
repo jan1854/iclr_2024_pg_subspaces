@@ -1,47 +1,15 @@
-import dataclasses
 import re
 from pathlib import Path
-from typing import List, Literal, Optional, Sequence, Tuple, Union
+from typing import Literal, Optional, Sequence, Tuple, Union
 
-import filelock
-import numpy as np
 import stable_baselines3
 import torch
+from sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen
+from sb3_utils.common.parameters import flatten_parameters
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
 
-from action_space_toolbox.analysis.hessian.calculate_hessian import calculate_hessian
-from action_space_toolbox.analysis.util import flatten_parameters
-from action_space_toolbox.util.sb3_training import ppo_loss
-
-
-@dataclasses.dataclass
-class EigenAgent:
-    policy: "EigenEntry"
-    value_function: "EigenEntry"
-
-    def __int__(
-        self,
-        eigenvalues_policy: torch.Tensor,
-        eigenvectors_policy: torch.Tensor,
-        eigenvalues_value_function: torch.Tensor,
-        eigenvectors_value_function: torch.Tensor,
-    ):
-        self.policy = EigenEntry(eigenvalues_policy, eigenvectors_policy)
-        self.value_function = EigenEntry(
-            eigenvalues_value_function, eigenvectors_value_function
-        )
-
-    @property
-    def num_eigenvectors(self) -> int:
-        return min(
-            self.policy.eigenvectors.shape[1], self.value_function.eigenvectors.shape[1]
-        )
-
-
-@dataclasses.dataclass
-class EigenEntry:
-    eigenvalues: torch.Tensor
-    eigenvectors: torch.Tensor
+from sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
+from sb3_utils.ppo.ppo_parameters import combine_policy_vf_parameter_vectors
 
 
 class CachedEigenIterator:
@@ -75,12 +43,12 @@ class CachedEigenIterator:
                 )
             elif self.loss_name == "policy_loss":
                 eigenvals = eigen.policy.eigenvalues
-                eigenvecs = self.hessian_calc.combine_policy_vf_parameter_vectors(
+                eigenvecs = combine_policy_vf_parameter_vectors(
                     eigen.policy.eigenvectors, None, self.agent
                 )
             elif self.loss_name == "value_function_loss":
                 eigenvals = eigen.value_function.eigenvalues
-                eigenvecs = self.hessian_calc.combine_policy_vf_parameter_vectors(
+                eigenvecs = combine_policy_vf_parameter_vectors(
                     None, eigen.value_function.eigenvectors, self.agent
                 )
             else:
@@ -100,6 +68,7 @@ class HessianEigenCachedCalculator:
     ):
         self.cache_path = run_dir / "cached_results" / "eigen"
         self.cache_path.mkdir(exist_ok=True, parents=True)
+        self.hessian_eigen = HessianEigenExplicit()
         self.num_eigenvectors_to_cache = num_eigenvectors_to_cache
         self.device = device
 
@@ -112,7 +81,7 @@ class HessianEigenCachedCalculator:
         num_eigenvectors: Optional[int],
         overwrite_cache: bool,
         calculate_if_no_cached_value: bool,
-    ) -> EigenAgent:
+    ) -> ActorCriticEigen:
         # Check that the there is no parameter sharing between policy and value function
         assert (
             sum(["shared" in name for name, _ in agent.policy.named_parameters()]) == 0
@@ -133,30 +102,10 @@ class HessianEigenCachedCalculator:
         else:
             if not calculate_if_no_cached_value:
                 raise FileNotFoundError(f"Did not find cache file.")
-            names_policy = self._policy_parameter_names(agent.policy.named_parameters())
-            names_vf = self._value_function_parameter_names(
-                agent.policy.named_parameters()
-            )
-            hess_policy = calculate_hessian(
-                agent, lambda a: ppo_loss(a, data)[0], names_policy
-            )
-            hess_value_function = calculate_hessian(
-                agent, lambda a: ppo_loss(a, data)[0], names_vf
-            )
 
-            with torch.no_grad():
-                eigenvalues_policy, eigenvectors_policy = torch.linalg.eigh(hess_policy)
-                eigenvalues_policy = torch.flip(eigenvalues_policy, dims=(0,))
-                eigenvectors_policy = torch.flip(eigenvectors_policy, dims=(1,))
-                eigenvalues_vf, eigenvectors_vf = torch.linalg.eigh(hess_value_function)
-                eigenvalues_vf = torch.flip(eigenvalues_vf, dims=(0,))
-                eigenvectors_vf = torch.flip(eigenvectors_vf, dims=(1,))
-
-            eigen = EigenAgent(
-                EigenEntry(eigenvalues_policy, eigenvectors_policy),
-                EigenEntry(eigenvalues_vf, eigenvectors_vf),
+            eigen = self.hessian_eigen.calculate_top_eigen(
+                agent, data, self.num_eigenvectors_to_cache
             )
-
             self.cache_eigen(eigen, env_step, num_grad_steps_additional_training)
         eigen.policy.eigenvectors = eigen.policy.eigenvectors[:, :num_eigenvectors]
         eigen.value_function.eigenvectors = eigen.value_function.eigenvectors[
@@ -204,10 +153,10 @@ class HessianEigenCachedCalculator:
             overwrite_cache,
             calculate_if_no_cached_value,
         )
-        policy_eigenvectors_all_parameters = self.combine_policy_vf_parameter_vectors(
+        policy_eigenvectors_all_parameters = combine_policy_vf_parameter_vectors(
             eigen.policy.eigenvectors, None, agent
         )
-        vf_eigenvectors_all_parameters = self.combine_policy_vf_parameter_vectors(
+        vf_eigenvectors_all_parameters = combine_policy_vf_parameter_vectors(
             None, eigen.value_function.eigenvectors, agent
         )
         return (eigen.policy.eigenvalues, policy_eigenvectors_all_parameters), (
@@ -219,7 +168,7 @@ class HessianEigenCachedCalculator:
     def collect_top_eigenvectors(
         cls,
         agent: stable_baselines3.ppo.PPO,
-        eigen: EigenAgent,
+        eigen: ActorCriticEigen,
         num_eigenvectors: Optional[int] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         eigenvectors = []
@@ -246,14 +195,14 @@ class HessianEigenCachedCalculator:
                 > eigen.value_function.eigenvalues[vf_ev_idx]
             ):
                 eigenvectors.append(
-                    cls.combine_policy_vf_parameter_vectors(
+                    combine_policy_vf_parameter_vectors(
                         eigen.policy.eigenvectors[:, policy_ev_idx], None, agent
                     )
                 )
                 policy_ev_idx += 1
             elif vf_ev_idx < len(eigen.value_function.eigenvalues):
                 eigenvectors.append(
-                    cls.combine_policy_vf_parameter_vectors(
+                    combine_policy_vf_parameter_vectors(
                         None, eigen.value_function.eigenvectors[:, vf_ev_idx], agent
                     )
                 )
@@ -271,7 +220,7 @@ class HessianEigenCachedCalculator:
 
     def read_cached_eigen(
         self, env_step: int, num_grad_steps_additional_training: int
-    ) -> Optional[EigenAgent]:
+    ) -> Optional[ActorCriticEigen]:
         cache_path = self._get_cache_path(
             self.cache_path, env_step, num_grad_steps_additional_training
         )
@@ -280,50 +229,22 @@ class HessianEigenCachedCalculator:
     @classmethod
     def read_eigen_from_path(
         cls, cache_path: Path, device: torch.device
-    ) -> Optional[EigenAgent]:
+    ) -> Optional[ActorCriticEigen]:
         if not cache_path.exists():
             return None
         else:
-            with filelock.FileLock(cache_path.with_suffix(cache_path.suffix + ".lock")):
-                eigen_npz = np.load(str(cache_path), allow_pickle=True)
-                eigen_policy = EigenEntry(
-                    torch.tensor(eigen_npz["policy.eigenvalues"], device=device),
-                    torch.tensor(eigen_npz["policy.eigenvectors"], device=device),
-                )
-                eigen_value_function = EigenEntry(
-                    torch.tensor(
-                        eigen_npz["value_function.eigenvalues"], device=device
-                    ),
-                    torch.tensor(
-                        eigen_npz["value_function.eigenvectors"], device=device
-                    ),
-                )
-                return EigenAgent(eigen_policy, eigen_value_function)
+            return ActorCriticEigen.load(cache_path, device)
 
     def cache_eigen(
         self,
-        eigen: EigenAgent,
+        eigen: ActorCriticEigen,
         env_step: int,
         num_grad_steps_additional_training: int,
     ) -> None:
         cache_path = self._get_cache_path(
             self.cache_path, env_step, num_grad_steps_additional_training
         )
-        eigen.policy.eigenvectors = eigen.policy.eigenvectors[
-            :, : self.num_eigenvectors_to_cache
-        ]
-        eigen.value_function.eigenvectors = eigen.value_function.eigenvectors[
-            :, : self.num_eigenvectors_to_cache
-        ]
-        with filelock.FileLock(cache_path.with_suffix(cache_path.suffix + ".lock")):
-            np.savez_compressed(
-                str(cache_path),
-                **{
-                    f"{net}.{n}": t.cpu().numpy()
-                    for net, e in dataclasses.asdict(eigen).items()
-                    for n, t in e.items()
-                },
-            )
+        eigen.dump(cache_path, self.num_eigenvectors_to_cache)
 
     def iter_cached_eigen(
         self,
@@ -350,67 +271,6 @@ class HessianEigenCachedCalculator:
             sorted(env_steps),
             num_grad_steps_additional_training,
         )
-
-    @classmethod
-    def _policy_parameter_names(
-        cls, named_parameters: Sequence[Tuple[str, torch.nn.Parameter]]
-    ) -> List[str]:
-        return [
-            n
-            for n, _ in named_parameters
-            if "action_net" in n or "policy_net" in n or n == "log_std"
-        ]
-
-    @classmethod
-    def _value_function_parameter_names(
-        cls, named_parameters: Sequence[Tuple[str, torch.nn.Parameter]]
-    ) -> List[str]:
-        return [n for n, _ in named_parameters if "value_net" in n]
-
-    @classmethod
-    def combine_policy_vf_parameter_vectors(
-        cls,
-        policy_parameters: Optional[torch.Tensor],
-        value_function_parameters: Optional[torch.Tensor],
-        agent: stable_baselines3.ppo.PPO,
-    ) -> torch.Tensor:
-        policy_idx = 0
-        vf_idx = 0
-        device = (
-            policy_parameters.device
-            if policy_parameters is not None
-            else value_function_parameters.device
-        )
-        shape = (
-            policy_parameters.shape[1:]
-            if policy_parameters is not None
-            else value_function_parameters.shape[1:]
-        )
-        parameters = []
-        for name, params in agent.policy.named_parameters():
-            if "action_net" in name or "policy_net" in name or name == "log_std":
-                if policy_parameters is not None:
-                    parameters.append(
-                        policy_parameters[policy_idx : policy_idx + params.numel()]
-                    )
-                    policy_idx += params.numel()
-                else:
-                    parameters.append(
-                        torch.zeros((params.numel(),) + shape, device=device)
-                    )
-            elif "value_net" in name:
-                if value_function_parameters is not None:
-                    parameters.append(
-                        value_function_parameters[vf_idx : vf_idx + params.numel()]
-                    )
-                    vf_idx += params.numel()
-                else:
-                    parameters.append(
-                        torch.zeros((params.numel(),) + shape, device=device)
-                    )
-            else:
-                raise ValueError(f"Encountered invalid parameter: {name}")
-        return torch.cat(parameters, dim=0)
 
     @classmethod
     def _get_cache_path(

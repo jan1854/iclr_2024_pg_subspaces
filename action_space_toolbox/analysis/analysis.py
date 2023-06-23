@@ -9,11 +9,11 @@ from typing import Callable, Dict, List
 import gym
 import yaml
 
-from action_space_toolbox.util.agent_spec import AgentSpec
 from action_space_toolbox.util.tensorboard_logs import (
     TensorboardLogs,
     add_new_data_indicator,
 )
+from sb3_utils.common.agent_spec import AgentSpec
 
 logger = logging.getLogger(__name__)
 
