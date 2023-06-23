@@ -23,7 +23,6 @@ from action_space_toolbox.analysis.util import (
     evaluate_agent_returns,
     evaluate_agent_losses,
     filter_normalize_direction,
-    project,
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from sb3_utils.common.agent_spec import AgentSpec
@@ -31,6 +30,7 @@ from sb3_utils.common.buffer import fill_rollout_buffer
 from sb3_utils.common.parameters import (
     flatten_parameters,
     unflatten_parameters_for_agent,
+    project,
 )
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 from sb3_utils.ppo.ppo_loss import ppo_loss

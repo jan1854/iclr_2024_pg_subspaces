@@ -13,11 +13,10 @@ from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
     HessianEigenCachedCalculator,
 )
-from action_space_toolbox.analysis.util import project
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from sb3_utils.common.agent_spec import AgentSpec
 from sb3_utils.common.buffer import fill_rollout_buffer
-from sb3_utils.common.parameters import flatten_parameters
+from sb3_utils.common.parameters import flatten_parameters, project
 from sb3_utils.common.training import sample_update_trajectory
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 

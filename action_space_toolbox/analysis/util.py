@@ -248,16 +248,3 @@ def write_dict_recursive(d: Dict, keys: Sequence, value: Any) -> None:
             d[key] = {}
         d = d[key]
     d[keys[-1]] = value
-
-
-def project(
-    vec: torch.Tensor, subspace: torch.Tensor, result_in_orig_space: bool
-) -> torch.Tensor:
-    # Projection matrix: (subspace^T @ subspace)^(-1) @ subspace^T
-    vec_subspace = torch.linalg.solve(subspace.T @ subspace, subspace.T @ vec).to(
-        torch.float32
-    )
-    if result_in_orig_space:
-        return subspace @ vec_subspace
-    else:
-        return vec_subspace
