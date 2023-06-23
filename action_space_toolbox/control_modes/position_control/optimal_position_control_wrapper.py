@@ -7,9 +7,7 @@ import numpy as np
 from action_space_toolbox.controller_base.controller_base_wrapper import (
     ControllerBaseWrapper,
 )
-from action_space_toolbox.control_modes.check_wrapped import (
-    check_wrapped,
-)
+from sb3_utils.common.training import check_wrapped
 
 logger = logging.getLogger(__name__)
 

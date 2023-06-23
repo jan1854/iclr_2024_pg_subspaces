@@ -10,10 +10,8 @@ from action_space_toolbox.controller_base.controller_base_wrapper import (
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
 )
-from action_space_toolbox.control_modes.check_wrapped import (
-    check_wrapped,
-)
 from action_space_toolbox.util.angles import normalize_angle
+from sb3_utils.common.training import check_wrapped
 
 
 class AbstractPositionControlWrapper(ActionTransformationWrapper, abc.ABC):

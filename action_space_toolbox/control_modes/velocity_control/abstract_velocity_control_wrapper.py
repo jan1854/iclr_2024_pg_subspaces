@@ -4,15 +4,13 @@ from typing import Optional
 
 import gym
 import numpy as np
+import sb3_utils
 
 from action_space_toolbox.controller_base.controller_base_wrapper import (
     ControllerBaseWrapper,
 )
 from action_space_toolbox.action_transformation_wrapper import (
     ActionTransformationWrapper,
-)
-from action_space_toolbox.control_modes.check_wrapped import (
-    check_wrapped,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +24,7 @@ class AbstractVelocityControlWrapper(ActionTransformationWrapper, abc.ABC):
         controller_steps: int = 1,
         keep_base_timestep: bool = True,
     ):
-        assert check_wrapped(env, ControllerBaseWrapper)
+        assert sb3_utils.common.training.check_wrapped(env, ControllerBaseWrapper)
         super().__init__(env, controller_steps, keep_base_timestep)
 
         if target_velocity_limits is not None:

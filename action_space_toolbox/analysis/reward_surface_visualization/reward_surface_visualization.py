@@ -20,20 +20,20 @@ from action_space_toolbox.analysis.reward_surface_visualization.plotting import 
     plot_results,
 )
 from action_space_toolbox.analysis.util import (
-    flatten_parameters,
     evaluate_agent_returns,
     evaluate_agent_losses,
     filter_normalize_direction,
     project,
-    unflatten_parameters_for_agent,
-)
-from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.sb3_training import (
-    fill_rollout_buffer,
-    ppo_loss,
-    ppo_gradient,
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+from sb3_utils.common.agent_spec import AgentSpec
+from sb3_utils.common.buffer import fill_rollout_buffer
+from sb3_utils.common.parameters import (
+    flatten_parameters,
+    unflatten_parameters_for_agent,
+)
+from sb3_utils.ppo.ppo_gradient import ppo_gradient
+from sb3_utils.ppo.ppo_loss import ppo_loss
 
 logger = logging.getLogger(__name__)
 

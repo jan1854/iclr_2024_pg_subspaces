@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Union, Literal, Tuple
+from typing import Callable, Literal, Optional, Sequence, Tuple, Union
 
 import PIL.Image
 import numpy as np

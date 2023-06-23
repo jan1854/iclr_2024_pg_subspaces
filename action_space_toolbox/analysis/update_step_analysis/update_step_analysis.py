@@ -14,17 +14,14 @@ from action_space_toolbox.analysis.util import (
     evaluate_agent_returns,
     LossEvaluationResult,
     ReturnEvaluationResult,
-    flatten_parameters,
     evaluate_returns_rollout_buffer,
 )
-from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.get_episode_length import get_episode_length
 from action_space_toolbox.util.metrics import mean_relative_difference
-from action_space_toolbox.util.sb3_training import (
-    fill_rollout_buffer,
-    sample_update_trajectory,
-)
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
+from sb3_utils.common.agent_spec import AgentSpec
+from sb3_utils.common.buffer import fill_rollout_buffer
+from sb3_utils.common.parameters import flatten_parameters
+from sb3_utils.common.training import sample_update_trajectory
 
 
 class UpdateStepAnalysis(Analysis):

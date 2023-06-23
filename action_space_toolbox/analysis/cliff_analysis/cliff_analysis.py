@@ -14,20 +14,17 @@ import yaml
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.util import (
-    flatten_parameters,
     evaluate_agent_returns,
     evaluate_returns_rollout_buffer,
     ReturnEvaluationResult,
     evaluate_agent_losses,
     LossEvaluationResult,
 )
-from action_space_toolbox.util.agent_spec import AgentSpec, HydraAgentSpec
-from action_space_toolbox.util.sb3_training import (
-    ppo_gradient,
-    fill_rollout_buffer,
-)
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
-
+from sb3_utils.common.agent_spec import AgentSpec, HydraAgentSpec
+from sb3_utils.common.buffer import fill_rollout_buffer
+from sb3_utils.common.parameters import flatten_parameters
+from sb3_utils.ppo.ppo_gradient import ppo_gradient
 
 logger = logging.getLogger(__name__)
 

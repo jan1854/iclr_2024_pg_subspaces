@@ -14,13 +14,16 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from action_space_toolbox.analysis.util import (
     evaluate_agent_returns,
     project,
+)
+from action_space_toolbox.util.angles import normalize_angle
+from action_space_toolbox.util.tensorboard_logs import merge_dicts
+from sb3_utils.common.agent_spec import AgentSpec
+from sb3_utils.common.buffer import fill_rollout_buffer
+from sb3_utils.common.parameters import (
     flatten_parameters,
     unflatten_parameters_for_agent,
 )
-from action_space_toolbox.util.agent_spec import AgentSpec
-from action_space_toolbox.util.angles import normalize_angle
-from action_space_toolbox.util.sb3_training import fill_rollout_buffer, ppo_gradient
-from action_space_toolbox.util.tensorboard_logs import merge_dicts
+from sb3_utils.ppo.ppo_gradient import ppo_gradient
 
 
 def test_angle_normalization():
