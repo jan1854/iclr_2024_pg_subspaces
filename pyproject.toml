@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 package-dir = {"" = "action_space_toolbox"}
 
 [project]
-name = "action-space-toolbox"
+name = "action_space_toolbox"
 description = ""
 version = "0.0.1"
 authors = [
