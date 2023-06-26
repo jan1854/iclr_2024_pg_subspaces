@@ -34,6 +34,11 @@ class DummyEnv(gym.Env):
             {},
         )
 
+    def reset(self):
+        self.counter = 0
+        self.curr_episode += 1
+        return np.zeros(1)
+
 
 def test_angle_normalization():
     assert normalize_angle(np.pi) == pytest.approx(np.pi)
