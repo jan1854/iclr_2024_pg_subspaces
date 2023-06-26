@@ -23,11 +23,9 @@ dependencies = [
     "omegaconf",
     "Pillow",
     "plotly",
-    "pyhessian",
-    "rich",
     "scipy",
     "scikit-image",
-    "stable-baselines3",
+    "stable-baselines3[extra]",
     "tensorboard",
     "torch",
     "tqdm"
