@@ -16,7 +16,7 @@ from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator impor
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from sb3_utils.common.agent_spec import AgentSpec
 from sb3_utils.common.buffer import fill_rollout_buffer
-from sb3_utils.common.parameters import flatten_parameters, project
+from sb3_utils.common.parameters import flatten_parameters, project_orthonormal
 from sb3_utils.common.training import sample_update_trajectory
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 
@@ -219,7 +219,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
     def _calculate_eigenvectors_overlap(
         cls, eigenvectors1: torch.Tensor, eigenvectors2: torch.Tensor
     ) -> float:
-        projected_evs = project(eigenvectors2, eigenvectors1, result_in_orig_space=True)
+        projected_evs = project_orthonormal(
+            eigenvectors2, eigenvectors1, result_in_orig_space=True
+        )
         return torch.mean(torch.norm(projected_evs, dim=0) ** 2).item()
 
     def _plot_eigenspectrum(
@@ -292,7 +294,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             gradient = gradient_func(batch)
             gradient = flatten_parameters(gradient).unsqueeze(1)
             for num_eigenvecs in self.top_eigenvec_levels:
-                gradient_projected = project(
+                gradient_projected = project_orthonormal(
                     gradient,
                     eigenvectors[:, :num_eigenvecs],
                     result_in_orig_space=True,
