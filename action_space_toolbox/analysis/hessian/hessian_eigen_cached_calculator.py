@@ -104,7 +104,7 @@ class HessianEigenCachedCalculator:
                 raise FileNotFoundError(f"Did not find cache file.")
 
             eigen = self.hessian_eigen.calculate_top_eigen(
-                agent, data, self.num_eigenvectors_to_cache
+                agent, data, self.num_eigenvectors_to_cache, eigenvectors_fullsize=False
             )
             self.cache_eigen(eigen, env_step, num_grad_steps_additional_training)
         eigen.policy.eigenvectors = eigen.policy.eigenvectors[:, :num_eigenvectors]
