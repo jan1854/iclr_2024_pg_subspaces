@@ -1,5 +1,5 @@
 defaults:
-  - hess_eigen: hess_eigen_power_method
+  - hess_eigen: hess_eigen_lanczos
 
 _target_: rl_subspace_optimization.gradient_subspace.high_curvature_subspace.HighCurvatureSubspace
 subspace_dimension: 100
