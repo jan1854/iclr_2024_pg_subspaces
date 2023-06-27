@@ -1,0 +1,3 @@
+_target_: sb3_utils.hessian.eigen.hessian_eigen_power_method.HessianEigenPowerMethod
+tolerance: 1e-3
+max_iter: 100
