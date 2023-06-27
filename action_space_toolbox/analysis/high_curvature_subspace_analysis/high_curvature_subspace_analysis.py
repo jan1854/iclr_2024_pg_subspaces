@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Optional, Sequence, Literal
+from typing import Callable, Dict, Iterable, Literal, Optional, Sequence
 
 import gym
 import numpy as np
