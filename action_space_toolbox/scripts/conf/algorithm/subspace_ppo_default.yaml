@@ -8,6 +8,7 @@ algorithm:
   _target_: rl_subspace_optimization.subspace_ppo.SubspacePPO
   gradient_subspace: ???
   warmup_steps_orig_space: 10000
+  project_before_differentiating: false
   policy: "MlpPolicy"
   device: "auto"
   tensorboard_log: tensorboard
