@@ -41,9 +41,10 @@ def create_plots(
     keys: List[str],
     smoothing_weight: float,
     separate_legend: bool,
+    fontsize: int,
     out: Path,
 ) -> None:
-    plt.rc("font", size=18)
+    plt.rc("font", size=fontsize)
     ax = plt.gca()
     for log_path in log_paths:
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
@@ -158,6 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
     parser.add_argument("--separate-legend", action="store_true")
+    parser.add_argument("--fontsize", type=int, default=12)
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
@@ -177,5 +179,6 @@ if __name__ == "__main__":
         args.key,
         args.smoothing_weight,
         args.separate_legend,
+        args.fontsize,
         out,
     )
