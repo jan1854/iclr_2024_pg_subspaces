@@ -3,6 +3,7 @@ name: "subspace_ppo"
 
 defaults:
   - gradient_subspace@algorithm.gradient_subspace: random_subspace
+  - optimizer: adam
 
 algorithm:
   _target_: rl_subspace_optimization.subspace_ppo.SubspacePPO

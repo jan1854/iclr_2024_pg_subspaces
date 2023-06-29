@@ -1,6 +1,9 @@
 # TODO: Most parameters should be in a default PPO config
 name: "ppo"
 
+defaults:
+  - optimizer: adam
+
 algorithm:
   _target_: stable_baselines3.PPO
   policy: 'MlpPolicy'

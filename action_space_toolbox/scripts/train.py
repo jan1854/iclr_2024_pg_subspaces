@@ -77,7 +77,17 @@ def train(cfg: omegaconf.DictConfig) -> None:
 
     env = make_env(cfg)
 
-    algorithm = hydra.utils.instantiate(cfg.algorithm.algorithm, env=env)
+    assert "optimizer_kwargs" not in cfg.get("policy_kwargs", {})
+    optimizer_kwargs = dict(cfg.algorithm.optimizer)
+    optimizer_kwargs.pop("_target_")
+    policy_kwargs = {
+        "optimizer_class": hydra.utils.get_class(cfg.algorithm.optimizer._target_),
+        "optimizer_kwargs": optimizer_kwargs,
+        **cfg.get("policy_kwargs", {}),
+    }
+    algorithm = hydra.utils.instantiate(
+        cfg.algorithm.algorithm, env=env, policy_kwargs=policy_kwargs
+    )
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )
