@@ -2,11 +2,13 @@
 name: "ppo"
 
 defaults:
-  - optimizer: adam
+  - optimizer@algorithm.policy_kwargs.optimizer: adam
 
 algorithm:
   _target_: stable_baselines3.PPO
-  policy: 'MlpPolicy'
+  policy: "MlpPolicy"
+  policy_kwargs:
+    optimizer: ???
   n_steps: 32
   batch_size: 256
   gae_lambda: 0.8

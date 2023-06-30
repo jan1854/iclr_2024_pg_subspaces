@@ -1,11 +1,13 @@
 name: "ppo"
 
 defaults:
-  - optimizer: adam
+  - optimizer@algorithm.policy_kwargs.optimizer: adam
 
 algorithm:
   _target_: stable_baselines3.PPO
   policy: "MlpPolicy"
+  policy_kwargs:
+    optimizer: ???
   device: "auto"
   tensorboard_log: tensorboard
   batch_size: 32

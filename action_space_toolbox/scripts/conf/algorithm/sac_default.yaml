@@ -2,11 +2,13 @@
 name: "sac"
 
 defaults:
-  - optimizer: adam
+  - optimizer@algorithm.policy_kwargs.optimizer: adam
 
 algorithm:
   _target_: stable_baselines3.SAC
   policy: "MlpPolicy"
+  policy_kwargs:
+    optimizer: ???
   device: "auto"
   tensorboard_log: tensorboard
 

@@ -2,6 +2,7 @@ import logging
 import random
 import subprocess
 from pathlib import Path
+from typing import Any, Dict
 
 import gym
 import hydra
@@ -24,6 +25,28 @@ from action_space_toolbox.callbacks.fix_ep_info_buffer_callback import (
 from action_space_toolbox.util.sb3_custom_logger import SB3CustomLogger
 
 logger = logging.getLogger(__name__)
+
+
+def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise we need to checkpoint
+    the entire object to allow save / load. Therefore, replace each object in the config by a <obj>_type and
+    <obj>_kwargs to allow creating them in the algorithm's constructor.
+
+    :param conf_dict:
+    :return:
+    """
+    new_conf = {}
+    for key in conf_dict.keys():
+        if not isinstance(conf_dict[key], dict):
+            new_conf[key] = conf_dict[key]
+        elif "_target_" in conf_dict[key]:
+            new_conf[f"{key}_class"] = hydra.utils.get_class(conf_dict[key]["_target_"])
+            conf_dict[key].pop("_target_")
+            new_conf[f"{key}_kwargs"] = obj_config_to_type_and_kwargs(conf_dict[key])
+        else:
+            new_conf[key] = obj_config_to_type_and_kwargs(conf_dict[key])
+    return new_conf
 
 
 def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
@@ -77,17 +100,11 @@ def train(cfg: omegaconf.DictConfig) -> None:
 
     env = make_env(cfg)
 
-    assert "optimizer_kwargs" not in cfg.get("policy_kwargs", {})
-    optimizer_kwargs = dict(cfg.algorithm.optimizer)
-    optimizer_kwargs.pop("_target_")
-    policy_kwargs = {
-        "optimizer_class": hydra.utils.get_class(cfg.algorithm.optimizer._target_),
-        "optimizer_kwargs": optimizer_kwargs,
-        **cfg.get("policy_kwargs", {}),
-    }
-    algorithm = hydra.utils.instantiate(
-        cfg.algorithm.algorithm, env=env, policy_kwargs=policy_kwargs
+    algorithm_cfg = obj_config_to_type_and_kwargs(
+        omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
     )
+
+    algorithm = hydra.utils.instantiate(algorithm_cfg, env=env)
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )

@@ -1,11 +1,13 @@
 name: "a2c"
 
 defaults:
-  - optimizer: adam
+  - optimizer@algorithm.policy_kwargs.optimizer: adam
 
 algorithm:
   _target_: stable_baselines3.A2C
   policy: "MlpPolicy"
+  policy_kwargs:
+    optimizer: ???
   device: "auto"
   tensorboard_log: tensorboard
   ent_coef: 0.0
