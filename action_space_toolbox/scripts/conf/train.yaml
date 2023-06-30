@@ -6,7 +6,7 @@ defaults:
 env: Pendulum_TC-v1
 env_args: {}
 seed: null
-show_progress: false
+show_progress: true
 checkpoint_interval: 10000
 
 log_dir: ${oc.env:ACTION_SPACE_TOOLBOX_LOG_DIR,logs}
