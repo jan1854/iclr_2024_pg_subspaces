@@ -13,6 +13,7 @@ algorithm:
   policy: "MlpPolicy"
   policy_kwargs:
     optimizer: ???
+  learning_rate: 3e-4
   device: "auto"
   tensorboard_log: tensorboard
 
