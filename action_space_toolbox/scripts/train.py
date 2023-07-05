@@ -92,13 +92,14 @@ def train(cfg: omegaconf.DictConfig) -> None:
 
     logger.info(f"Log directory: {Path.cwd()}")
 
+    env = make_env(cfg)
+
     if cfg.seed is not None:
         random.seed(cfg.seed)
         np.random.seed(cfg.seed)
         torch.manual_seed(cfg.seed)
         torch.cuda.manual_seed(cfg.seed)
-
-    env = make_env(cfg)
+        env.seed(cfg.seed)
 
     algorithm_cfg = obj_config_to_type_and_kwargs(
         omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
