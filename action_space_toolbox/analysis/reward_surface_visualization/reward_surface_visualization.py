@@ -31,6 +31,7 @@ from sb3_utils.common.parameters import (
     flatten_parameters,
     unflatten_parameters_for_agent,
     project,
+    project_orthonormal_inverse,
 )
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 from sb3_utils.ppo.ppo_loss import ppo_loss
@@ -47,7 +48,7 @@ class RewardSurfaceVisualization(Analysis):
         run_dir: Path,
         grid_size: int,
         magnitude: float,
-        direction_types: Sequence[Literal["rand", "grad", "hess_ev"]],
+        direction_types: Sequence[str],
         fix_rand_dirs_at_checkpoint: bool,
         num_samples_true_loss: int,
         num_steps: int,
@@ -188,7 +189,31 @@ class RewardSurfaceVisualization(Analysis):
                             for ev in unflatten_parameters_for_agent(curr_ev, agent)
                         ]
                     )
-                else:
+                elif dir_type.startswith("high_curv"):
+                    num_evs = int(dir_type[len("high_curv") :])
+                    (_, pol_eigenvecs), (
+                        _,
+                        vf_eigenvecs,
+                    ) = hess_eigen_calc.get_eigen_policy_vf_loss(
+                        agent,
+                        next(rollout_buffer_true_loss.get()),
+                        env_step,
+                        num_eigenvectors=num_evs,
+                    )
+                    hess_eigenvecs = torch.cat((pol_eigenvecs, vf_eigenvecs), dim=1)
+                    subspace_vec = torch.rand(2 * num_evs) * 2 - 1
+                    direction_unnormalized = project_orthonormal_inverse(
+                        subspace_vec, hess_eigenvecs
+                    )
+                    directions.append(
+                        unflatten_parameters_for_agent(
+                            direction_unnormalized
+                            / torch.linalg.norm(direction_unnormalized)
+                            * rand_dir_norm,
+                            agent,
+                        )
+                    )
+                elif dir_type == "random":
                     if self.fix_rand_dirs_at_checkpoint and last_rand_dir is not None:
                         directions.append(last_rand_dir)
                     else:
@@ -198,6 +223,8 @@ class RewardSurfaceVisualization(Analysis):
                             )
                         )
                         last_rand_dir = directions[-1]
+                else:
+                    raise ValueError(f"Unknown direction_type: {dir_type}")
 
             agent_weights = [p.detach().clone() for p in agent.policy.parameters()]
             weights_offsets = [[None] * self.grid_size for _ in range(self.grid_size)]
