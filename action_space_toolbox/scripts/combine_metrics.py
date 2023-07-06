@@ -1,7 +1,7 @@
 import argparse
 import shutil
 from pathlib import Path
-from typing import Sequence, Any, Dict
+from typing import Any, Dict, Sequence
 
 import yaml
 from tqdm import tqdm
