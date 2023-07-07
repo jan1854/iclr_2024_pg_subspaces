@@ -193,9 +193,14 @@ def plot_surface(
             axis_titles.append("random dir.")
         elif dir_type == "grad":
             axis_titles.append("gradient dir.")
-        else:
+        elif dir_type == "hess_ev":
             # TODO: This axis should also include the number of the ev (top-k ev)
             axis_titles.append("Hessian ev.")
+        elif dir_type.startswith("high_curv"):
+            k = int(dir_type[len("high_curv") :])
+            axis_titles.append(f"curv. dir. ({k})")
+        else:
+            raise ValueError(f"Unknown direction type: {dir_type}")
     margins = PLOT_MARGINS_WITHOUT_TITLE if disable_title else PLOT_MARGINS_WITH_TITLE
     axis_label_fontsize = 26
     ticks_fontsize = 14
