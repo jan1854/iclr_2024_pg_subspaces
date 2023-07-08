@@ -2,7 +2,7 @@ import functools
 import logging
 import pickle
 from pathlib import Path
-from typing import Callable, Iterable, List, Literal, Optional, Sequence, Tuple
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
