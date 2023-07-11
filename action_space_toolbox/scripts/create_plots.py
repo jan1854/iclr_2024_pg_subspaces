@@ -41,13 +41,18 @@ def create_plots(
     keys: List[str],
     smoothing_weight: float,
     separate_legend: bool,
+    num_same_color_plots: int,
     fontsize: int,
     out: Path,
 ) -> None:
     plt.rc("font", size=fontsize)
     ax = plt.gca()
-    for log_path in log_paths:
+    color = None  # To make PyLint happy
+    linestyles = ["-", "--", "-.", ":"]
+    for i, log_path in enumerate(log_paths):
         run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
+        if i % num_same_color_plots == 0:
+            color = next(ax._get_lines.prop_cycler)["color"]
         if len(run_dirs) > 0:
             tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
             event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
@@ -78,8 +83,12 @@ def create_plots(
             if xaxis_log:
                 steps = 10**steps
                 plt.xscale("log")
-            color = next(ax._get_lines.prop_cycler)["color"]
-            plt.plot(steps, value_mean, color=color)
+            plt.plot(
+                steps,
+                value_mean,
+                color=color,
+                linestyle=linestyles[i % num_same_color_plots],
+            )
             plt.fill_between(
                 steps,
                 value_mean - value_std,
@@ -112,6 +121,8 @@ def create_plots(
             plt.plot(
                 steps,
                 smooth([s[1].value for s in scalar], smoothing_weight),
+                color=color,
+                linestyle=linestyles[i % num_same_color_plots],
             )
     if not xaxis_log:
         plt.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
@@ -159,6 +170,7 @@ if __name__ == "__main__":
     parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
     parser.add_argument("--separate-legend", action="store_true")
+    parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--fontsize", type=int, default=12)
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
@@ -179,6 +191,7 @@ if __name__ == "__main__":
         args.key,
         args.smoothing_weight,
         args.separate_legend,
+        args.num_same_color_plots,
         args.fontsize,
         out,
     )
