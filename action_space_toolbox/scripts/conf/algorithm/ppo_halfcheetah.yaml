@@ -1,0 +1,37 @@
+name: "ppo"
+
+defaults:
+  - optimizer@algorithm.policy_kwargs.optimizer: adam
+  - env_wrappers:
+      - vec_normalize
+  - activation_fn@algorithm.policy_kwargs.activation_fn: relu
+
+algorithm:
+  _target_: stable_baselines3.PPO
+  policy: "MlpPolicy"
+  batch_size: 64
+  n_steps: 512
+  gamma: 0.98
+  learning_rate: 2.0633e-05
+  ent_coef: 0.000401762
+  clip_range: 0.1
+  n_epochs: 20
+  gae_lambda: 0.92
+  max_grad_norm: 0.8
+  vf_coef: 0.58096
+  policy_kwargs:
+    log_std_init: -2
+    ortho_init: false
+    activation_fn: ???
+    net_arch:
+      pi:
+        - 256
+        - 256
+      vf:
+        - 256
+        - 256
+
+
+training:
+  steps: 5_000_000
+  n_envs: 1

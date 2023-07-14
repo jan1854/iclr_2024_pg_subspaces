@@ -40,10 +40,12 @@ def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
     for key in conf_dict.keys():
         if not isinstance(conf_dict[key], dict):
             new_conf[key] = conf_dict[key]
-        elif "_target_" in conf_dict[key]:
+        elif "_target_" in conf_dict[key] and not key == "activation_fn":
             new_conf[f"{key}_class"] = hydra.utils.get_class(conf_dict[key]["_target_"])
             conf_dict[key].pop("_target_")
             new_conf[f"{key}_kwargs"] = obj_config_to_type_and_kwargs(conf_dict[key])
+        elif "_target_" in conf_dict[key] and key == "activation_fn":
+            new_conf[key] = hydra.utils.get_class(conf_dict[key]["_target_"])
         else:
             new_conf[key] = obj_config_to_type_and_kwargs(conf_dict[key])
     return new_conf
@@ -108,7 +110,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
     )
 
-    algorithm = hydra.utils.instantiate(algorithm_cfg, env=env)
+    algorithm = hydra.utils.instantiate(algorithm_cfg, env=env, _convert_="partial")
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )
