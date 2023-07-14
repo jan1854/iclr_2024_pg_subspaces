@@ -1,0 +1,4 @@
+_target_: sb3_utils.hessian.eigen.hessian_eigen_lanczos.HessianEigenLanczos
+tolerance: 1e-5
+max_iter: 50
+num_lanczos_vectors: null

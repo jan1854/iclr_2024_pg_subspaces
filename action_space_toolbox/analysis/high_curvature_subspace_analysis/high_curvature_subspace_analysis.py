@@ -18,6 +18,7 @@ from sb3_utils.common.agent_spec import AgentSpec
 from sb3_utils.common.buffer import fill_rollout_buffer
 from sb3_utils.common.parameters import flatten_parameters, project_orthonormal
 from sb3_utils.common.training import sample_update_trajectory
+from sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 
 logger = logging.Logger(__name__)
@@ -33,6 +34,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         num_samples_true_loss: int,
         top_eigenvec_levels: Sequence[int],
         eigenvec_overlap_checkpoints: Sequence[int],
+        hessian_eigen: HessianEigen,
         overwrite_cached_eigen: bool,
     ):
         super().__init__(
@@ -45,6 +47,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         self.num_samples_true_loss = num_samples_true_loss
         self.top_eigenvec_levels = top_eigenvec_levels
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
+        self.hessian_eigen = hessian_eigen
         self.overwrite_cached_eigen = overwrite_cached_eigen
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
@@ -87,7 +90,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         fill_rollout_buffer(self.env_factory, agent, rollout_buffer_gradient_estimates)
 
         hess_eigen_calculator = HessianEigenCachedCalculator(
-            self.run_dir, device=agent.device
+            self.run_dir, self.hessian_eigen, device=agent.device
         )
         (
             eigenvals_combined,
@@ -314,7 +317,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
     def _calculate_overlaps(
         self, loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"]
     ) -> Dict[int, Dict[int, Dict[int, float]]]:
-        hess_eigen_calculator = HessianEigenCachedCalculator(self.run_dir)
+        hess_eigen_calculator = HessianEigenCachedCalculator(self.run_dir, self.hessian_eigen)
         start_checkpoints_eigenvecs = {
             num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels
         }

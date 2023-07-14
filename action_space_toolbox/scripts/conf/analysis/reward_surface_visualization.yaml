@@ -1,3 +1,6 @@
+defaults:
+  - hessian_eigen: lanczos
+
 _target_: action_space_toolbox.analysis.reward_surface_visualization.reward_surface_visualization.RewardSurfaceVisualization
 analysis_run_id: default
 grid_size: 31
@@ -12,3 +15,4 @@ plot_sgd_steps: true
 plot_true_gradient_steps: true
 max_gradient_trajectories: 10
 max_steps_per_gradient_trajectory: null
+hessian_eigen: ???

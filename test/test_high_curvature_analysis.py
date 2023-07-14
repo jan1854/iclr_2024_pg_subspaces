@@ -14,6 +14,7 @@ from action_space_toolbox.analysis.high_curvature_subspace_analysis.high_curvatu
     HighCurvatureSubspaceAnalysis,
 )
 from sb3_utils.common.buffer import fill_rollout_buffer
+from sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
 
 
 def test_high_curvature_overlap():
@@ -47,7 +48,7 @@ def test_hessian_eigen_cached_calculator():
     fill_rollout_buffer(env, agent, rollout_buffer)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir))
+        hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir), HessianEigenExplicit())
         eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen_combined_loss(
             agent,
             next(rollout_buffer.get()),

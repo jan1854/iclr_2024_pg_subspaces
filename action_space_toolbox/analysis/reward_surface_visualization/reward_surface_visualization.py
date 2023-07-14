@@ -33,6 +33,8 @@ from sb3_utils.common.parameters import (
     project,
     project_orthonormal_inverse,
 )
+from sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
+from sb3_utils.hessian.eigen.hessian_eigen_lanczos import HessianEigenLanczos
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 from sb3_utils.ppo.ppo_loss import ppo_loss
 
@@ -58,6 +60,7 @@ class RewardSurfaceVisualization(Analysis):
         plot_true_gradient_steps: bool,
         max_gradient_trajectories: int,
         max_steps_per_gradient_trajectory: Optional[int],
+        hessian_eigen: HessianEigen
     ):
         super().__init__(
             "reward_surface_visualization",
@@ -90,6 +93,7 @@ class RewardSurfaceVisualization(Analysis):
         self.plot_true_gradient_steps = plot_true_gradient_steps
         self.max_gradient_trajectories = max_gradient_trajectories
         self.max_steps_per_gradient_trajectory = max_steps_per_gradient_trajectory
+        self.hessian_eigen = hessian_eigen
         self.out_dir = (
             run_dir / "analyses" / "reward_surface_visualization" / analysis_run_id
         )
@@ -151,7 +155,7 @@ class RewardSurfaceVisualization(Analysis):
                 self.sample_filter_normalized_direction(list(agent.policy.parameters()))
             ).norm()
 
-            hess_eigen_calc = HessianEigenCachedCalculator(self.run_dir)
+            hess_eigen_calc = HessianEigenCachedCalculator(self.run_dir, self.hessian_eigen)
 
             directions = []
             last_rand_dir = None

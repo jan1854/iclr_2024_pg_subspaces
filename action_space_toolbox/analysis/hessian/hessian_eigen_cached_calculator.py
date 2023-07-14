@@ -4,11 +4,10 @@ from typing import Literal, Optional, Sequence, Tuple, Union
 
 import stable_baselines3
 import torch
-from sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen
+from sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen, HessianEigen
 from sb3_utils.common.parameters import flatten_parameters
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
 
-from sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
 from sb3_utils.ppo.ppo_parameters import combine_policy_vf_parameter_vectors
 
 
@@ -63,12 +62,13 @@ class HessianEigenCachedCalculator:
     def __init__(
         self,
         run_dir: Path,
+        hessian_eigen: HessianEigen,
         num_eigenvectors_to_cache: int = 200,
         device: Union[str, torch.device] = "cpu",
     ):
         self.cache_path = run_dir / "cached_results" / "eigen"
         self.cache_path.mkdir(exist_ok=True, parents=True)
-        self.hessian_eigen = HessianEigenExplicit()
+        self.hessian_eigen = hessian_eigen
         self.num_eigenvectors_to_cache = num_eigenvectors_to_cache
         self.device = device
 
