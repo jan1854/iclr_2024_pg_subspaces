@@ -3,6 +3,7 @@ name: "a2c"
 
 defaults:
   - optimizer@algorithm.policy_kwargs.optimizer: adam
+  - env_wrappers: []
 
 algorithm:
   _target_: stable_baselines3.A2C

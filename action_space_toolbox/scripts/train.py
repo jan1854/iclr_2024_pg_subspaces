@@ -73,6 +73,9 @@ def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecE
             ]
         )
         env = stable_baselines3.common.vec_env.VecMonitor(env)
+    if "env_wrappers" in cfg.algorithm:
+        for wrapper in cfg.algorithm.env_wrappers.values():
+            env = hydra.utils.instantiate(wrapper, venv=env)
     return env
 
 

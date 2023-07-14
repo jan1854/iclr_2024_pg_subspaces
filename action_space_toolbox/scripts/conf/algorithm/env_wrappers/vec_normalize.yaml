@@ -1,0 +1,10 @@
+vec_normalize:
+  _target_: stable_baselines3.common.vec_env.VecNormalize
+  training: true
+  norm_obs: true
+  norm_reward: true
+  clip_obs: 10.0
+  clip_reward: 10.0
+  gamma: 0.99
+  epsilon: 1e-8
+  norm_obs_keys: null

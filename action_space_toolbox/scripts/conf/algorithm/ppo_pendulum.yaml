@@ -3,6 +3,7 @@ name: "ppo"
 
 defaults:
   - optimizer@algorithm.policy_kwargs.optimizer: adam
+  - env_wrappers: []
 
 algorithm:
   _target_: stable_baselines3.PPO
@@ -26,9 +27,10 @@ algorithm:
   target_kl: null
   tensorboard_log: tensorboard
   create_eval_env: false
-  policy_kwargs: null
   verbose: 0
   device: "auto"
+
+env_wrappers: ???
 
 training:
   steps: 600000

@@ -3,8 +3,9 @@ name: "ppo"
 
 defaults:
   - optimizer@algorithm.policy_kwargs.optimizer: adam
+  - env_wrappers:
+      - vec_normalize
 
-# TODO: rl-baselines3-zoo also seems to do some normalization for Reacher (https://github.com/DLR-RM/rl-baselines3-zoo/issues/64)
 algorithm:
   _target_: stable_baselines3.PPO
   policy: "MlpPolicy"
