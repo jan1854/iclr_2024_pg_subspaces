@@ -280,6 +280,7 @@ BASE_ENV_TYPE_OR_ID = {
     "Ant-v3": AntEnv,
     "HalfCheetah-v3": HalfCheetahEnv,
     "Hopper-v3": HopperEnv,
+    "Humanoid-v3": HopperEnv,
     "Reacher-v2": ReacherEnv,
     "Walker2d-v3": Walker2dEnv,
 } | {
