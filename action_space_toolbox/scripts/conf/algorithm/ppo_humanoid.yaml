@@ -10,6 +10,7 @@ defaults:
 algorithm:
   _target_: stable_baselines3.PPO
   policy: "MlpPolicy"
+  device: "auto"
   policy_kwargs:
     optimizer: ???
     log_std_init: -2
