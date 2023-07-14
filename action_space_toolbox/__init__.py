@@ -1,4 +1,3 @@
-import itertools
 import logging
 import random
 from pathlib import Path
