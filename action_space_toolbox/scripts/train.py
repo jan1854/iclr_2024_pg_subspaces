@@ -12,6 +12,7 @@ import omegaconf
 import rl_subspace_optimization
 import stable_baselines3.common.logger
 import stable_baselines3.common.monitor
+import stable_baselines3.common.on_policy_algorithm
 import stable_baselines3.common.vec_env
 import torch
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -132,8 +133,11 @@ def train(cfg: omegaconf.DictConfig) -> None:
             cfg.checkpoint_interval, str(checkpoints_path), cfg.algorithm.name
         ),
         FixEpInfoBufferCallback(),
-        AdditionalTrainingMetricsCallback(),
     ]
+    if isinstance(
+        algorithm, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+    ):
+        callbacks.append(AdditionalTrainingMetricsCallback())
     training_steps = cfg.algorithm.training.steps // base_env_timestep_factor
     try:
         algorithm.learn(
