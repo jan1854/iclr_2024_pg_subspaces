@@ -166,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--ymax", type=float)
     parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
-    parser.add_argument("--use-incomplete-steps", action="store_true", default=True)
+    parser.add_argument("--use-incomplete-steps", action="store_true")
     parser.add_argument("--separate-legend", action="store_true")
     parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--fontsize", type=int, default=12)
