@@ -159,7 +159,9 @@ def read_scalar(
 
 
 def calculate_mean_std_sequence(
-    event_accumulators: Sequence[event_accumulator.EventAccumulator], key: str
+    event_accumulators: Sequence[event_accumulator.EventAccumulator],
+    key: str,
+    only_complete_steps: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     assert len(event_accumulators) > 0
     scalars = []
@@ -176,31 +178,39 @@ def calculate_mean_std_sequence(
     for scalar in scalars:
         scalar.sort(key=lambda s: s.step)
         assert np.all(s.step in steps for s in scalar), "Steps do not match."
-    steps = [scalar.step for scalar in scalars[0]]
-    if len(steps) < len(scalars[-1]):
+    if len(scalars[0]) < len(scalars[-1]):
         logger.warning(
             f"Found a different number of scalars for the event accumulators (key: {key}, "
-            f"min: {len(steps)}, max: {len(scalars[-1])}), using the minimum value"
+            f"min: {len(scalars[0])}, max: {len(scalars[-1])}), using the "
+            f"{'minimum' if only_complete_steps else 'maximum'} value"
         )
+    if only_complete_steps:
+        steps = [scalar.step for scalar in scalars[0]]
+    else:
+        steps = [scalar.step for scalar in scalars[-1]]
 
-    values = np.array(
+    values = [
         [
-            [scalars_curr_run[i].value for i in range(len(steps))]
+            scalars_curr_run[i].value
             for scalars_curr_run in scalars
+            if i < len(scalars_curr_run)
         ]
-    )
-    wall_time = np.array(
+        for i in range(len(steps))
+    ]
+    wall_time = [
         [
-            [scalars_curr_run[i].wall_time for i in range(len(steps))]
+            scalars_curr_run[i].wall_time
             for scalars_curr_run in scalars
+            if i < len(scalars_curr_run)
         ]
-    )
+        for i in range(len(steps))
+    ]
 
     return (
         np.array(steps),
-        np.mean(wall_time, axis=0),
-        np.mean(values, axis=0),
-        np.std(values, axis=0) if values.shape[0] > 1 else None,
+        np.array([np.mean(wt) for wt in wall_time]),
+        np.array([np.mean(v) for v in values]),
+        np.array([np.std(v) if len(v) > 1 else 0.0 for v in values]),
     )
 
 

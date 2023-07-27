@@ -40,6 +40,7 @@ def create_plots(
     xaxis_log: bool,
     keys: List[str],
     smoothing_weight: float,
+    only_complete_steps: bool,
     separate_legend: bool,
     num_same_color_plots: int,
     fontsize: int,
@@ -70,12 +71,9 @@ def create_plots(
                 plt.plot([], [])
                 continue
             key = keys[key_indices[0].item()]
-            (
-                steps,
-                _,
-                value_mean,
-                value_std,
-            ) = calculate_mean_std_sequence(event_accumulators, key)
+            (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
+                event_accumulators, key, only_complete_steps
+            )
 
             value_mean = smooth(value_mean, smoothing_weight)
             value_std = smooth(value_std, smoothing_weight)
@@ -141,7 +139,6 @@ def create_plots(
         plt.legend(legend, loc="lower right")
     plt.tight_layout(pad=0.1)
     out.parent.mkdir(exist_ok=True, parents=True)
-    # plt.savefig(out.with_suffix(".png"))
     plt.savefig(out.with_suffix(".pdf"))
     if legend is not None and separate_legend:
         legend_plt = plt.legend(
@@ -169,6 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--ymax", type=float)
     parser.add_argument("--xaxis-log", action="store_true")
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
+    parser.add_argument("--use-incomplete-steps", action="store_true", default=True)
     parser.add_argument("--separate-legend", action="store_true")
     parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--fontsize", type=int, default=12)
@@ -190,6 +188,7 @@ if __name__ == "__main__":
         args.xaxis_log,
         args.key,
         args.smoothing_weight,
+        not args.use_incomplete_steps,
         args.separate_legend,
         args.num_same_color_plots,
         args.fontsize,
