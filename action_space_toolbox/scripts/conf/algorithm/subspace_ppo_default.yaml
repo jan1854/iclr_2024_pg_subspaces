@@ -17,6 +17,7 @@ algorithm:
   learning_rate: 3e-4
   device: "auto"
   tensorboard_log: tensorboard
+  update_trajectory_logging_interval: null
 
 training:
   steps: 1000000
