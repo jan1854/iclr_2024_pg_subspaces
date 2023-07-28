@@ -1,0 +1,2 @@
+_target_: rl_subspace_optimization.optimizer.newtons_method.NewtonsMethod
+saddle_free: false
