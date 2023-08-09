@@ -1,0 +1,19 @@
+# TODO: Most parameters should be in a default config
+name: "td3"
+
+defaults:
+  - optimizer@algorithm.policy_kwargs.optimizer: adam
+  - env_wrappers: []
+
+algorithm:
+  _target_: stable_baselines3.TD3
+  policy: "MlpPolicy"
+  policy_kwargs:
+    optimizer: ???
+  learning_rate: 1e-3
+  device: "auto"
+  tensorboard_log: tensorboard
+
+training:
+  steps: 1000000
+  n_envs: 1
