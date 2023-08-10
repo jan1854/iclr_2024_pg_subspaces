@@ -3,6 +3,7 @@ name: "td3"
 
 defaults:
   - optimizer@algorithm.policy_kwargs.optimizer: adam
+  -  gradient_subspace@algorithm.exploration_subspace:  identity
   - env_wrappers: []
 
 algorithm:
@@ -13,7 +14,7 @@ algorithm:
   learning_rate: 1e-3
   device: "auto"
   tensorboard_log: tensorboard
-  exploration_subspace: null
+  exploration_subspace: ???
   exploration_parameters_std: 0.001
 
 training:
