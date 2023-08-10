@@ -8,7 +8,7 @@ from sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen, HessianEigen
 from sb3_utils.common.parameters import flatten_parameters
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
 
-from sb3_utils.ppo.ppo_parameters import combine_policy_vf_parameter_vectors
+from sb3_utils.ppo.ppo_parameters import combine_actor_critic_parameter_vectors
 
 
 class CachedEigenIterator:
@@ -42,12 +42,12 @@ class CachedEigenIterator:
                 )
             elif self.loss_name == "policy_loss":
                 eigenvals = eigen.policy.eigenvalues
-                eigenvecs = combine_policy_vf_parameter_vectors(
+                eigenvecs = combine_actor_critic_parameter_vectors(
                     eigen.policy.eigenvectors, None, self.agent
                 )
             elif self.loss_name == "value_function_loss":
                 eigenvals = eigen.value_function.eigenvalues
-                eigenvecs = combine_policy_vf_parameter_vectors(
+                eigenvecs = combine_actor_critic_parameter_vectors(
                     None, eigen.value_function.eigenvectors, self.agent
                 )
             else:
@@ -153,10 +153,10 @@ class HessianEigenCachedCalculator:
             overwrite_cache,
             calculate_if_no_cached_value,
         )
-        policy_eigenvectors_all_parameters = combine_policy_vf_parameter_vectors(
+        policy_eigenvectors_all_parameters = combine_actor_critic_parameter_vectors(
             eigen.policy.eigenvectors, None, agent
         )
-        vf_eigenvectors_all_parameters = combine_policy_vf_parameter_vectors(
+        vf_eigenvectors_all_parameters = combine_actor_critic_parameter_vectors(
             None, eigen.value_function.eigenvectors, agent
         )
         return (eigen.policy.eigenvalues, policy_eigenvectors_all_parameters), (
@@ -195,14 +195,14 @@ class HessianEigenCachedCalculator:
                 > eigen.value_function.eigenvalues[vf_ev_idx]
             ):
                 eigenvectors.append(
-                    combine_policy_vf_parameter_vectors(
+                    combine_actor_critic_parameter_vectors(
                         eigen.policy.eigenvectors[:, policy_ev_idx], None, agent
                     )
                 )
                 policy_ev_idx += 1
             elif vf_ev_idx < len(eigen.value_function.eigenvalues):
                 eigenvectors.append(
-                    combine_policy_vf_parameter_vectors(
+                    combine_actor_critic_parameter_vectors(
                         None, eigen.value_function.eigenvectors[:, vf_ev_idx], agent
                     )
                 )
