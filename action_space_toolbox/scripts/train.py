@@ -130,7 +130,13 @@ def train(cfg: omegaconf.DictConfig) -> None:
     path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
     algorithm.save(path)
     eval_envs = stable_baselines3.common.vec_env.SubprocVecEnv(
-        [lambda: make_single_env(cfg.env, **cfg.env_args)] * cfg.num_eval_episodes
+        [
+            lambda: stable_baselines3.common.monitor.Monitor(
+                make_single_env(cfg.env, **cfg.env_args)
+            )
+        ]
+        * cfg.num_eval_episodes,
+        start_method="fork",
     )
     callbacks = [
         stable_baselines3.common.callbacks.CheckpointCallback(
