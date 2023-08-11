@@ -60,7 +60,7 @@ class RewardSurfaceVisualization(Analysis):
         plot_true_gradient_steps: bool,
         max_gradient_trajectories: int,
         max_steps_per_gradient_trajectory: Optional[int],
-        hessian_eigen: HessianEigen
+        hessian_eigen: HessianEigen,
     ):
         super().__init__(
             "reward_surface_visualization",
@@ -155,7 +155,9 @@ class RewardSurfaceVisualization(Analysis):
                 self.sample_filter_normalized_direction(list(agent.policy.parameters()))
             ).norm()
 
-            hess_eigen_calc = HessianEigenCachedCalculator(self.run_dir, self.hessian_eigen)
+            hess_eigen_calc = HessianEigenCachedCalculator(
+                self.run_dir, self.hessian_eigen
+            )
 
             directions = []
             last_rand_dir = None
