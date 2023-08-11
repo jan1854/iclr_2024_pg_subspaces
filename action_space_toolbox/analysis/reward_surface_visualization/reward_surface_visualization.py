@@ -217,7 +217,7 @@ class RewardSurfaceVisualization(Analysis):
                             agent,
                         )
                     )
-                elif dir_type == "random":
+                elif dir_type == "rand":
                     if self.fix_rand_dirs_at_checkpoint and last_rand_dir is not None:
                         directions.append(last_rand_dir)
                     else:
