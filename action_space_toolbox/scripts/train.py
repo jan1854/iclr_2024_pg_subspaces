@@ -10,12 +10,12 @@ import numpy as np
 import omegaconf
 
 import rl_subspace_optimization
+import stable_baselines3.common.callbacks
 import stable_baselines3.common.logger
 import stable_baselines3.common.monitor
 import stable_baselines3.common.on_policy_algorithm
 import stable_baselines3.common.vec_env
 import torch
-from stable_baselines3.common.callbacks import CheckpointCallback
 
 from action_space_toolbox.callbacks.additional_training_metrics_callback import (
     AdditionalTrainingMetricsCallback,
@@ -52,26 +52,27 @@ def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
     return new_conf
 
 
-def make_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
-    def make_env(env_cfg, **kwargs):
-        env = gym.make(env_cfg, **kwargs)
-        # To get the training code working for environments not wrapped with a ControllerBaseWrapper.
-        if not hasattr(env, "base_env_timestep_factor"):
-            env.base_env_timestep_factor = 1
-        return env
+def make_single_env(env_cfg: omegaconf.DictConfig, **kwargs):
+    env = gym.make(env_cfg, **kwargs)
+    # To get the training code working for environments not wrapped with a ControllerBaseWrapper.
+    if not hasattr(env, "base_env_timestep_factor"):
+        env.base_env_timestep_factor = 1
+    return env
 
+
+def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
     if cfg.algorithm.training.n_envs == 1:
         env = stable_baselines3.common.vec_env.DummyVecEnv(
             [
                 lambda: stable_baselines3.common.monitor.Monitor(
-                    make_env(cfg.env, **cfg.env_args)
+                    make_single_env(cfg.env, **cfg.env_args)
                 )
             ]
         )
     else:
         env = stable_baselines3.common.vec_env.SubprocVecEnv(
             [
-                lambda: make_env(cfg.env, **cfg.env_args)
+                lambda: make_single_env(cfg.env, **cfg.env_args)
                 for _ in range(cfg.algorithm.training.n_envs)
             ]
         )
@@ -98,7 +99,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
 
     logger.info(f"Log directory: {Path.cwd()}")
 
-    env = make_env(cfg)
+    env = make_vec_env(cfg)
 
     if cfg.seed is not None:
         random.seed(cfg.seed)
@@ -128,11 +129,20 @@ def train(cfg: omegaconf.DictConfig) -> None:
     # Save the initial agent
     path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
     algorithm.save(path)
+    eval_envs = stable_baselines3.common.vec_env.SubprocVecEnv(
+        [lambda: make_single_env(cfg.env, **cfg.env_args)] * cfg.num_eval_episodes
+    )
     callbacks = [
-        CheckpointCallback(
+        stable_baselines3.common.callbacks.CheckpointCallback(
             cfg.checkpoint_interval, str(checkpoints_path), cfg.algorithm.name
         ),
         FixEpInfoBufferCallback(),
+        stable_baselines3.common.callbacks.EvalCallback(
+            eval_envs,
+            n_eval_episodes=cfg.num_eval_episodes,
+            eval_freq=cfg.eval_interval,
+            verbose=0,
+        ),
     ]
     if isinstance(
         algorithm, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
