@@ -161,7 +161,7 @@ def read_scalar(
 def calculate_mean_std_sequence(
     event_accumulators: Sequence[event_accumulator.EventAccumulator],
     key: str,
-    only_complete_steps: bool = False,
+    only_complete_steps: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     assert len(event_accumulators) > 0
     scalars = []
