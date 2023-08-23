@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 
 import action_space_toolbox
 import gym
+import hydra
 from omegaconf import OmegaConf
 from stable_baselines3 import PPO
 
@@ -32,7 +33,7 @@ class Renderer:
 def render(path: Path, step: int, num_episodes: int, outpath: Optional[Path]) -> None:
     cfg = OmegaConf.load(path / ".hydra" / "config.yaml")
     env = gym.make(cfg.env, **cfg.env_args)
-    agent = PPO.load(
+    agent = hydra.utils.get_class(cfg.algorithm.algorithm._target_).load(
         path / "checkpoints" / f"{cfg.algorithm.name}_{step}_steps",
         env,
         device=cfg.algorithm.algorithm.device,
