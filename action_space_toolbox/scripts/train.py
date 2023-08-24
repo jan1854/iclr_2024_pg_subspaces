@@ -139,9 +139,6 @@ def train(cfg: omegaconf.DictConfig) -> None:
         start_method="fork",
     )
     callbacks = [
-        stable_baselines3.common.callbacks.CheckpointCallback(
-            cfg.checkpoint_interval, str(checkpoints_path), cfg.algorithm.name
-        ),
         FixEpInfoBufferCallback(),
         stable_baselines3.common.callbacks.EvalCallback(
             eval_envs,
@@ -150,6 +147,12 @@ def train(cfg: omegaconf.DictConfig) -> None:
             verbose=0,
         ),
     ]
+    if cfg.checkpoint_interval is not None:
+        callbacks.append(
+            stable_baselines3.common.callbacks.CheckpointCallback(
+                cfg.checkpoint_interval, str(checkpoints_path), cfg.algorithm.name
+            )
+        )
     if isinstance(
         algorithm, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
     ):
