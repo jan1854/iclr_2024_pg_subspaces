@@ -166,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--legend", type=str, nargs="+")
     parser.add_argument("--title", type=str, default="")
     parser.add_argument("--xlabel", type=str, default="Environment steps")
-    parser.add_argument("--ylabel", type=str, default="Cumulative reward")
+    parser.add_argument("--ylabel", type=str, default="")
     parser.add_argument("--xmin", type=float)
     parser.add_argument("--xmax", type=float)
     parser.add_argument("--ymin", type=float)
