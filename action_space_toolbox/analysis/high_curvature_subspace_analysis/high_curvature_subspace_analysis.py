@@ -17,7 +17,6 @@ from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from sb3_utils.common.agent_spec import AgentSpec
 from sb3_utils.common.buffer import fill_rollout_buffer
 from sb3_utils.common.parameters import flatten_parameters, project_orthonormal
-from sb3_utils.common.training import sample_update_trajectory
 from sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
 
@@ -111,36 +110,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             overwrite_cache=self.overwrite_cached_eigen,
         )
 
-        update_trajectory = sample_update_trajectory(
-            self.agent_spec,
-            rollout_buffer_gradient_estimates,
-            agent.batch_size,
-            n_epochs=agent.n_epochs,
-        )
-        agent_spec_after_update = self.agent_spec.copy_with_new_parameters(
-            update_trajectory[-1]
-        )
-        (
-            _,
-            eigenvecs_after_update_combined,
-        ) = hess_eigen_calculator.get_eigen_combined_loss(
-            agent_spec_after_update.create_agent(self.env_factory()),
-            next(rollout_buffer_true_loss.get()),
-            env_step,
-            len(update_trajectory),
-            overwrite_cache=self.overwrite_cached_eigen,
-        )
-        (_, eigenvecs_after_update_policy,), (
-            _,
-            eigenvecs_after_update_vf,
-        ) = hess_eigen_calculator.get_eigen_policy_vf_loss(
-            agent_spec_after_update.create_agent(self.env_factory()),
-            next(rollout_buffer_true_loss.get()),
-            env_step,
-            len(update_trajectory),
-            overwrite_cache=self.overwrite_cached_eigen,
-        )
-
         self._plot_eigenspectrum(eigenvals_policy, eigenvals_vf, env_step)
 
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
@@ -151,23 +120,16 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         ]
         eigenvals_params = [eigenvals_combined, eigenvals_policy, eigenvals_vf]
         eigenvecs_params = [eigenvecs_combined, eigenvecs_policy, eigenvecs_vf]
-        eigenvecs_after_update_params = [
-            eigenvecs_after_update_combined,
-            eigenvecs_after_update_policy,
-            eigenvecs_after_update_vf,
-        ]
         for (
             loss_name,
             gradient_func,
             eigenvals,
             eigenvecs,
-            eigenvecs_after_update,
         ) in zip(
             loss_names,
             gradient_funcs,
             eigenvals_params,
             eigenvecs_params,
-            eigenvecs_after_update_params,
         ):
             subspace_fracs_est_grad = self._calculate_gradient_subspace_fraction(
                 eigenvecs,
@@ -204,17 +166,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                         for t2, overlap in overlaps_t1.items():
                             logs.add_scalar(curr_key, overlap, t2)
                 logs.add_multiline_scalar(f"overlaps_top{k:03d}/{loss_name}", keys)
-
-            keys_update = []
-            for k in self.top_eigenvec_levels:
-                overlap = self._calculate_eigenvectors_overlap(
-                    eigenvecs[:, :k],
-                    eigenvecs_after_update[:, :k],
-                )
-                curr_key = f"overlaps_update_top{k:03d}/{loss_name}"
-                logs.add_scalar(curr_key, overlap, env_step)
-                keys_update.append(curr_key)
-            logs.add_multiline_scalar(f"overlaps_update/{loss_name}", keys_update)
 
         return logs
 
