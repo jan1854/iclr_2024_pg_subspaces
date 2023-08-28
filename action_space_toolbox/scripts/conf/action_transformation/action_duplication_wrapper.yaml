@@ -1,0 +1,4 @@
+_target_: action_space_toolbox.transformations.stateless.action_duplication_wrapper.ActionDuplicationWrapper
+num_action_duplicates: 1
+rescale_weights: true,
+weights: null
