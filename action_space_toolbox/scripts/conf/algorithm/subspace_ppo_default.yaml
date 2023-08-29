@@ -18,6 +18,7 @@ algorithm:
   device: "auto"
   tensorboard_log: tensorboard
   update_trajectory_logging_interval: null
+  additional_samples_subspace: null
 
 training:
   steps: 1000000

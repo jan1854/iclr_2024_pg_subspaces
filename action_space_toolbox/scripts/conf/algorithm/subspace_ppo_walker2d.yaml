@@ -27,6 +27,7 @@ algorithm:
   vf_coef: 0.871923
   tensorboard_log: tensorboard
   update_trajectory_logging_interval: null
+  additional_samples_subspace: null
 
 training:
   steps: 5_000_000
