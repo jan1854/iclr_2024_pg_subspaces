@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Literal, Optional, Sequence
+from typing import Callable, Dict, Iterable, Literal, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
@@ -8,6 +8,7 @@ import stable_baselines3
 import stable_baselines3.common.buffers
 import torch
 from matplotlib import pyplot as plt
+from stable_baselines3.common.type_aliases import RolloutBufferSamples
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
@@ -19,6 +20,7 @@ from sb3_utils.common.buffer import fill_rollout_buffer
 from sb3_utils.common.parameters import flatten_parameters, project_orthonormal
 from sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 from sb3_utils.ppo.ppo_gradient import ppo_gradient
+from sb3_utils.ppo.ppo_parameters import combine_actor_critic_parameter_vectors
 
 logger = logging.Logger(__name__)
 
@@ -110,6 +112,19 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             overwrite_cache=self.overwrite_cached_eigen,
         )
 
+        (
+            (eigenvals_combined_low_samples, eigenvecs_combined_low_samples),
+            (eigenvals_policy_low_samples, eigenvecs_policy_low_samples),
+            (
+                eigenvals_vf_low_samples,
+                eigenvecs_vf_low_samples,
+            ),
+        ) = self.calculate_eigen(
+            agent,
+            next(rollout_buffer_gradient_estimates.get()),
+            self.top_eigenvec_levels[-1],
+        )
+
         self._plot_eigenspectrum(eigenvals_policy, eigenvals_vf, env_step)
 
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
@@ -120,54 +135,100 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         ]
         eigenvals_params = [eigenvals_combined, eigenvals_policy, eigenvals_vf]
         eigenvecs_params = [eigenvecs_combined, eigenvecs_policy, eigenvecs_vf]
+        eigenvecs_params_ls = [
+            eigenvecs_combined_low_samples,
+            eigenvecs_policy_low_samples,
+            eigenvecs_vf_low_samples,
+        ]
         for (
             loss_name,
             gradient_func,
             eigenvals,
             eigenvecs,
+            eigenvecs_ls,
         ) in zip(
             loss_names,
             gradient_funcs,
             eigenvals_params,
             eigenvecs_params,
+            eigenvecs_params_ls,
         ):
             subspace_fracs_est_grad = self._calculate_gradient_subspace_fraction(
                 eigenvecs,
                 gradient_func,
                 rollout_buffer_gradient_estimates.get(agent.batch_size),
             )
-            keys = []
-            for num_evs, subspace_frac in subspace_fracs_est_grad.items():
-                curr_key = f"gradient_subspace_fraction_{num_evs:03d}evs/estimated_gradient/{loss_name}"
-                keys.append(curr_key)
-                logs.add_scalar(curr_key, subspace_frac, env_step)
-            logs.add_multiline_scalar(
-                f"gradient_subspace_fraction/estimated_gradient/{loss_name}", keys
-            )
             subspace_fracs_true_grad = self._calculate_gradient_subspace_fraction(
                 eigenvecs, gradient_func, rollout_buffer_true_loss.get()
             )
-            keys = []
-            for num_evs, subspace_frac in subspace_fracs_true_grad.items():
-                curr_key = f"gradient_subspace_fraction_{num_evs:03d}evs/true_gradient/{loss_name}"
-                keys.append(curr_key)
-                logs.add_scalar(curr_key, subspace_frac, env_step)
-            logs.add_multiline_scalar(
-                f"gradient_subspace_fraction/true_gradient/{loss_name}", keys
+            subspace_fracs_est_grad_ls = self._calculate_gradient_subspace_fraction(
+                eigenvecs_ls,
+                gradient_func,
+                rollout_buffer_gradient_estimates.get(agent.batch_size),
+            )
+            subspace_fracs_true_grad_ls = self._calculate_gradient_subspace_fraction(
+                eigenvecs_ls, gradient_func, rollout_buffer_true_loss.get()
+            )
+            self.log_subspace_metrics(
+                env_step,
+                subspace_fracs_est_grad,
+                subspace_fracs_true_grad,
+                loss_name,
+                logs,
+            )
+            self.log_subspace_metrics(
+                env_step,
+                subspace_fracs_est_grad_ls,
+                subspace_fracs_true_grad_ls,
+                loss_name,
+                logs,
+                "low_sample",
             )
 
-            overlaps = self._calculate_overlaps(loss_name)
-            for k, overlaps_top_k in overlaps.items():
-                keys = []
-                for t1, overlaps_t1 in overlaps_top_k.items():
-                    if len(overlaps_t1) > 0:
-                        curr_key = f"overlaps_top{k:03d}_checkpoint{t1:07d}/{loss_name}"
-                        keys.append(curr_key)
-                        for t2, overlap in overlaps_t1.items():
-                            logs.add_scalar(curr_key, overlap, t2)
-                logs.add_multiline_scalar(f"overlaps_top{k:03d}/{loss_name}", keys)
-
         return logs
+
+    def log_subspace_metrics(
+        self,
+        env_step: int,
+        subspace_fracs_est: Dict[int, float],
+        subspace_fracs_true: Dict[int, float],
+        loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"],
+        logs: TensorboardLogs,
+        prefix: Optional[str] = None,
+    ):
+        if prefix is None:
+            prefix = ""
+        else:
+            prefix = prefix + "/"
+        keys = []
+        for num_evs, subspace_frac in subspace_fracs_est.items():
+            curr_key = f"{prefix}gradient_subspace_fraction_{num_evs:03d}evs/estimated_gradient/{loss_name}"
+            keys.append(curr_key)
+            logs.add_scalar(curr_key, subspace_frac, env_step)
+        logs.add_multiline_scalar(
+            f"{prefix}gradient_subspace_fraction/estimated_gradient/{loss_name}", keys
+        )
+        keys = []
+        for num_evs, subspace_frac in subspace_fracs_true.items():
+            curr_key = f"{prefix}gradient_subspace_fraction_{num_evs:03d}evs/true_gradient/{loss_name}"
+            keys.append(curr_key)
+            logs.add_scalar(curr_key, subspace_frac, env_step)
+        logs.add_multiline_scalar(
+            f"{prefix}gradient_subspace_fraction/true_gradient/{loss_name}", keys
+        )
+
+        overlaps = self._calculate_overlaps(loss_name)
+        for k, overlaps_top_k in overlaps.items():
+            keys = []
+            for t1, overlaps_t1 in overlaps_top_k.items():
+                if len(overlaps_t1) > 0:
+                    curr_key = (
+                        f"{prefix}overlaps_top{k:03d}_checkpoint{t1:07d}/{loss_name}"
+                    )
+                    keys.append(curr_key)
+                    for t2, overlap in overlaps_t1.items():
+                        logs.add_scalar(curr_key, overlap, t2)
+            logs.add_multiline_scalar(f"{prefix}overlaps_top{k:03d}/{loss_name}", keys)
 
     @classmethod
     def _calculate_eigenvectors_overlap(
@@ -268,7 +329,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
     def _calculate_overlaps(
         self, loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"]
     ) -> Dict[int, Dict[int, Dict[int, float]]]:
-        hess_eigen_calculator = HessianEigenCachedCalculator(self.run_dir, self.hessian_eigen)
+        hess_eigen_calculator = HessianEigenCachedCalculator(
+            self.run_dir, self.hessian_eigen
+        )
         start_checkpoints_eigenvecs = {
             num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels
         }
@@ -295,3 +358,42 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                     curr_start_checkpoints_eigenvecs[env_step] = eigenvecs
                     curr_overlaps[env_step] = {}
         return overlaps
+
+    # TODO: This is redundant with HessianEigenCachedCalculator
+    def calculate_eigen(
+        self,
+        agent: stable_baselines3.ppo.PPO,
+        data: RolloutBufferSamples,
+        num_eigenvectors: Optional[int],
+    ) -> Tuple[
+        Tuple[torch.Tensor, torch.Tensor],
+        Tuple[torch.Tensor, torch.Tensor],
+        Tuple[torch.Tensor, torch.Tensor],
+    ]:
+        # Check that the there is no parameter sharing between policy and value function
+        assert (
+            sum(["shared" in name for name, _ in agent.policy.named_parameters()]) == 0
+        )
+        eigen = self.hessian_eigen.calculate_top_eigen(
+            agent, data, num_eigenvectors, eigenvectors_fullsize=False
+        )
+        policy_eigenvectors_all_parameters = combine_actor_critic_parameter_vectors(
+            eigen.policy.eigenvectors, None, agent
+        )
+        vf_eigenvectors_all_parameters = combine_actor_critic_parameter_vectors(
+            None, eigen.value_function.eigenvectors, agent
+        )
+        (
+            eigenvals_combined,
+            eigenvecs_combined,
+        ) = HessianEigenCachedCalculator.collect_top_eigenvectors(
+            agent, eigen, num_eigenvectors
+        )
+        return (
+            (eigenvals_combined[:100], eigenvecs_combined),
+            (eigen.policy.eigenvalues, policy_eigenvectors_all_parameters),
+            (
+                eigen.value_function.eigenvalues,
+                vf_eigenvectors_all_parameters,
+            ),
+        )
