@@ -46,6 +46,7 @@ def create_multiline_plots(
 ) -> None:
     plt.rc("font", size=12)
     ax = plt.gca()
+    ax.margins(x=0)
     if (log_path / "tensorboard").exists():
         run_dirs = [log_path]
     else:

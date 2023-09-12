@@ -48,6 +48,7 @@ def create_plots(
 ) -> None:
     plt.rc("font", size=fontsize)
     ax = plt.gca()
+    ax.margins(x=0)
     color = None  # To make PyLint happy
     linestyles = ["-", "--", "-.", ":"]
     for i, log_path in enumerate(log_paths):
