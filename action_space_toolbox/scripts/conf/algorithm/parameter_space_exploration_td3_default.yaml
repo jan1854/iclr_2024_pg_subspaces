@@ -16,6 +16,7 @@ algorithm:
   tensorboard_log: tensorboard
   exploration_subspace: ???
   exploration_parameters_std: 0.001
+  exploration_parameters_resample_interval: null
 
 training:
   steps: 1000000
