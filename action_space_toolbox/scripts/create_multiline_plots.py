@@ -44,6 +44,10 @@ def create_multiline_plots(
     num_same_color_plots: int,
     out: Path,
 ) -> None:
+    if legend is not None and len(keys) != len(legend):
+        logger.warning(
+            f"keys and legend do not have the same number of elements, keys: {len(keys)}, legend: {len(legend)}"
+        )
     plt.rc("font", size=12)
     ax = plt.gca()
     ax.margins(x=0)

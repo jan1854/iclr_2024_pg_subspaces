@@ -46,6 +46,12 @@ def create_plots(
     fontsize: int,
     out: Path,
 ) -> None:
+    log_paths_filtered = [l for l in log_paths if l is not None]
+    if legend is not None and len(log_paths_filtered) != len(legend):
+        logger.warning(
+            f'log_paths (without "skip"s) and legend do not have the same number of elements, '
+            f"log_paths: {len(log_paths_filtered)}, legend: {len(legend)}"
+        )
     plt.rc("font", size=fontsize)
     ax = plt.gca()
     ax.margins(x=0)
