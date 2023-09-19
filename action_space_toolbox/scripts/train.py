@@ -52,7 +52,11 @@ def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
     return new_conf
 
 
-def make_single_env(env_cfg: omegaconf.DictConfig, action_transformation_cfg: Optional[omegaconf.DictConfig], **kwargs):
+def make_single_env(
+    env_cfg: omegaconf.DictConfig,
+    action_transformation_cfg: Optional[omegaconf.DictConfig],
+    **kwargs,
+):
     env = gym.make(env_cfg, **kwargs)
     if action_transformation_cfg is not None:
         env = hydra.utils.instantiate(action_transformation_cfg, env=env)
@@ -67,14 +71,18 @@ def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.
         env = stable_baselines3.common.vec_env.DummyVecEnv(
             [
                 lambda: stable_baselines3.common.monitor.Monitor(
-                    make_single_env(cfg.env, cfg.get("action_transformation"), **cfg.env_args)
+                    make_single_env(
+                        cfg.env, cfg.get("action_transformation"), **cfg.env_args
+                    )
                 )
             ]
         )
     else:
         env = stable_baselines3.common.vec_env.SubprocVecEnv(
             [
-                lambda: make_single_env(cfg.env, cfg.get("action_transformation"), **cfg.env_args)
+                lambda: make_single_env(
+                    cfg.env, cfg.get("action_transformation"), **cfg.env_args
+                )
                 for _ in range(cfg.algorithm.training.n_envs)
             ]
         )
@@ -134,7 +142,9 @@ def train(cfg: omegaconf.DictConfig) -> None:
     eval_envs = stable_baselines3.common.vec_env.SubprocVecEnv(
         [
             lambda: stable_baselines3.common.monitor.Monitor(
-                make_single_env(cfg.env, cfg.get("action_transformation"), **cfg.env_args)
+                make_single_env(
+                    cfg.env, cfg.get("action_transformation"), **cfg.env_args
+                )
             )
         ]
         * cfg.num_eval_episodes,
@@ -152,7 +162,11 @@ def train(cfg: omegaconf.DictConfig) -> None:
     if cfg.checkpoint_interval is not None:
         callbacks.append(
             stable_baselines3.common.callbacks.CheckpointCallback(
-                cfg.checkpoint_interval, str(checkpoints_path), cfg.algorithm.name
+                cfg.checkpoint_interval,
+                str(checkpoints_path),
+                cfg.algorithm.name,
+                save_replay_buffer=cfg.save_replay_buffer,
+                save_vecnormalize=True,
             )
         )
     if isinstance(

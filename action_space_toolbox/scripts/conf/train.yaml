@@ -10,6 +10,7 @@ show_progress: true
 num_eval_episodes: 10
 eval_interval: 10000
 checkpoint_interval: null
+save_replay_buffer: false
 
 log_dir: ${oc.env:ACTION_SPACE_TOOLBOX_LOG_DIR,logs}
 run_log_dir: ${log_dir}/training/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
