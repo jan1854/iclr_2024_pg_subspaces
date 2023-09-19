@@ -164,6 +164,7 @@ def create_plots(
             legend_fig.dpi_scale_trans.inverted()
         )
         legend_fig.savefig(out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox)
+    plt.close()
 
 
 if __name__ == "__main__":
