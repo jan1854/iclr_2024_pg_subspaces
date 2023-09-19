@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
@@ -10,7 +10,14 @@ import stable_baselines3.common.off_policy_algorithm
 import stable_baselines3.common.on_policy_algorithm
 import torch
 from matplotlib import pyplot as plt
-from stable_baselines3.common.type_aliases import RolloutBufferSamples
+from stable_baselines3.common.callbacks import CallbackList
+from stable_baselines3.common.type_aliases import (
+    RolloutBufferSamples,
+    ReplayBufferSamples,
+    TrainFreq,
+    TrainFrequencyUnit,
+)
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from action_space_toolbox.analysis.analysis import Analysis
 from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
@@ -419,10 +426,26 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             rollout_buffer_gradient_estimates.get(agent.batch_size)
         )
 
-    @staticmethod
     def _collect_data_off_policy_algorithm(
+        self,
         agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
-    ) -> Tuple[RolloutBufferSamples, List[RolloutBufferSamples]]:
+    ) -> Tuple[ReplayBufferSamples, List[ReplayBufferSamples]]:
+        # If the replay buffer is empty (step 0), collect some random data
+        if not agent.replay_buffer.full and agent.replay_buffer.pos == 0:
+            env = DummyVecEnv([lambda: self.env_factory()])
+            agent._last_obs = env.reset()
+            # collect_rollouts requires a callback for some reason
+            callback = CallbackList([])
+            callback.init_callback(agent)
+            agent._total_timesteps = 50_000
+            agent.collect_rollouts(
+                env,
+                callback,
+                TrainFreq(50_000, TrainFrequencyUnit.STEP),
+                agent.replay_buffer,
+                agent.action_noise,
+                50_000,
+            )
         max_idx = (
             agent.replay_buffer.buffer_size
             if agent.replay_buffer.full
