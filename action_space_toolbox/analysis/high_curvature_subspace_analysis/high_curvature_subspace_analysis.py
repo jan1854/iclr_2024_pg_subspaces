@@ -1,11 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Literal, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple
 
 import gym
 import numpy as np
 import stable_baselines3
 import stable_baselines3.common.buffers
+import stable_baselines3.common.off_policy_algorithm
+import stable_baselines3.common.on_policy_algorithm
 import torch
 from matplotlib import pyplot as plt
 from stable_baselines3.common.type_aliases import RolloutBufferSamples
@@ -16,11 +18,11 @@ from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator impor
 )
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from sb3_utils.common.agent_spec import AgentSpec
-from sb3_utils.common.buffer import fill_rollout_buffer
+from sb3_utils.common.buffer import fill_rollout_buffer, concatenate_buffer_samples
 from sb3_utils.common.parameters import flatten_parameters, project_orthonormal
 from sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
-from sb3_utils.ppo.ppo_gradient import ppo_gradient
-from sb3_utils.ppo.ppo_parameters import combine_actor_critic_parameter_vectors
+from sb3_utils.common.loss import actor_critic_gradient
+from sb3_utils.common.parameters import combine_actor_critic_parameter_vectors
 
 logger = logging.Logger(__name__)
 
@@ -65,30 +67,20 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         overwrite_results: bool,
         verbose: bool,
     ) -> TensorboardLogs:
-        agent = self.agent_spec.create_agent(self.env_factory())
-        rollout_buffer_true_loss = stable_baselines3.common.buffers.RolloutBuffer(
-            self.num_samples_true_loss,
-            agent.observation_space,
-            agent.action_space,
-            agent.device,
-            agent.gae_lambda,
-            agent.gamma,
-        )
-        fill_rollout_buffer(
-            self.env_factory,
-            self.agent_spec,
-            rollout_buffer_true_loss,
-        )
 
-        rollout_buffer_gradient_estimates = (
-            stable_baselines3.common.buffers.RolloutBuffer(
-                agent.n_steps * agent.n_envs,
-                agent.observation_space,
-                agent.action_space,
-                agent.device,
-            )
-        )
-        fill_rollout_buffer(self.env_factory, agent, rollout_buffer_gradient_estimates)
+        agent = self.agent_spec.create_agent(self.env_factory())
+        if isinstance(
+            agent, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+        ):
+            (
+                data_true_loss,
+                data_estimated_loss,
+            ) = self._collect_data_on_policy_algorithm(agent)
+        else:
+            (
+                data_true_loss,
+                data_estimated_loss,
+            ) = self._collect_data_off_policy_algorithm(agent)
 
         hess_eigen_calculator = HessianEigenCachedCalculator(
             self.run_dir, self.hessian_eigen, device=agent.device
@@ -98,7 +90,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             eigenvecs_combined,
         ) = hess_eigen_calculator.get_eigen_combined_loss(
             agent,
-            next(rollout_buffer_true_loss.get()),
+            data_true_loss,
             env_step,
             overwrite_cache=self.overwrite_cached_eigen,
         )
@@ -107,11 +99,12 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             eigenvecs_vf,
         ) = hess_eigen_calculator.get_eigen_policy_vf_loss(
             agent,
-            next(rollout_buffer_true_loss.get()),
+            data_true_loss,
             env_step,
             overwrite_cache=self.overwrite_cached_eigen,
         )
 
+        data_estimated_loss_one_batch = concatenate_buffer_samples(data_estimated_loss)
         (
             (eigenvals_combined_low_samples, eigenvecs_combined_low_samples),
             (eigenvals_policy_low_samples, eigenvecs_policy_low_samples),
@@ -121,7 +114,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             ),
         ) = self.calculate_eigen(
             agent,
-            next(rollout_buffer_gradient_estimates.get()),
+            data_estimated_loss_one_batch,
             self.top_eigenvec_levels[-1],
         )
 
@@ -129,9 +122,15 @@ class HighCurvatureSubspaceAnalysis(Analysis):
 
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         gradient_funcs = [
-            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[0],
-            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[1],
-            lambda batch: ppo_gradient(agent, batch, all_gradients_fullsize=True)[2],
+            lambda batch: actor_critic_gradient(
+                agent, batch, all_gradients_fullsize=True
+            )[0],
+            lambda batch: actor_critic_gradient(
+                agent, batch, all_gradients_fullsize=True
+            )[1],
+            lambda batch: actor_critic_gradient(
+                agent, batch, all_gradients_fullsize=True
+            )[2],
         ]
         eigenvals_params = [eigenvals_combined, eigenvals_policy, eigenvals_vf]
         eigenvecs_params = [eigenvecs_combined, eigenvecs_policy, eigenvecs_vf]
@@ -140,13 +139,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             eigenvecs_policy_low_samples,
             eigenvecs_vf_low_samples,
         ]
-        for (
-            loss_name,
-            gradient_func,
-            eigenvals,
-            eigenvecs,
-            eigenvecs_ls,
-        ) in zip(
+        for (loss_name, gradient_func, eigenvals, eigenvecs, eigenvecs_ls) in zip(
             loss_names,
             gradient_funcs,
             eigenvals_params,
@@ -154,20 +147,16 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             eigenvecs_params_ls,
         ):
             subspace_fracs_est_grad = self._calculate_gradient_subspace_fraction(
-                eigenvecs,
-                gradient_func,
-                rollout_buffer_gradient_estimates.get(agent.batch_size),
+                eigenvecs, gradient_func, data_estimated_loss
             )
             subspace_fracs_true_grad = self._calculate_gradient_subspace_fraction(
-                eigenvecs, gradient_func, rollout_buffer_true_loss.get()
+                eigenvecs, gradient_func, [data_true_loss]
             )
             subspace_fracs_est_grad_ls = self._calculate_gradient_subspace_fraction(
-                eigenvecs_ls,
-                gradient_func,
-                rollout_buffer_gradient_estimates.get(agent.batch_size),
+                eigenvecs_ls, gradient_func, data_estimated_loss
             )
             subspace_fracs_true_grad_ls = self._calculate_gradient_subspace_fraction(
-                eigenvecs_ls, gradient_func, rollout_buffer_true_loss.get()
+                eigenvecs_ls, gradient_func, [data_true_loss]
             )
             self.log_subspace_metrics(
                 env_step,
@@ -301,7 +290,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             Sequence[torch.Tensor],
         ],
         rollout_buffer_samples: Optional[
-            Iterable[stable_baselines3.common.buffers.RolloutBufferSamples]
+            Sequence[stable_baselines3.common.buffers.RolloutBufferSamples]
         ] = None,
     ) -> Dict[int, float]:
         subspace_fractions = {}
@@ -397,3 +386,51 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                 vf_eigenvectors_all_parameters,
             ),
         )
+
+    def _collect_data_on_policy_algorithm(
+        self,
+        agent: stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm,
+    ) -> Tuple[RolloutBufferSamples, List[RolloutBufferSamples]]:
+        rollout_buffer_true_loss = stable_baselines3.common.buffers.RolloutBuffer(
+            self.num_samples_true_loss,
+            agent.observation_space,
+            agent.action_space,
+            agent.device,
+            agent.gae_lambda,
+            agent.gamma,
+        )
+        fill_rollout_buffer(
+            self.env_factory,
+            self.agent_spec,
+            rollout_buffer_true_loss,
+        )
+
+        rollout_buffer_gradient_estimates = (
+            stable_baselines3.common.buffers.RolloutBuffer(
+                agent.n_steps * agent.n_envs,
+                agent.observation_space,
+                agent.action_space,
+                agent.device,
+            )
+        )
+        fill_rollout_buffer(self.env_factory, agent, rollout_buffer_gradient_estimates)
+
+        return next(rollout_buffer_true_loss.get()), list(
+            rollout_buffer_gradient_estimates.get(agent.batch_size)
+        )
+
+    @staticmethod
+    def _collect_data_off_policy_algorithm(
+        agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
+    ) -> Tuple[RolloutBufferSamples, List[RolloutBufferSamples]]:
+        max_idx = (
+            agent.replay_buffer.buffer_size
+            if agent.replay_buffer.full
+            else agent.replay_buffer.pos
+        )
+        # Set the number of batches for the estimated gradient so that the same amount of data is used as for
+        # default PPO
+        return agent.replay_buffer._get_samples(np.arange(max_idx)), [
+            agent.replay_buffer.sample(agent.batch_size)
+            for _ in range(2048 // agent.batch_size)
+        ]

@@ -24,7 +24,7 @@ from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
 from sb3_utils.common.agent_spec import AgentSpec, HydraAgentSpec
 from sb3_utils.common.buffer import fill_rollout_buffer
 from sb3_utils.common.parameters import flatten_parameters
-from sb3_utils.ppo.ppo_gradient import ppo_gradient
+from sb3_utils.common.loss import actor_critic_gradient
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,9 @@ class CliffAnalysis(Analysis):
             )
 
         if overwrite_results or not self._check_logs_complete(results, env_step):
-            gradient, _, _ = ppo_gradient(agent, next(rollout_buffer_true_loss.get()))
+            gradient, _, _ = actor_critic_gradient(
+                agent, next(rollout_buffer_true_loss.get())
+            )
             if self.gradient_normalization == "original":
                 # This is not the L1 norm (missing the abs), not sure why the Cliff Diving authors use this
                 # normalization

@@ -3,19 +3,26 @@ from pathlib import Path
 from typing import Literal, Optional, Sequence, Tuple, Union
 
 import stable_baselines3
+import stable_baselines3.common.base_class
 import torch
+from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
+from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
+
 from sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen, HessianEigen
 from sb3_utils.common.parameters import flatten_parameters
-from stable_baselines3.common.type_aliases import RolloutBufferSamples
+from stable_baselines3.common.type_aliases import (
+    RolloutBufferSamples,
+    ReplayBufferSamples,
+)
 
-from sb3_utils.ppo.ppo_parameters import combine_actor_critic_parameter_vectors
+from sb3_utils.common.parameters import combine_actor_critic_parameter_vectors
 
 
 class CachedEigenIterator:
     def __init__(
         self,
         hessian_calc: "HessianEigenCachedCalculator",
-        agent: stable_baselines3.ppo.PPO,
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
         loss_name: Literal["policy_loss", "value_function_loss", "combined_loss"],
         env_steps: Sequence[int],
         num_grad_steps_additional_training: int,
@@ -74,8 +81,8 @@ class HessianEigenCachedCalculator:
 
     def _get_eigen(
         self,
-        agent: stable_baselines3.ppo.PPO,
-        data: RolloutBufferSamples,
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
+        data: Union[ReplayBufferSamples, RolloutBufferSamples],
         env_step: int,
         num_grad_steps_additional_training: int,
         num_eigenvectors: Optional[int],
@@ -85,6 +92,12 @@ class HessianEigenCachedCalculator:
         # Check that the there is no parameter sharing between policy and value function
         assert (
             sum(["shared" in name for name, _ in agent.policy.named_parameters()]) == 0
+        )
+        assert (
+            isinstance(data, ReplayBufferSamples)
+            and isinstance(agent, OffPolicyAlgorithm)
+            or isinstance(data, RolloutBufferSamples)
+            and isinstance(agent, OnPolicyAlgorithm)
         )
         cached_eigen = self.read_cached_eigen(
             env_step, num_grad_steps_additional_training
@@ -115,7 +128,7 @@ class HessianEigenCachedCalculator:
 
     def get_eigen_combined_loss(
         self,
-        agent: stable_baselines3.ppo.PPO,
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
         data: RolloutBufferSamples,
         env_step: int,
         num_grad_steps_additional_training: int = 0,
@@ -136,7 +149,7 @@ class HessianEigenCachedCalculator:
 
     def get_eigen_policy_vf_loss(
         self,
-        agent: stable_baselines3.ppo.PPO,
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
         data: RolloutBufferSamples,
         env_step: int,
         num_grad_steps_additional_training: int = 0,
@@ -167,7 +180,7 @@ class HessianEigenCachedCalculator:
     @classmethod
     def collect_top_eigenvectors(
         cls,
-        agent: stable_baselines3.ppo.PPO,
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
         eigen: ActorCriticEigen,
         num_eigenvectors: Optional[int] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -248,7 +261,7 @@ class HessianEigenCachedCalculator:
 
     def iter_cached_eigen(
         self,
-        agent: stable_baselines3.ppo.PPO,
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
         num_grad_steps_additional_training: int = 0,
         loss_name: Literal[
             "policy_loss", "value_function_loss", "combined_loss"

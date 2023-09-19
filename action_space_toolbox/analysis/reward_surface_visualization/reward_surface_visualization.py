@@ -34,8 +34,7 @@ from sb3_utils.common.parameters import (
     project_orthonormal_inverse,
 )
 from sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
-from sb3_utils.hessian.eigen.hessian_eigen_lanczos import HessianEigenLanczos
-from sb3_utils.ppo.ppo_gradient import ppo_gradient
+from sb3_utils.common.loss import actor_critic_gradient
 from sb3_utils.ppo.ppo_loss import ppo_loss
 
 logger = logging.getLogger(__name__)
@@ -163,7 +162,7 @@ class RewardSurfaceVisualization(Analysis):
             last_rand_dir = None
             for dir_type in self.direction_types:
                 if dir_type == "grad":
-                    gradient, _, _ = ppo_gradient(
+                    gradient, _, _ = actor_critic_gradient(
                         agent, next(rollout_buffer_true_loss.get())
                     )
                     # Normalize the gradient to have the same length as the random direction vector (as described in

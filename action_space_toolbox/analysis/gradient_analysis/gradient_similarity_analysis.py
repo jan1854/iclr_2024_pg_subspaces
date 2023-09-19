@@ -7,7 +7,7 @@ import torch
 from stable_baselines3.common.buffers import RolloutBuffer
 
 from action_space_toolbox.util.tensorboard_logs import TensorboardLogs
-from sb3_utils.ppo.ppo_gradient import ppo_gradient
+from sb3_utils.common.loss import actor_critic_gradient
 
 
 class GradientSimilarityAnalysis:
@@ -174,7 +174,9 @@ class GradientSimilarityAnalysis:
                 and i >= max_num_gradients * batches_per_gradient
             ) or (batch.actions.shape[0] != batch_size):
                 break
-            combined_gradient, policy_gradient, vf_gradient = ppo_gradient(agent, batch)
+            combined_gradient, policy_gradient, vf_gradient = actor_critic_gradient(
+                agent, batch
+            )
             policy_gradients.append(torch.cat([g.flatten() for g in policy_gradient]))
             vf_gradients.append(torch.cat([g.flatten() for g in vf_gradient]))
             combined_gradients.append(
