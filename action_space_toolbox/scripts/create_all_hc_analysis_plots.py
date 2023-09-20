@@ -41,8 +41,8 @@ RUN_CONFIGS = {
     },
 }
 PLOT_CONFIGS = {
-    "gradient_subspace_fraction_precise_vs_approx_hessian": {
-        "title": "Subspace frac., precise vs. low-sample Hessian (low sample)",
+    "gradient_subspace_fraction_precise_vs_low_sample_hessian": {
+        "title": "Subspace frac., precise vs. low-sample Hessian",
         "out_dir": "gradient_subspace_fraction",
         "keys": [
             "gradient_subspace_fraction_001evs/estimated_gradient",
@@ -122,6 +122,30 @@ PLOT_CONFIGS = {
         "ylabel": "Gradient fraction in subspace",
         "ymin": 0.0,
         "ymax": 1.0,
+    },
+    "subspace_overlap_0100000_precise_vs_low_sample_hessian": {
+        "title": "Subspace overlap, precise vs. low-sample Hessian, $t_1 = 10^{5}$",
+        "out_dir": "subspace_overlap",
+        "keys": [
+            "overlaps_top001_checkpoint0100000",
+            "low_sample/overlaps_top001_checkpoint0100000",
+            "overlaps_top010_checkpoint0100000",
+            "low_sample/overlaps_top010_checkpoint0100000",
+            "overlaps_top100_checkpoint0100000",
+            "low_sample/overlaps_top100_checkpoint0100000",
+        ],
+        "legend": [
+            "precise Hessian; 1 EV",
+            "low-sample Hessian; 1 EV",
+            "precise Hessian; 10 EVs",
+            "low-sample Hessian; 10 EVs",
+            "precise Hessian; 100 EVs",
+            "low-sample Hessian; 100 EVs",
+        ],
+        "ylabel": "Subspace overlap",
+        "ymin": 0.0,
+        "ymax": 1.0,
+        "fill_in_data": {100000: 1.0},
     },
     "subspace_overlap_0010000": {
         "title": "Subspace overlap, $t_1 = 10^{4}$",
