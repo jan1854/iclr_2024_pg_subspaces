@@ -1,7 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -42,6 +42,8 @@ def create_multiline_plots(
     smoothing_weight: float,
     separate_legend: bool,
     num_same_color_plots: int,
+    marker: Optional[str],
+    fill_in_data: Dict[int, float],
     out: Path,
 ) -> None:
     if legend is not None and len(keys) != len(legend):
@@ -68,6 +70,12 @@ def create_multiline_plots(
                 value_std,
             ) = calculate_mean_std_sequence(event_accumulators, key)
 
+            for s, v in fill_in_data.items():
+                if s not in steps:
+                    idx = np.argmax(steps > s)
+                    steps = np.insert(steps, idx, s)
+                    value_mean = np.insert(value_mean, idx, v)
+                    value_std = np.insert(value_std, idx, 0.0)
             value_mean = smooth(value_mean, smoothing_weight)
             if value_std is not None:
                 value_std = smooth(value_std, smoothing_weight)
@@ -80,6 +88,7 @@ def create_multiline_plots(
             plt.plot(
                 steps,
                 value_mean,
+                marker=marker,
                 color=color,
                 linestyle=linestyles[i % num_same_color_plots],
             )
@@ -121,7 +130,7 @@ def create_multiline_plots(
     if not xaxis_log:
         plt.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
     plt.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
-    plt.title(title)
+    plt.title(title, fontsize=12)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xlim(xlimits)

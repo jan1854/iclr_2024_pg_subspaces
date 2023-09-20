@@ -1,7 +1,7 @@
 import logging
 import multiprocessing
 from pathlib import Path
-from typing import Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
@@ -41,6 +41,30 @@ RUN_CONFIGS = {
     },
 }
 PLOT_CONFIGS = {
+    "gradient_subspace_fraction_precise_vs_approx_hessian": {
+        "title": "Subspace frac., precise vs. low-sample Hessian (low sample)",
+        "out_dir": "gradient_subspace_fraction",
+        "keys": [
+            "gradient_subspace_fraction_001evs/estimated_gradient",
+            "low_sample/gradient_subspace_fraction_001evs/estimated_gradient",
+            "gradient_subspace_fraction_010evs/estimated_gradient",
+            "low_sample/gradient_subspace_fraction_010evs/estimated_gradient",
+            "gradient_subspace_fraction_100evs/estimated_gradient",
+            "low_sample/gradient_subspace_fraction_100evs/estimated_gradient",
+        ],
+        "legend": [
+            "precise Hessian; 1 EV",
+            "low-sample Hessian; 1 EV",
+            "precise Hessian; 10 EVs",
+            "low-sample Hessian; 10 EVs",
+            "precise Hessian; 100 EVs",
+            "low-sample Hessian; 100 EVs",
+        ],
+        "ylabel": "Gradient fraction in subspace",
+        "num_same_color_plots": 2,
+        "ymin": 0.0,
+        "ymax": 1.0,
+    },
     "gradient_subspace_fraction_estimated_vs_true": {
         "title": "Subspace frac., estimated vs. true grad.",
         "out_dir": "gradient_subspace_fraction",
@@ -115,6 +139,7 @@ PLOT_CONFIGS = {
         "ylabel": "Subspace overlap",
         "ymin": 0.0,
         "ymax": 1.0,
+        "fill_in_data": {10000: 1.0},
     },
     "subspace_overlap_0100000": {
         "title": "Subspace overlap, $t_1 = 10^{5}$",
@@ -132,6 +157,7 @@ PLOT_CONFIGS = {
         "ylabel": "Subspace overlap",
         "ymin": 0.0,
         "ymax": 1.0,
+        "fill_in_data": {100000: 1.0},
     },
     "subspace_overlap_0500000": {
         "title": "Subspace overlap, $t_1 = 5 \cdot 10^{5}$",
@@ -149,6 +175,7 @@ PLOT_CONFIGS = {
         "ylabel": "Subspace overlap",
         "ymin": 0.0,
         "ymax": 1.0,
+        "fill_in_data": {500000: 1.0},
     },
 }
 
@@ -166,6 +193,8 @@ def worker(
     smoothing_weight: float,
     separate_legend: bool,
     num_same_color_plots: int,
+    marker: Optional[str],
+    fill_in_data: Dict[int, float],
     out: Path,
 ):
     try:
@@ -182,6 +211,8 @@ def worker(
             smoothing_weight,
             separate_legend,
             num_same_color_plots,
+            marker,
+            fill_in_data,
             out,
         )
     except Exception as e:
@@ -239,6 +270,8 @@ with multiprocessing.Pool(20) as pool:
                                 0.3,
                                 False,
                                 plot_config.get("num_same_color_plots", 1),
+                                plot_config.get("marker", "d"),
+                                plot_config.get("fill_in_data", {}),
                                 out_path,
                             ),
                         )
