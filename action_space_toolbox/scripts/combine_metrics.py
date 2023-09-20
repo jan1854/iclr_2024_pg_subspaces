@@ -1,4 +1,5 @@
 import argparse
+import logging
 import shutil
 from pathlib import Path
 from typing import Any, Dict, Sequence
@@ -11,6 +12,8 @@ from action_space_toolbox.util.tensorboard_logs import (
     check_new_data_indicator,
     remove_new_data_indicator,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def same_configurations(run_dirs: Sequence[Path]) -> bool:
@@ -72,11 +75,16 @@ def combine_metrics(log_path: Path) -> None:
 
     for run_dirs, combined_dir in tqdm(jobs):
         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-        if combined_dir.exists():
-            shutil.rmtree(combined_dir)
-        combine_tb_logs(tb_dirs, combined_dir)
-        for run_dir in run_dirs:
-            remove_new_data_indicator(run_dir)
+        try:
+            if combined_dir.exists():
+                shutil.rmtree(combined_dir)
+            combine_tb_logs(tb_dirs, combined_dir)
+            for run_dir in run_dirs:
+                remove_new_data_indicator(run_dir)
+        except Exception as e:
+            logger.warning(
+                f"Failed to combine metrics in {combined_dir.parent}. Got exception: {e}."
+            )
 
 
 if __name__ == "__main__":
