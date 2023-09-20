@@ -352,7 +352,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                     )
                 if env_step in self.eigenvec_overlap_checkpoints:
                     curr_start_checkpoints_eigenvecs[env_step] = eigenvecs
-                    curr_overlaps[env_step] = {}
+                    curr_overlaps[env_step] = {env_step: 1.0}
         return overlaps
 
     # TODO: This is redundant with HessianEigenCachedCalculator
