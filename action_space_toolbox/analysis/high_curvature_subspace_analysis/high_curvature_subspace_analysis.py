@@ -90,7 +90,10 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             ) = self._collect_data_off_policy_algorithm(agent)
 
         hess_eigen_calculator = HessianEigenCachedCalculator(
-            self.run_dir, self.hessian_eigen, device=agent.device
+            self.run_dir,
+            self.hessian_eigen,
+            max(self.top_eigenvec_levels),
+            device=agent.device,
         )
         (
             eigenvals_combined,
