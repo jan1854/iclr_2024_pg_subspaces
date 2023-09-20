@@ -89,6 +89,7 @@ def create_multiline_plots(
                 steps,
                 value_mean,
                 marker=marker,
+                markersize=3,
                 color=color,
                 linestyle=linestyles[i % num_same_color_plots],
             )
