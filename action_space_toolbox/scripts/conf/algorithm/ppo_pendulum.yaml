@@ -33,5 +33,5 @@ algorithm:
 env_wrappers: ???
 
 training:
-  steps: 600000
+  steps: 1000000
   n_envs: 4
