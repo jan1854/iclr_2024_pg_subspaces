@@ -26,7 +26,6 @@ algorithm:
   sde_sample_freq: 4
   target_kl: null
   tensorboard_log: tensorboard
-  create_eval_env: false
   verbose: 0
   device: "auto"
 
