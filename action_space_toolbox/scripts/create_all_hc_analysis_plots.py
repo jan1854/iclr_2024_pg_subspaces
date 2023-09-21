@@ -19,7 +19,7 @@ RUN_CONFIGS = {
     "HalfCheetah_TC-v3": {
         "log_dirs": {"ppo": "2023-07-14/21-58-53", "sac": "2023-09-19/11-08-06"},
         "xmax": 3_000_000,
-        "analysis_run_ids": {"ppo": "repeat_low_sample", "sac": "default"},
+        "analysis_run_ids": {"ppo": "repeat_low_sample", "sac": "repeat_after_bugfix"},
     },
     "Pendulum_TC-v1": {"log_dirs": {"ppo": "2022-11-18/17-21-45/0"}, "xmax": 500_000},
     "Pendulum_PC-v1": {"log_dirs": {"ppo": "2022-11-18/17-24-43/0"}, "xmax": 500_000},
