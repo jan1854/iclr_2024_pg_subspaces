@@ -173,6 +173,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                 subspace_fracs_est_grad,
                 subspace_fracs_true_grad,
                 loss_name,
+                agent,
                 logs,
             )
             self.log_subspace_metrics(
@@ -180,6 +181,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                 subspace_fracs_est_grad_ls,
                 subspace_fracs_true_grad_ls,
                 loss_name,
+                agent,
                 logs,
                 "low_sample",
             )
@@ -192,6 +194,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         subspace_fracs_est: Dict[int, float],
         subspace_fracs_true: Dict[int, float],
         loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"],
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
         logs: TensorboardLogs,
         prefix: Optional[str] = None,
     ):
@@ -216,7 +219,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             f"{prefix}gradient_subspace_fraction/true_gradient/{loss_name}", keys
         )
 
-        overlaps = self._calculate_overlaps(loss_name)
+        overlaps = self._calculate_overlaps(loss_name, agent)
         for k, overlaps_top_k in overlaps.items():
             keys = []
             for t1, overlaps_t1 in overlaps_top_k.items():
@@ -326,7 +329,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         }
 
     def _calculate_overlaps(
-        self, loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"]
+        self,
+        loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"],
+        agent: stable_baselines3.common.base_class.BaseAlgorithm,
     ) -> Dict[int, Dict[int, Dict[int, float]]]:
         hess_eigen_calculator = HessianEigenCachedCalculator(
             self.run_dir, self.hessian_eigen
@@ -336,7 +341,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         }
         overlaps = {num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels}
         for env_step, _, eigenvecs in hess_eigen_calculator.iter_cached_eigen(
-            self.agent_spec.create_agent(), loss_name=loss_name
+            agent, loss_name=loss_name
         ):
             for num_eigenvecs in self.top_eigenvec_levels:
                 curr_start_checkpoints_eigenvecs = start_checkpoints_eigenvecs[
