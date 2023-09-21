@@ -143,6 +143,7 @@ PLOT_CONFIGS = {
             "low-sample Hessian; 100 EVs",
         ],
         "ylabel": "Subspace overlap",
+        "num_same_color_plots": 2,
         "ymin": 0.0,
         "ymax": 1.0,
         "fill_in_data": {100000: 1.0},
