@@ -8,8 +8,6 @@ logging.basicConfig(level=logging.CRITICAL)
 
 from tqdm import tqdm
 
-from scripts.create_multiline_plots import create_multiline_plots
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
@@ -222,6 +220,8 @@ def worker(
     fill_in_data: Dict[int, float],
     out: Path,
 ):
+    from scripts.create_multiline_plots import create_multiline_plots
+
     try:
         create_multiline_plots(
             log_path,
@@ -246,60 +246,65 @@ def worker(
         )
 
 
-results = []
-with multiprocessing.Pool(20) as pool:
-    for env_name, run_config in RUN_CONFIGS.items():
-        for algo_name, algo_log_dir in run_config["log_dirs"].items():
-            curr_log_dir = log_dir / env_name / algo_log_dir
-            env_file_name = env_name[:-3].lower().replace("-", "_")
-            if not env_name.startswith("dmc"):
-                env_file_name = "gym_" + env_file_name
-            for out_filename, plot_config in PLOT_CONFIGS.items():
-                for loss_type, loss_type_short in [
-                    ("combined_loss", "combined"),
-                    ("policy_loss", "policy"),
-                    ("value_function_loss", "vf"),
-                ]:
-                    out_path = (
-                        out_dir
-                        / plot_config["out_dir"]
-                        / loss_type
-                        / f"{algo_name}_{env_file_name}_{out_filename}_{loss_type_short}.pdf"
-                    )
-                    if "analysis_run_ids" in run_config and isinstance(
-                        run_config["analysis_run_ids"], dict
-                    ):
-                        analysis_run_id = run_config["analysis_run_ids"][algo_name]
-                    else:
-                        analysis_run_id = run_config.get("anlysis_run_ids", "default")
-                    keys = [
-                        f"high_curvature_subspace_analysis/{analysis_run_id}/{key}/{loss_type}"
-                        for key in plot_config["keys"]
-                    ]
-                    title_env_name = (
-                        env_name[4:-3] if env_name.startswith("dmc_") else env_name[:-3]
-                    )
-                    results.append(
-                        pool.apply_async(
-                            worker,
-                            (
-                                curr_log_dir,
-                                plot_config["legend"],
-                                f"{algo_name.upper()} - {title_env_name} - {plot_config['title']}",
-                                plot_config.get("xlabel", "Environment steps"),
-                                plot_config["ylabel"],
-                                (run_config.get("xmin", 0), run_config.get("xmax")),
-                                (plot_config.get("ymin"), plot_config.get("ymax")),
-                                False,
-                                keys,
-                                0.3,
-                                False,
-                                plot_config.get("num_same_color_plots", 1),
-                                plot_config.get("marker", "d"),
-                                plot_config.get("fill_in_data", {}),
-                                out_path,
-                            ),
+if __name__ == "__main__":
+    results = []
+    with multiprocessing.Pool(20) as pool:
+        for env_name, run_config in RUN_CONFIGS.items():
+            for algo_name, algo_log_dir in run_config["log_dirs"].items():
+                curr_log_dir = log_dir / env_name / algo_log_dir
+                env_file_name = env_name[:-3].lower().replace("-", "_")
+                if not env_name.startswith("dmc"):
+                    env_file_name = "gym_" + env_file_name
+                for out_filename, plot_config in PLOT_CONFIGS.items():
+                    for loss_type, loss_type_short in [
+                        ("combined_loss", "combined"),
+                        ("policy_loss", "policy"),
+                        ("value_function_loss", "vf"),
+                    ]:
+                        out_path = (
+                            out_dir
+                            / plot_config["out_dir"]
+                            / loss_type
+                            / f"{algo_name}_{env_file_name}_{out_filename}_{loss_type_short}.pdf"
                         )
-                    )
-    for res in tqdm(results):
-        res.get()
+                        if "analysis_run_ids" in run_config and isinstance(
+                            run_config["analysis_run_ids"], dict
+                        ):
+                            analysis_run_id = run_config["analysis_run_ids"][algo_name]
+                        else:
+                            analysis_run_id = run_config.get(
+                                "anlysis_run_ids", "default"
+                            )
+                        keys = [
+                            f"high_curvature_subspace_analysis/{analysis_run_id}/{key}/{loss_type}"
+                            for key in plot_config["keys"]
+                        ]
+                        title_env_name = (
+                            env_name[4:-3]
+                            if env_name.startswith("dmc_")
+                            else env_name[:-3]
+                        )
+                        results.append(
+                            pool.apply_async(
+                                worker,
+                                (
+                                    curr_log_dir,
+                                    plot_config["legend"],
+                                    f"{algo_name.upper()} - {title_env_name} - {plot_config['title']}",
+                                    plot_config.get("xlabel", "Environment steps"),
+                                    plot_config["ylabel"],
+                                    (run_config.get("xmin", 0), run_config.get("xmax")),
+                                    (plot_config.get("ymin"), plot_config.get("ymax")),
+                                    False,
+                                    keys,
+                                    0.3,
+                                    False,
+                                    plot_config.get("num_same_color_plots", 1),
+                                    plot_config.get("marker", "d"),
+                                    plot_config.get("fill_in_data", {}),
+                                    out_path,
+                                ),
+                            )
+                        )
+        for res in tqdm(results):
+            res.get()
