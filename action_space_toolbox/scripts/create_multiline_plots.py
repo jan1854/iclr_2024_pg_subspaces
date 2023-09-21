@@ -89,7 +89,7 @@ def create_multiline_plots(
                 steps,
                 value_mean,
                 marker=marker,
-                markersize=3,
+                markersize=2,
                 color=color,
                 linestyle=linestyles[i % num_same_color_plots],
             )
@@ -193,6 +193,7 @@ if __name__ == "__main__":
     parser.add_argument("--smoothing-weight", type=float, default=0.6)
     parser.add_argument("--separate-legend", action="store_true")
     parser.add_argument("--num-same-color-plots", type=int, default=1)
+    parser.add_argument("--marker", default="d")
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
@@ -213,5 +214,7 @@ if __name__ == "__main__":
         args.smoothing_weight,
         args.separate_legend,
         args.num_same_color_plots,
+        args.marker,
+        {},
         out,
     )
