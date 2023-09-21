@@ -150,14 +150,15 @@ def train(cfg: omegaconf.DictConfig) -> None:
         * cfg.num_eval_episodes,
         start_method="fork",
     )
+    eval_callback = stable_baselines3.common.callbacks.EvalCallback(
+        eval_envs,
+        n_eval_episodes=cfg.num_eval_episodes,
+        eval_freq=cfg.eval_interval,
+        verbose=0,
+    )
     callbacks = [
         FixEpInfoBufferCallback(),
-        stable_baselines3.common.callbacks.EvalCallback(
-            eval_envs,
-            n_eval_episodes=cfg.num_eval_episodes,
-            eval_freq=cfg.eval_interval,
-            verbose=0,
-        ),
+        eval_callback,
     ]
     if cfg.checkpoint_interval is not None:
         callbacks.append(
@@ -175,6 +176,9 @@ def train(cfg: omegaconf.DictConfig) -> None:
         callbacks.append(AdditionalTrainingMetricsCallback())
     training_steps = cfg.algorithm.training.steps // base_env_timestep_factor
     try:
+        # Hack to get the evaluation of the initial policy in addition
+        eval_callback.init_callback(algorithm)
+        eval_callback._on_step()
         algorithm.learn(
             total_timesteps=training_steps,
             callback=callbacks,
