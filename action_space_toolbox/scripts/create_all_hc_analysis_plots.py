@@ -14,7 +14,7 @@ logger.setLevel(logging.WARNING)
 log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training")
 out_dir = Path(__file__).parents[2] / "out"
 RUN_CONFIGS = {
-    "Ant_TC-v1": {"log_dirs": {"ppo": "2023-09-22/10-47-54"}},
+    "Ant_TC-v3": {"log_dirs": {"ppo": "2023-09-22/10-47-54"}},
     "HalfCheetah_TC-v3": {
         "log_dirs": {"ppo": "2023-07-14/21-58-53", "sac": "2023-09-19/11-08-06"},
         "xmax": 3_000_000,
