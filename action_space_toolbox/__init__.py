@@ -286,7 +286,7 @@ BASE_ENV_TYPE_OR_ID = {
 } | {
     f"dmc_{domain.capitalize()}-{task}-v1": (domain, task)
     for domain, task in dm_control.suite.BENCHMARKING
-    if domain not in ["fish", "ball_in_cup", "manipulator", "point_mass"]
+    if domain not in ["fish", "manipulator", "point_mass"]
 }
 
 DEFAULT_PARAMETERS = {
