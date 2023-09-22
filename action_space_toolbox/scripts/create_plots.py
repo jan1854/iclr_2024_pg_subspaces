@@ -53,7 +53,7 @@ def create_plots(
             f"log_paths: {len(log_paths_filtered)}, legend: {len(legend)}"
         )
     plt.rc("font", size=fontsize)
-    ax = plt.gca()
+    fig, ax = plt.subplots()
     ax.margins(x=0)
     color = None  # To make PyLint happy
     linestyles = ["-", "--", "-.", ":"]
@@ -82,7 +82,7 @@ def create_plots(
                         f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
                     )
                     # Empty plot to advance the color cycle (so that future plots have the correct color)
-                    plt.plot([], [])
+                    ax.plot([], [])
                     continue
                 key = keys[key_indices[0].item()]
                 (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
@@ -94,14 +94,14 @@ def create_plots(
 
                 if xaxis_log:
                     steps = 10**steps
-                    plt.xscale("log")
-                plt.plot(
+                    ax.xscale("log")
+                ax.plot(
                     steps,
                     value_mean,
                     color=color,
                     linestyle=linestyles[i % num_same_color_plots],
                 )
-                plt.fill_between(
+                ax.fill_between(
                     steps,
                     value_mean - value_std,
                     value_mean + value_std,
@@ -129,33 +129,33 @@ def create_plots(
                 steps = np.array([s[0] for s in scalar])
                 if xaxis_log:
                     steps = 10**steps
-                    plt.xscale("log")
-                plt.plot(
+                    ax.xscale("log")
+                ax.plot(
                     steps,
                     smooth([s[1].value for s in scalar], smoothing_weight),
                     color=color,
                     linestyle=linestyles[i % num_same_color_plots],
                 )
     if not xaxis_log:
-        plt.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
-    plt.title(title, fontsize=12)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xlim(xlimits)
-    plt.ylim(ylimits)
+        ax.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
+    ax.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
+    ax.set_title(title, fontsize=12)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_xlim(xlimits)
+    ax.set_ylim(ylimits)
     # To avoid cramming ticks labels too close together in the origin
     ax.tick_params(axis="x", pad=8)
     ax.tick_params(axis="y", pad=8)
     ax.xaxis.set_major_locator(plt.MaxNLocator(6))
     ax.yaxis.set_major_locator(plt.MaxNLocator(6))
     if legend is not None and not separate_legend:
-        plt.legend(legend, loc="lower right")
-    plt.tight_layout(pad=0.1)
+        ax.legend(legend, loc="lower right")
+    fig.tight_layout(pad=0.1)
     out.parent.mkdir(exist_ok=True, parents=True)
-    plt.savefig(out.with_suffix(".pdf"))
+    fig.savefig(out.with_suffix(".pdf"))
     if legend is not None and separate_legend:
-        legend_plt = plt.legend(
+        legend_plt = ax.legend(
             legend, frameon=False, ncol=len(legend), bbox_to_anchor=(2.0, 2.0)
         )
         legend_fig = legend_plt.figure
@@ -164,7 +164,7 @@ def create_plots(
             legend_fig.dpi_scale_trans.inverted()
         )
         legend_fig.savefig(out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox)
-    plt.close()
+    plt.close(fig)
 
 
 if __name__ == "__main__":
