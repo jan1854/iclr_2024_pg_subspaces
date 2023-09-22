@@ -20,7 +20,7 @@ RUN_CONFIGS = {
         "xmax": 3_000_000,
         "analysis_run_ids": {"ppo": "repeat_low_sample", "sac": "repeat_after_bugfix"},
     },
-    "Pendulum_TC-v1": {"log_dirs": {"ppo": "2023-09-21/10-51-27"}, "xmax": 500_000},
+    "Pendulum_TC-v1": {"log_dirs": {"ppo": "2023-09-22/10-51-27"}, "xmax": 500_000},
     "Pendulum_PC-v1": {"log_dirs": {"ppo": "2022-11-18/17-24-43/0"}, "xmax": 500_000},
     "Pendulum_VC-v1": {"log_dirs": {"ppo": "2022-11-21/19-55-23/0"}, "xmax": 500_000},
     "Reacher_PC-v2": {"log_dirs": {"ppo": "2022-11-14/13-57-50/0"}, "xmax": 1_000_000},
