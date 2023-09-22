@@ -139,17 +139,9 @@ def train(cfg: omegaconf.DictConfig) -> None:
     # Save the initial agent
     path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
     algorithm.save(path)
-    eval_envs = stable_baselines3.common.vec_env.DummyVecEnv(
-        [
-            lambda: stable_baselines3.common.monitor.Monitor(
-                make_single_env(
-                    cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                )
-            )
-        ]
-    )
+    eval_env = make_vec_env(cfg)
     eval_callback = stable_baselines3.common.callbacks.EvalCallback(
-        eval_envs,
+        eval_env,
         n_eval_episodes=cfg.num_eval_episodes,
         eval_freq=cfg.eval_interval,
         verbose=0,
