@@ -54,117 +54,126 @@ def create_plots(
         )
     plt.rc("font", size=fontsize)
     fig, ax = plt.subplots()
-    ax.margins(x=0)
-    color = None  # To make PyLint happy
-    linestyles = ["-", "--", "-.", ":"]
-    for i, log_path in enumerate(log_paths):
-        if i % num_same_color_plots == 0:
-            color = next(ax._get_lines.prop_cycler)["color"]
-        if log_path is not None:
-            run_dirs = [
-                d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
-            ]
-            if len(run_dirs) > 0:
-                tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-                event_accumulators = [
-                    ea for _, ea in create_event_accumulators(tb_dirs)
+    try:
+        ax.margins(x=0)
+        color = None  # To make PyLint happy
+        linestyles = ["-", "--", "-.", ":"]
+        for i, log_path in enumerate(log_paths):
+            if i % num_same_color_plots == 0:
+                color = next(ax._get_lines.prop_cycler)["color"]
+            if log_path is not None:
+                run_dirs = [
+                    d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
                 ]
-                key_indices = np.argwhere(
-                    [
-                        np.all(
-                            [key in ea.Tags()["scalars"] for ea in event_accumulators]
-                        )
-                        for key in keys
+                if len(run_dirs) > 0:
+                    tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
+                    event_accumulators = [
+                        ea for _, ea in create_event_accumulators(tb_dirs)
                     ]
-                )
-                if key_indices.shape[0] == 0:
-                    logger.warning(
-                        f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
+                    key_indices = np.argwhere(
+                        [
+                            np.all(
+                                [
+                                    key in ea.Tags()["scalars"]
+                                    for ea in event_accumulators
+                                ]
+                            )
+                            for key in keys
+                        ]
                     )
-                    # Empty plot to advance the color cycle (so that future plots have the correct color)
-                    ax.plot([], [])
-                    continue
-                key = keys[key_indices[0].item()]
-                (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
-                    event_accumulators, key, only_complete_steps
-                )
+                    if key_indices.shape[0] == 0:
+                        logger.warning(
+                            f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
+                        )
+                        # Empty plot to advance the color cycle (so that future plots have the correct color)
+                        ax.plot([], [])
+                        continue
+                    key = keys[key_indices[0].item()]
+                    (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
+                        event_accumulators, key, only_complete_steps
+                    )
 
-                value_mean = smooth(value_mean, smoothing_weight)
-                value_std = smooth(value_std, smoothing_weight)
+                    value_mean = smooth(value_mean, smoothing_weight)
+                    value_std = smooth(value_std, smoothing_weight)
 
-                if xaxis_log:
-                    steps = 10**steps
-                    ax.xscale("log")
-                ax.plot(
-                    steps,
-                    value_mean,
-                    color=color,
-                    linestyle=linestyles[i % num_same_color_plots],
-                )
-                ax.fill_between(
-                    steps,
-                    value_mean - value_std,
-                    value_mean + value_std,
-                    alpha=0.2,
-                    label="_nolegend_",
-                    color=color,
-                )
-            else:
-                if (log_path / "tensorboard").exists():
-                    tb_dir = log_path / "tensorboard"
+                    if xaxis_log:
+                        steps = 10**steps
+                        ax.xscale("log")
+                    ax.plot(
+                        steps,
+                        value_mean,
+                        color=color,
+                        linestyle=linestyles[i % num_same_color_plots],
+                    )
+                    ax.fill_between(
+                        steps,
+                        value_mean - value_std,
+                        value_mean + value_std,
+                        alpha=0.2,
+                        label="_nolegend_",
+                        color=color,
+                    )
                 else:
-                    tb_dir = log_path
-                _, event_accumulator = create_event_accumulators([tb_dir])[0]
-                key_indices = np.argwhere(
-                    [key in event_accumulator.Tags()["scalars"] for key in keys]
-                )
-                assert (
-                    key_indices.shape[0] > 0
-                ), f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
-                key = keys[key_indices[0].item()]
-                scalar = read_scalar(event_accumulator, key)
-                scalar = list(scalar.items())
-                scalar.sort(key=lambda x: x[0])
+                    if (log_path / "tensorboard").exists():
+                        tb_dir = log_path / "tensorboard"
+                    else:
+                        tb_dir = log_path
+                    _, event_accumulator = create_event_accumulators([tb_dir])[0]
+                    key_indices = np.argwhere(
+                        [key in event_accumulator.Tags()["scalars"] for key in keys]
+                    )
+                    assert (
+                        key_indices.shape[0] > 0
+                    ), f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
+                    key = keys[key_indices[0].item()]
+                    scalar = read_scalar(event_accumulator, key)
+                    scalar = list(scalar.items())
+                    scalar.sort(key=lambda x: x[0])
 
-                steps = np.array([s[0] for s in scalar])
-                if xaxis_log:
-                    steps = 10**steps
-                    ax.xscale("log")
-                ax.plot(
-                    steps,
-                    smooth([s[1].value for s in scalar], smoothing_weight),
-                    color=color,
-                    linestyle=linestyles[i % num_same_color_plots],
-                )
-    if not xaxis_log:
-        ax.ticklabel_format(style="sci", axis="x", scilimits=(-4, 4), useMathText=True)
-    ax.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
-    ax.set_title(title, fontsize=12)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_xlim(xlimits)
-    ax.set_ylim(ylimits)
-    # To avoid cramming ticks labels too close together in the origin
-    ax.tick_params(axis="x", pad=8)
-    ax.tick_params(axis="y", pad=8)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(6))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(6))
-    if legend is not None and not separate_legend:
-        ax.legend(legend, loc="lower right")
-    fig.tight_layout(pad=0.1)
-    out.parent.mkdir(exist_ok=True, parents=True)
-    fig.savefig(out.with_suffix(".pdf"))
-    if legend is not None and separate_legend:
-        legend_plt = ax.legend(
-            legend, frameon=False, ncol=len(legend), bbox_to_anchor=(2.0, 2.0)
-        )
-        legend_fig = legend_plt.figure
-        legend_fig.canvas.draw()
-        bbox = legend_plt.get_window_extent().transformed(
-            legend_fig.dpi_scale_trans.inverted()
-        )
-        legend_fig.savefig(out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox)
-    plt.close(fig)
+                    steps = np.array([s[0] for s in scalar])
+                    if xaxis_log:
+                        steps = 10**steps
+                        ax.xscale("log")
+                    ax.plot(
+                        steps,
+                        smooth([s[1].value for s in scalar], smoothing_weight),
+                        color=color,
+                        linestyle=linestyles[i % num_same_color_plots],
+                    )
+        if not xaxis_log:
+            ax.ticklabel_format(
+                style="sci", axis="x", scilimits=(-4, 4), useMathText=True
+            )
+        ax.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
+        ax.set_title(title, fontsize=12)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_xlim(xlimits)
+        ax.set_ylim(ylimits)
+        # To avoid cramming ticks labels too close together in the origin
+        ax.tick_params(axis="x", pad=8)
+        ax.tick_params(axis="y", pad=8)
+        ax.xaxis.set_major_locator(plt.MaxNLocator(6))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(6))
+        if legend is not None and not separate_legend:
+            ax.legend(legend, loc="lower right")
+        fig.tight_layout(pad=0.1)
+        out.parent.mkdir(exist_ok=True, parents=True)
+        fig.savefig(out.with_suffix(".pdf"))
+        if legend is not None and separate_legend:
+            legend_plt = ax.legend(
+                legend, frameon=False, ncol=len(legend), bbox_to_anchor=(2.0, 2.0)
+            )
+            legend_fig = legend_plt.figure
+            legend_fig.canvas.draw()
+            bbox = legend_plt.get_window_extent().transformed(
+                legend_fig.dpi_scale_trans.inverted()
+            )
+            legend_fig.savefig(
+                out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox
+            )
+    finally:
+        plt.close(fig)
 
 
 if __name__ == "__main__":
