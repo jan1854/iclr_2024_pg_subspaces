@@ -15,7 +15,8 @@ log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training
 out_dir = Path(__file__).parents[2] / "out"
 RUN_CONFIGS = {
     "Ant_TC-v3": {
-        "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-22/23-31-12"}
+        "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-22/23-31-12"},
+        "xmax": 3_000_000,
     },
     "HalfCheetah_TC-v3": {
         "log_dirs": {"ppo": "2023-07-14/21-58-53", "sac": "2023-09-19/11-08-06"},
