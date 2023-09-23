@@ -17,7 +17,7 @@ log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training
 out_dir = Path(__file__).parents[2] / "out"
 RUN_CONFIGS = {
     "Ant_TC-v3": {
-        "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-22/23-31-21"}
+        "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-22/23-31-12"}
     },
     "HalfCheetah_TC-v3": {
         "log_dirs": {"ppo": "2023-07-14/21-58-53", "sac": "2023-09-19/11-08-06"},
@@ -26,10 +26,10 @@ RUN_CONFIGS = {
     },
     "Pendulum_TC-v1": {
         "log_dirs": {"ppo": "2023-09-22/10-51-27", "sac": "2023-09-22/19-13-25"},
-        "xmax": 500_000,
+        "xmax": 300_000,
     },
-    # "Pendulum_PC-v1": {"log_dirs": {"ppo": "2022-11-18/17-24-43/0"}, "xmax": 500_000},
-    # "Pendulum_VC-v1": {"log_dirs": {"ppo": "2022-11-21/19-55-23/0"}, "xmax": 500_000},
+    # "Pendulum_PC-v1": {"log_dirs": {"ppo": "2022-11-18/17-24-43/0"}, "xmax": 300_000},
+    # "Pendulum_VC-v1": {"log_dirs": {"ppo": "2022-11-21/19-55-23/0"}, "xmax": 300_000},
     # "Reacher_PC-v2": {"log_dirs": {"ppo": "2022-11-14/13-57-50/0"}, "xmax": 1_000_000},
     # "Reacher_VC-v2": {"log_dirs": {"ppo": "2023-01-13/16-01-01/0"}, "xmax": 1_000_000},
     "Walker2d_TC-v3": {
