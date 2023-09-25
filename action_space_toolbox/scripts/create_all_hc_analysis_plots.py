@@ -41,7 +41,7 @@ RUN_CONFIGS = {
     },
     "dmc_Ball_in_cup-catch_TC-v1": {
         "log_dirs": {"ppo": "2023-09-22/10-49-35", "sac": "2023-09-24/20-17-17"},
-        "xmax": 3_000_000,
+        "xmax": 2_000_000,
     },
     "dmc_Finger-spin_TC-v1": {
         "log_dirs": {"ppo": "2022-12-21/20-44-24", "sac": "2023-09-21/10-34-29"},
