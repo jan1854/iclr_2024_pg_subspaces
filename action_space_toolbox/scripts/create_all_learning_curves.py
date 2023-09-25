@@ -18,7 +18,7 @@ out_dir = Path(__file__).parents[2] / "out"
 RUN_CONFIGS = {
     "Ant_TC-v3": {
         "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-24/20-22-46"},
-        "xmax": 3_000_000,
+        "xmax": 2_000_000,
     },
     "HalfCheetah_TC-v3": {
         "log_dirs": {"ppo": "2023-07-14/21-58-53", "sac": "2023-09-19/11-08-06"},
