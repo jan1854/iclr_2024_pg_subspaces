@@ -191,7 +191,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         eval_callback.init_callback(algorithm)
         eval_callback._on_step()
         algorithm.learn(
-            total_timesteps=training_steps,
+            total_timesteps=training_steps - algorithm.num_timesteps,
             callback=callbacks,
             progress_bar=cfg.show_progress,
             reset_num_timesteps=False,
