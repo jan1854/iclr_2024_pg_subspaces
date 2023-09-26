@@ -46,6 +46,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         eigenvec_overlap_checkpoints: Sequence[int],
         hessian_eigen: HessianEigen,
         overwrite_cached_eigen: bool,
+        skip_cacheing_eigen: bool,
     ):
         super().__init__(
             "high_curvature_subspace_analysis",
@@ -59,6 +60,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
         self.hessian_eigen = hessian_eigen
         self.overwrite_cached_eigen = overwrite_cached_eigen
+        self.skip_cacheing_eigen = skip_cacheing_eigen
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.eigenspectrum_dir = self.results_dir / "eigenspectrum"
@@ -94,6 +96,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             self.hessian_eigen,
             max(self.top_eigenvec_levels),
             device=agent.device,
+            skip_cacheing=self.skip_cacheing_eigen,
         )
         (
             eigenvals_combined,
@@ -334,7 +337,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         agent: stable_baselines3.common.base_class.BaseAlgorithm,
     ) -> Dict[int, Dict[int, Dict[int, float]]]:
         hess_eigen_calculator = HessianEigenCachedCalculator(
-            self.run_dir, self.hessian_eigen
+            self.run_dir, self.hessian_eigen, skip_cacheing=self.skip_cacheing_eigen
         )
         start_checkpoints_eigenvecs = {
             num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels

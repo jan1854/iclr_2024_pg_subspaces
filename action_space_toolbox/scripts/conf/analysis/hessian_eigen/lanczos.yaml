@@ -2,3 +2,4 @@ _target_: sb3_utils.hessian.eigen.hessian_eigen_lanczos.HessianEigenLanczos
 tolerance: 1e-4
 max_iter: 500
 num_lanczos_vectors: null
+which_eigen: "LA"

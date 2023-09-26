@@ -72,12 +72,14 @@ class HessianEigenCachedCalculator:
         hessian_eigen: HessianEigen,
         num_eigenvectors_to_cache: int = 200,
         device: Union[str, torch.device] = "cpu",
+        skip_cacheing: bool = False,
     ):
         self.cache_path = run_dir / "cached_results" / "eigen"
         self.cache_path.mkdir(exist_ok=True, parents=True)
         self.hessian_eigen = hessian_eigen
         self.num_eigenvectors_to_cache = num_eigenvectors_to_cache
         self.device = device
+        self.skip_cacheing = skip_cacheing
 
     def _get_eigen(
         self,
@@ -119,7 +121,8 @@ class HessianEigenCachedCalculator:
             eigen = self.hessian_eigen.calculate_top_eigen(
                 agent, data, self.num_eigenvectors_to_cache, eigenvectors_fullsize=False
             )
-            self.cache_eigen(eigen, env_step, num_grad_steps_additional_training)
+            if not self.skip_cacheing:
+                self.cache_eigen(eigen, env_step, num_grad_steps_additional_training)
         eigen.policy.eigenvectors = eigen.policy.eigenvectors[:, :num_eigenvectors]
         eigen.value_function.eigenvectors = eigen.value_function.eigenvectors[
             :, :num_eigenvectors
@@ -254,6 +257,7 @@ class HessianEigenCachedCalculator:
         env_step: int,
         num_grad_steps_additional_training: int,
     ) -> None:
+        assert not self.skip_cacheing
         cache_path = self._get_cache_path(
             self.cache_path, env_step, num_grad_steps_additional_training
         )
