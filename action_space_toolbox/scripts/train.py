@@ -15,6 +15,7 @@ import stable_baselines3.common.logger
 import stable_baselines3.common.monitor
 import stable_baselines3.common.on_policy_algorithm
 import stable_baselines3.common.vec_env
+import stable_baselines3.common.off_policy_algorithm
 import torch
 
 from action_space_toolbox.callbacks.additional_training_metrics_callback import (
@@ -135,10 +136,30 @@ def train(cfg: omegaconf.DictConfig) -> None:
         )
     )
     checkpoints_path = Path("checkpoints")
-    checkpoints_path.mkdir()
-    # Save the initial agent
-    path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
-    algorithm.save(path)
+    if checkpoints_path.exists():
+        checkpoints = [
+            int(p.name[len(f"{cfg.algorithm.name}_") : -len("_steps.zip")])
+            for p in checkpoints_path.iterdir()
+            if p.suffix == ".zip"
+        ]
+        checkpoint_to_load = max(checkpoints)
+        algorithm.load(
+            checkpoints_path / f"{cfg.algorithm.name}_{checkpoint_to_load}_steps.zip",
+            device=cfg.algorithm.algorithm.device,
+        )
+        algorithm.num_timesteps = checkpoint_to_load
+        if isinstance(
+            algorithm, stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm
+        ):
+            algorithm.load_replay_buffer(
+                checkpoints_path
+                / f"{cfg.algorithm.name}_replay_buffer_{checkpoint_to_load}_steps.pkl",
+            )
+    else:
+        checkpoints_path.mkdir()
+        # Save the initial agent
+        path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
+        algorithm.save(path)
     eval_env = make_vec_env(cfg)
     eval_callback = stable_baselines3.common.callbacks.EvalCallback(
         eval_env,
@@ -173,6 +194,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
             total_timesteps=training_steps,
             callback=callbacks,
             progress_bar=cfg.show_progress,
+            reset_num_timesteps=False,
         )
     finally:
         (Path.cwd() / "done").touch()
