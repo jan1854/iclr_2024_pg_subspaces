@@ -17,7 +17,7 @@ log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training
 out_dir = Path(__file__).parents[2] / "out"
 RUN_CONFIGS = {
     "Ant_TC-v3": {
-        "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-24/20-22-46"},
+        "log_dirs": {"ppo": "2023-09-22/18-15-58", "sac": "2023-09-26/16-54-05"},
         "xmax": 2_000_000,
     },
     "HalfCheetah_TC-v3": {
@@ -43,7 +43,7 @@ RUN_CONFIGS = {
     },
     "dmc_Ball_in_cup-catch_TC-v1": {
         "log_dirs": {"ppo": "2023-09-22/10-49-35", "sac": "2023-09-24/20-17-17"},
-        "xmax": 2_000_000,
+        "xmax": 1_000_000,
     },
     "dmc_Finger-spin_TC-v1": {
         "log_dirs": {"ppo": "2022-12-21/20-44-24", "sac": "2023-09-21/10-34-29"},
@@ -105,6 +105,7 @@ def worker(
             separate_legend,
             num_same_color_plots,
             fontsize,
+            {},
             out,
         )
     except Exception as e:
