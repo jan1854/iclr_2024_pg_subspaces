@@ -1,7 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -44,7 +44,9 @@ def create_plots(
     separate_legend: bool,
     num_same_color_plots: int,
     fontsize: int,
+    fill_in_data: Dict[int, float],
     out: Path,
+    annotations: Dict[int, str] = {},
 ) -> None:
     log_paths_filtered = [l for l in log_paths if l is not None]
     if legend is not None and len(log_paths_filtered) != len(legend):
@@ -92,6 +94,12 @@ def create_plots(
                     (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
                         event_accumulators, key, only_complete_steps
                     )
+                    for s, v in fill_in_data.items():
+                        if s not in steps:
+                            idx = np.argmax(steps > s)
+                            steps = np.insert(steps, idx, s)
+                            value_mean = np.insert(value_mean, idx, v)
+                            value_std = np.insert(value_std, idx, 0.0)
 
                     value_mean = smooth(value_mean, smoothing_weight)
                     value_std = smooth(value_std, smoothing_weight)
@@ -140,6 +148,19 @@ def create_plots(
                         color=color,
                         linestyle=linestyles[i % num_same_color_plots],
                     )
+        for xpos, annotation in annotations.items():
+            ax.axvline(x=xpos, color="gray", linestyle="--")
+            plt.text(
+                xpos,
+                0.5,
+                "$t_1$",
+                verticalalignment="center",
+                horizontalalignment="center",
+                color="gray",
+                bbox=dict(
+                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
+                ),
+            )
         if not xaxis_log:
             ax.ticklabel_format(
                 style="sci", axis="x", scilimits=(-4, 4), useMathText=True
