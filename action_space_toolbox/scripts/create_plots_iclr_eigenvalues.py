@@ -36,45 +36,64 @@ def create_plots_iclr_eigenvalues():
         eigen_npz_large = np.load(ev_cache_path_large, allow_pickle=True)
         eigenvals_policy_large = eigen_npz_large["policy.eigenvalues"]
         eigenvals_vf_large = eigen_npz_large["value_function.eigenvalues"]
-        eigen_npz_small = np.load(ev_cache_path_small)
-        eigenvals_policy_small = eigen_npz_small["policy.eigenvalues"]
-        eigenvals_vf_small = eigen_npz_small["value_function.eigenvalues"]
-        missing_evs_policy = (
-            np.ones(
-                run_config["policy_size"]
-                - len(eigenvals_policy_large)
-                - len(eigenvals_policy_small)
-            )
-            * eigenvals_policy_large[-1]
-        )
-        missing_evs_vf = (
-            np.ones(
-                run_config["value_function_size"]
-                - len(eigenvals_vf_large)
-                - len(eigenvals_vf_small)
-            )
-            * eigenvals_vf_large[-1]
-        )
+        # eigen_npz_small = np.load(ev_cache_path_small)
+        # eigenvals_policy_small = eigen_npz_small["policy.eigenvalues"]
+        # eigenvals_vf_small = eigen_npz_small["value_function.eigenvalues"]
+        # missing_evs_policy = (
+        #     np.ones(
+        #         run_config["policy_size"]
+        #         - len(eigenvals_policy_large)
+        #         - len(eigenvals_policy_small)
+        #     )
+        #     * eigenvals_policy_large[-1]
+        # )
+        # missing_evs_vf = (
+        #     np.ones(
+        #         run_config["value_function_size"]
+        #         - len(eigenvals_vf_large)
+        #         - len(eigenvals_vf_small)
+        #     )
+        #     * eigenvals_vf_large[-1]
+        # )
         # assert eigenvals_policy_small[-1] > 0
         # assert eigenvals_vf_small[-1] > 0
-        eigenvals_policy_all = np.concatenate(
-            (eigenvals_policy_large, missing_evs_policy, eigenvals_policy_small)
-        )
-        eigenvals_vf_all = np.concatenate(
-            (eigenvals_vf_large, missing_evs_vf, eigenvals_vf_small)
-        )
+        # eigenvals_policy_all = np.concatenate(
+        #     (eigenvals_policy_large, missing_evs_policy, eigenvals_policy_small)
+        # )
+        # eigenvals_vf_all = np.concatenate(
+        #     (eigenvals_vf_large, missing_evs_vf, eigenvals_vf_small)
+        # )
+        eigenvals_policy_all = eigenvals_policy_large
+        eigenvals_vf_all = eigenvals_vf_large
 
         for loss_type, eigenvals in zip(
             ["policy", "value_function"], [eigenvals_policy_all, eigenvals_vf_all]
         ):
+            plt.rc("font", size=14)
             fig, ax = plt.subplots()
-            bins = [-1, -1e-1, 0, 1e-1, 1, 10, 100, 1000, 10000]
+            bins = 10.0 ** np.arange(-2, 5, 1)
+            bins = np.concatenate((-bins, [0], bins))
+            bins.sort()
             ax.hist(eigenvals, log=True, bins=bins)
             ax.set_xscale(
-                "symlog", linthresh=1e-1
+                "symlog", linthresh=10 ** (-2)
             )  # Using symlog to handle the 0 in the bins
             ax.set_xticks(bins)  # To display all the bin edges
-            fig.savefig(f"/home/jschneider/Downloads/{env_name}_{loss_type}.pdf")
+            ax.set_xlabel("Eigenvalues")
+            ax.set_ylabel("Counts")
+            ax.set_xlim(min(bins), max(bins))
+            ax.set_ylim(0.5, 3000)
+
+            ax.set_xticks([-10000, -100, -1, -1e-2, 1e-2, 1, 100, 10000])
+            if env_name == "dmc_Finger-spin_TC-v1":
+                env_name_out = "dmc_finger_spin_tc"
+            else:
+                env_name_out = "gym_walker2d_tc"
+            fig.savefig(
+                f"/home/jschneider/Documents/project_optimal_action_spaces/action-space-toolbox/out/histograms/ppo_{env_name_out}_eigenspectrum_{loss_type}.pdf",
+                bbox_inches="tight",
+            )
+            plt.close(fig)
 
 
 if __name__ == "__main__":

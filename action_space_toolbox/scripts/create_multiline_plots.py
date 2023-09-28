@@ -43,14 +43,19 @@ def create_multiline_plots(
     separate_legend: bool,
     num_same_color_plots: int,
     marker: Optional[str],
+    fontsize: int,
+    linewidth: float,
     fill_in_data: Dict[int, float],
     out: Path,
+    annotations: Dict[int, str] = {},
 ) -> None:
     if legend is not None and len(keys) != len(legend):
         logger.warning(
             f"keys and legend do not have the same number of elements, keys: {len(keys)}, legend: {len(legend)}"
         )
-    plt.rc("font", size=12)
+    plt.rc("font", size=fontsize)
+    plt.rc("axes", linewidth=linewidth)
+    plt.rc("lines", linewidth=linewidth * 1.5)
     fig, ax = plt.subplots()
     try:
         ax.margins(x=0)
@@ -131,6 +136,20 @@ def create_multiline_plots(
                 smooth([s[1].value for s in scalar], smoothing_weight),
             )
 
+        for xpos, annotation in annotations.items():
+            ax.axvline(x=xpos, color="gray", linestyle="--")
+            plt.text(
+                xpos,
+                0.5,
+                "$t_1$",
+                verticalalignment="center",
+                horizontalalignment="center",
+                color="gray",
+                bbox=dict(
+                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
+                ),
+            )
+
         if not xaxis_log:
             ax.ticklabel_format(
                 style="sci", axis="x", scilimits=(-4, 4), useMathText=True
@@ -171,7 +190,7 @@ def create_multiline_plots(
         fig.savefig(out.with_suffix(".pdf"))
         if legend is not None and separate_legend:
             legend_plt = ax.legend(
-                legend, frameon=False, ncol=len(legend), bbox_to_anchor=(2.0, 2.0)
+                legend, frameon=False, ncol=1, bbox_to_anchor=(2.0, 2.0)
             )
             legend_fig = legend_plt.figure
             legend_fig.canvas.draw()
@@ -179,7 +198,8 @@ def create_multiline_plots(
                 legend_fig.dpi_scale_trans.inverted()
             )
             legend_fig.savefig(
-                out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox
+                out.parent / (out.name[:-4] + "_legend.pdf"),
+                bbox_inches=bbox,
             )
     finally:
         plt.close(fig)

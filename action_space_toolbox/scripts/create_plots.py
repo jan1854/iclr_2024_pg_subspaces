@@ -44,6 +44,7 @@ def create_plots(
     separate_legend: bool,
     num_same_color_plots: int,
     fontsize: int,
+    linewidth: float,
     fill_in_data: Dict[int, float],
     out: Path,
     annotations: Dict[int, str] = {},
@@ -55,6 +56,8 @@ def create_plots(
             f"log_paths: {len(log_paths_filtered)}, legend: {len(legend)}"
         )
     plt.rc("font", size=fontsize)
+    plt.rc("axes", linewidth=linewidth)
+    plt.rc("lines", linewidth=linewidth * 1.5)
     fig, ax = plt.subplots()
     try:
         ax.margins(x=0)

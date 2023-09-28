@@ -54,7 +54,7 @@ RUN_CONFIGS = {
 }
 PLOT_CONFIGS = {
     "gradient_subspace_fraction_precise_vs_low_sample_hessian": {
-        "title": "Subspace frac., precise vs. low-sample Hessian",
+        # "title": "Subspace frac., precise vs. low-sample Hessian",
         "out_dir": "gradient_subspace_fraction",
         "keys": [
             "gradient_subspace_fraction_001evs/estimated_gradient",
@@ -65,20 +65,21 @@ PLOT_CONFIGS = {
             "low_sample/gradient_subspace_fraction_100evs/estimated_gradient",
         ],
         "legend": [
-            "precise Hessian; 1 EV",
-            "low-sample Hessian; 1 EV",
-            "precise Hessian; 10 EVs",
-            "low-sample Hessian; 10 EVs",
-            "precise Hessian; 100 EVs",
-            "low-sample Hessian; 100 EVs",
+            "True Hessian; 1 EV",
+            "Estimated Hessian; 1 EV",
+            "True Hessian; 10 EVs",
+            "Estimated Hessian; 10 EVs",
+            "True Hessian; 100 EVs",
+            "Estimated Hessian; 100 EVs",
         ],
-        "ylabel": "Gradient fraction in subspace",
+        "ylabel": "Gradient subspace fraction",
         "num_same_color_plots": 2,
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
     },
     "gradient_subspace_fraction_estimated_vs_true": {
-        "title": "Subspace frac., estimated vs. true grad.",
+        # "title": "Subspace frac., estimated vs. true grad.",
         "out_dir": "gradient_subspace_fraction",
         "keys": [
             "gradient_subspace_fraction_001evs/true_gradient",
@@ -89,20 +90,21 @@ PLOT_CONFIGS = {
             "gradient_subspace_fraction_100evs/estimated_gradient",
         ],
         "legend": [
-            "true gradient; 1 EV",
-            "estimated gradient; 1 EV",
-            "true gradient; 10 EVs",
-            "estimated gradient; 10 EVs",
-            "true gradient; 100 EVs",
-            "estimated gradient; 100 EVs",
+            "True grad.; 1 EV",
+            "Estimated grad.; 1 EV",
+            "True grad.; 10 EVs",
+            "Estimated grad.; 10 EVs",
+            "True grad.; 100 EVs",
+            "Estimated grad.; 100 EVs",
         ],
-        "ylabel": "Gradient fraction in subspace",
+        "ylabel": "Gradient subspace fraction",
         "num_same_color_plots": 2,
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
     },
     "true_gradient_subspace_fraction": {
-        "title": "True gradient subspace fraction",
+        # "title": "True gradient subspace fraction",
         "out_dir": "gradient_subspace_fraction",
         "keys": [
             "gradient_subspace_fraction_001evs/true_gradient",
@@ -114,12 +116,13 @@ PLOT_CONFIGS = {
             "gradient_subspace_fraction_100evs/true_gradient",
         ],
         "legend": ["1 EV", "2 EVs", "5 EVs", "10 EVs", "20 EVs", "50 EVs", "100 EVs"],
-        "ylabel": "Gradient fraction in subspace",
+        "ylabel": "Gradient subspace fraction",
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
     },
     "estimated_gradient_subspace_fraction": {
-        "title": "Est. gradient subspace fraction",
+        # "title": "Est. gradient subspace fraction",
         "out_dir": "gradient_subspace_fraction",
         "keys": [
             "gradient_subspace_fraction_001evs/estimated_gradient",
@@ -131,12 +134,13 @@ PLOT_CONFIGS = {
             "gradient_subspace_fraction_100evs/estimated_gradient",
         ],
         "legend": ["1 EV", "2 EVs", "5 EVs", "10 EVs", "20 EVs", "50 EVs", "100 EVs"],
-        "ylabel": "Gradient fraction in subspace",
+        "ylabel": "Gradient subspace fraction",
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
     },
     "subspace_overlap_0100000_precise_vs_low_sample_hessian": {
-        "title": "Subspace overlap, precise vs. low-sample Hessian, $t_1 = 10^{5}$",
+        # "title": "Subspace overlap, precise vs. low-sample Hessian, $t_1 = 10^{5}$",
         "out_dir": "subspace_overlap",
         "keys": [
             "overlaps_top001_checkpoint0100000",
@@ -147,72 +151,70 @@ PLOT_CONFIGS = {
             "low_sample/overlaps_top100_checkpoint0100000",
         ],
         "legend": [
-            "precise Hessian; 1 EV",
-            "low-sample Hessian; 1 EV",
-            "precise Hessian; 10 EVs",
-            "low-sample Hessian; 10 EVs",
-            "precise Hessian; 100 EVs",
-            "low-sample Hessian; 100 EVs",
+            "True Hessian; 1 EV",
+            "Estimated Hessian; 1 EV",
+            "True Hessian; 10 EVs",
+            "Estimated Hessian; 10 EVs",
+            "True Hessian; 100 EVs",
+            "Estimated Hessian; 100 EVs",
         ],
         "ylabel": "Subspace overlap",
         "num_same_color_plots": 2,
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
         "fill_in_data": {100000: 1.0},
     },
     "subspace_overlap_0010000": {
-        "title": "Subspace overlap, $t_1 = 10^{4}$",
+        # "title": "Subspace overlap, $t_1 = 10^{4}$",
         "out_dir": "subspace_overlap",
         "keys": [
             "overlaps_top001_checkpoint0010000",
-            "overlaps_top002_checkpoint0010000",
-            "overlaps_top005_checkpoint0010000",
             "overlaps_top010_checkpoint0010000",
-            "overlaps_top020_checkpoint0010000",
-            "overlaps_top050_checkpoint0010000",
             "overlaps_top100_checkpoint0010000",
         ],
-        "legend": ["1 EV", "2 EVs", "5 EVs", "10 EVs", "20 EVs", "50 EVs", "100 EVs"],
+        "legend": ["1 EV", "10 EVs", "100 EVs"],
+        "xlabel": "$t_2$",
         "ylabel": "Subspace overlap",
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
         "fill_in_data": {10000: 1.0},
+        "annotations": {10000: "$t_1$"},
     },
     "subspace_overlap_0100000": {
-        "title": "Subspace overlap, $t_1 = 10^{5}$",
+        # "title": "Subspace overlap, $t_1 = 10^{5}$",
         "out_dir": "subspace_overlap",
         "keys": [
             "overlaps_top001_checkpoint0100000",
-            "overlaps_top002_checkpoint0100000",
-            "overlaps_top005_checkpoint0100000",
             "overlaps_top010_checkpoint0100000",
-            "overlaps_top020_checkpoint0100000",
-            "overlaps_top050_checkpoint0100000",
             "overlaps_top100_checkpoint0100000",
         ],
-        "legend": ["1 EV", "2 EVs", "5 EVs", "10 EVs", "20 EVs", "50 EVs", "100 EVs"],
+        "legend": ["1 EV", "10 EVs", "100 EVs"],
+        "xlabel": "$t_2$",
         "ylabel": "Subspace overlap",
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
         "fill_in_data": {100000: 1.0},
+        "annotations": {100000: "$t_1$"},
     },
     "subspace_overlap_0500000": {
-        "title": "Subspace overlap, $t_1 = 5 \cdot 10^{5}$",
+        # "title": "Subspace overlap, $t_1 = 5 \cdot 10^{5}$",
         "out_dir": "subspace_overlap",
         "keys": [
             "overlaps_top001_checkpoint0500000",
-            "overlaps_top002_checkpoint0500000",
-            "overlaps_top005_checkpoint0500000",
             "overlaps_top010_checkpoint0500000",
-            "overlaps_top020_checkpoint0500000",
-            "overlaps_top050_checkpoint0500000",
             "overlaps_top100_checkpoint0500000",
         ],
-        "legend": ["1 EV", "2 EVs", "5 EVs", "10 EVs", "20 EVs", "50 EVs", "100 EVs"],
+        "legend": ["1 EV", "10 EVs", "100 EVs"],
+        "xlabel": "$t_2$",
         "ylabel": "Subspace overlap",
         "ymin": 0.0,
         "ymax": 1.0,
+        "smoothing_weight": 0.0,
         "fill_in_data": {500000: 1.0},
+        "annotations": {500000: "$t_1$"},
     },
 }
 
@@ -231,8 +233,11 @@ def worker(
     separate_legend: bool,
     num_same_color_plots: int,
     marker: Optional[str],
+    fontsize: int,
+    linewidth: float,
     fill_in_data: Dict[int, float],
     out: Path,
+    annotations: Dict[int, str],
 ):
     from scripts.create_multiline_plots import create_multiline_plots
 
@@ -251,8 +256,11 @@ def worker(
             separate_legend,
             num_same_color_plots,
             marker,
+            fontsize,
+            linewidth,
             fill_in_data,
             out,
+            annotations,
         )
     except Exception as e:
         logger.warning(
@@ -298,13 +306,18 @@ if __name__ == "__main__":
                             if env_name.startswith("dmc_")
                             else env_name[:-3]
                         )
+                        title = (
+                            f"{algo_name.upper()} - {title_env_name} - {plot_config.get('title')}"
+                            if plot_config.get("title") is not None
+                            else None
+                        )
                         results.append(
                             pool.apply_async(
                                 worker,
                                 (
                                     curr_log_dir,
                                     plot_config["legend"],
-                                    f"{algo_name.upper()} - {title_env_name} - {plot_config['title']}",
+                                    title,
                                     plot_config.get("xlabel", "Environment steps"),
                                     plot_config["ylabel"],
                                     (run_config.get("xmin", 0), run_config.get("xmax")),
@@ -312,11 +325,14 @@ if __name__ == "__main__":
                                     False,
                                     keys,
                                     0.3,
-                                    False,
+                                    True,
                                     plot_config.get("num_same_color_plots", 1),
-                                    plot_config.get("marker", "d"),
+                                    plot_config.get("marker"),
+                                    plot_config.get("fontsize", 22),
+                                    plot_config.get("linewidth", 2.5),
                                     plot_config.get("fill_in_data", {}),
                                     out_path,
+                                    plot_config.get("annotations", {}),
                                 ),
                             )
                         )

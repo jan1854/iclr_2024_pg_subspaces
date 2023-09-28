@@ -85,6 +85,7 @@ def worker(
     separate_legend: bool,
     num_same_color_plots: int,
     fontsize: int,
+    linewidth: float,
     out: Path,
 ):
     from scripts.create_multiline_plots import create_multiline_plots
@@ -105,6 +106,7 @@ def worker(
             separate_legend,
             num_same_color_plots,
             fontsize,
+            linewidth,
             {},
             out,
         )
@@ -152,9 +154,10 @@ if __name__ == "__main__":
                             plot_config["key"],
                             plot_config["smoothing_weight"],
                             True,
-                            False,
+                            True,
                             plot_config.get("num_same_color_plots", 1),
-                            plot_config.get("fontsize", 12),
+                            plot_config.get("fontsize", 22),
+                            plot_config.get("linewidth", 1.5),
                             out_path,
                         ),
                     )

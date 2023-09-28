@@ -49,9 +49,7 @@ COLORSCHEME = [
 ]
 COLORSCHEME_LIGHT = lighten(COLORSCHEME)
 
-LR_CACHE_PATH = Path(
-    "/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/learning_curve_cache"
-)
+GOLDEN_RATIO = 1.618
 
 
 def env_name_to_diplay(name):
@@ -90,17 +88,18 @@ def split_training_phases(
 
 
 def load_logs(log_path, key, max_step, only_complete_steps=True):
-    run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()][
-        :2
-    ]  # TODO: Remove :2!!!!
+    run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
     if len(run_dirs) > 0:
         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
         event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
     scalars_value = []
     scalars_reward = []
     for ea in event_accumulators:
-        scalars_curr_ea_value = read_scalar(ea, key)
-        scalars_value.append(scalars_curr_ea_value)
+        try:
+            scalars_curr_ea_value = read_scalar(ea, key)
+            scalars_value.append(scalars_curr_ea_value)
+        except:
+            logger.warning(f"Did not find key {key} in all logs.")
         scalars_curr_ea_reward = read_scalar(ea, "rollout/ep_rew_mean")
         scalars_reward.append(scalars_curr_ea_reward)
     scalars_value = sorted(
@@ -159,32 +158,40 @@ def plot_bars(data, ax):
         "ecolor": "grey",
     }
     bars = ax.bar(
-        range(bar_xpos, bar_xpos + 6),
+        range(bar_xpos, bar_xpos + 9),
         [
             data["true_gradient"][0]["mean"],
             data["estimated_gradient"][0]["mean"],
+            data["low_sample/estimated_gradient"][0]["mean"],
             data["true_gradient"][1]["mean"],
             data["estimated_gradient"][1]["mean"],
+            data["low_sample/estimated_gradient"][1]["mean"],
             data["true_gradient"][2]["mean"],
             data["estimated_gradient"][2]["mean"],
+            data["low_sample/estimated_gradient"][2]["mean"],
         ],
         yerr=[
             data["true_gradient"][0]["std"],
             data["estimated_gradient"][0]["std"],
+            data["low_sample/estimated_gradient"][0]["std"],
             data["true_gradient"][1]["std"],
             data["estimated_gradient"][1]["std"],
+            data["low_sample/estimated_gradient"][1]["std"],
             data["true_gradient"][2]["std"],
             data["estimated_gradient"][2]["std"],
+            data["low_sample/estimated_gradient"][2]["std"],
         ],
         error_kw=error_bar_props,
         color=[c for cp in zip(COLORSCHEME, COLORSCHEME_LIGHT) for c in cp],
         edgecolor=[c for c in COLORSCHEME for _ in range(2)],
         width=1,
     )
-    bar_xpos += 8
+    bar_xpos += 10
     for i, bar in enumerate(bars):
-        if i % 2 == 1:
+        if i % 3 == 1:
             bar.set_hatch("///")
+        elif i % 3 == 2:
+            bar.set_hatch("XXX")
 
 
 def create_plots_iclr_gradient_subspace_fraction():
@@ -208,17 +215,26 @@ def create_plots_iclr_gradient_subspace_fraction():
                     ]:
                         curr_results_algo[loss_type_short] = {}
                         curr_results_loss = curr_results_algo[loss_type_short]
-                        for gradient_type in ["estimated_gradient", "true_gradient"]:
-                            key = (
-                                f"high_curvature_subspace_analysis/{run_config.get('analysis_run_id', {}).get(algorithm_name, 'default')}/"
-                                f"gradient_subspace_fraction_100evs/{gradient_type}/{loss_type}"
-                            )
+                        for grad_hess_type in [
+                            "estimated_gradient",
+                            "true_gradient",
+                            "low_sample",
+                        ]:
+                            if grad_hess_type == "low_sample":
+                                key = (
+                                    f"high_curvature_subspace_analysis/{run_config.get('analysis_run_ids', {}).get(algorithm_name, 'default')}/low_sample/"
+                                    f"gradient_subspace_fraction_100evs/estimated_gradient/{loss_type}"
+                                )
+                            else:
+                                key = (
+                                    f"high_curvature_subspace_analysis/{run_config.get('analysis_run_ids', {}).get(algorithm_name, 'default')}/"
+                                    f"gradient_subspace_fraction_100evs/{grad_hess_type}/{loss_type}"
+                                )
                             (steps_values, values), (
                                 steps_rewards,
                                 rewards,
                             ) = load_logs(algorthm_log_path, key, run_config["xmax"])
                             values_split = [[] for _ in range(3)]
-                            pass
                             for curr_values, curr_rewards, curr_steps in zip(
                                 np.transpose(values),
                                 np.transpose(rewards),
@@ -235,7 +251,7 @@ def create_plots_iclr_gradient_subspace_fraction():
                                         np.mean(curr_values_split[i])
                                     )
 
-                            curr_results_loss[gradient_type] = [
+                            curr_results_loss[grad_hess_type] = [
                                 {"mean": np.mean(v), "std": np.std(v)}
                                 for v in values_split
                             ]
@@ -248,7 +264,19 @@ def create_plots_iclr_gradient_subspace_fraction():
 
     for loss_type in ["policy", "vf"]:
         bar_xpos = 0
+        factor = 2
+        # fig, ax = plt.subplots(figsize=(factor * GOLDEN_RATIO * 4, factor))
+        plt.rc("font", size=8)
         fig, ax = plt.subplots()
+
+        # Calculate width and height for the desired aspect ratio
+        width = 0.9  # This value might need adjustment
+        height = width / 3.24
+
+        # Position the axes
+        left = 0.15  # Leave space for y-axis labels
+        bottom = 0.5 - (height / 2)  # Center the axes in the figure
+        ax.set_position([left, bottom, width, height])
         for env_name in ["dmc_Finger-spin_TC-v1", "Walker2d_TC-v3"]:
             env_results = results[env_name]
             x_pos_start_env = bar_xpos
@@ -257,15 +285,15 @@ def create_plots_iclr_gradient_subspace_fraction():
                 plot_bars(env_results[algorithm_name][loss_type], ax)
                 plt.text(
                     (x_pos_start_algo + bar_xpos - 2) / 2 - 0.5,
-                    -0.05,
+                    -0.1,
                     algorithm_name.upper(),
                     horizontalalignment="center",
                 )
-            bar_xpos += 2
+            bar_xpos += 1
 
             plt.text(
                 (x_pos_start_env + bar_xpos - 4) / 2 - 0.5,
-                -0.1,
+                -0.2,
                 env_name_to_diplay(env_name),
                 horizontalalignment="center",
             )
@@ -302,20 +330,43 @@ def create_plots_iclr_gradient_subspace_fraction():
                 alpha=0,
             )
         )
-        legend_handles.append(patches.Patch(color=GREY, label="True gradient"))
+        legend_handles.append(
+            patches.Patch(color=GREY, label="True gradient, true Hessian")
+        )
         legend_handles.append(
             patches.Patch(
                 facecolor=LIGHT_GREY,
                 edgecolor=GREY,
                 hatch="///",
-                label="Estimated gradient",
+                label="Approx. gradient",
             )
         )
-        fig.legend(handles=legend_handles)
-        fig.savefig(
-            f"/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/gradient_subspace_fraction/gradient_subspace_fraction_{loss_type}.pdf"
+        legend_handles.append(
+            patches.Patch(
+                facecolor=LIGHT_GREY,
+                edgecolor=GREY,
+                hatch="XXX",
+                label="Approx. gradient, approx. Hessian",
+            )
         )
-        pass
+        # legend_plt = ax.legend(
+        #     handles=legend_handles,
+        #     frameon=False,
+        #     ncol=len(legend_handles) // 2,
+        #     bbox_to_anchor=(2.0, 2.0),
+        # )
+        # legend_fig = legend_plt.figure
+        # legend_fig.canvas.draw()
+        # bbox = legend_plt.get_window_extent().transformed(
+        #     legend_fig.dpi_scale_trans.inverted()
+        # )
+        out_path = Path(
+            f"/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/gradient_subspace_fraction/gradient_subspace_fraction_{loss_type}"
+        )
+        # legend_fig.savefig(
+        #     out_path.parent / (out_path.name + "_legend.pdf"), bbox_inches=bbox
+        # )
+        fig.savefig(out_path.with_suffix(".pdf"), bbox_inches="tight")
 
 
 if __name__ == "__main__":
