@@ -200,11 +200,8 @@ def plot_bars(data, ax):
             bar.set_hatch("XXX")
 
 
-def create_plots_iclr_gradient_subspace_fraction(log_dir):
+def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
     global bar_xpos
-    cache_file = Path(
-        "/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/gradient_subspace_fraction_cache.pkl"
-    )
     if not cache_file.exists():
         results = {}
         for env_name, run_config in RUN_CONFIGS.items():
@@ -368,7 +365,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir):
         #     legend_fig.dpi_scale_trans.inverted()
         # )
         out_path = Path(
-            f"/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/gradient_subspace_fraction/gradient_subspace_fraction_{loss_type}"
+            out_dir / f"gradient_subspace_fraction_{loss_type}"
         )
         # legend_fig.savefig(
         #     out_path.parent / (out_path.name + "_legend.pdf"), bbox_inches=bbox
@@ -379,5 +376,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
+    parser.add_argument("cache_file", type=str)
+    parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir))
+    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir))
