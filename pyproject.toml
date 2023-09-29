@@ -10,11 +10,11 @@ name = "action_space_toolbox"
 description = ""
 version = "0.0.1"
 authors = [
-    {name="Jan Schneider", email="Jan.Schneider@tuebingen.mpg.de"}
+    {name="Anonymous", email="anonymous@anonymous.com"}
 ]
 dependencies = [
     "dm_control",
-    "dmc2gym @ git+https://github.com/jan1854/dmc2gym.git",
+    "dmc2gym",
     "filelock",
     "gym[mujoco]",
     "hydra-core",
