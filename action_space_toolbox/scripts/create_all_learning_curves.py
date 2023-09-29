@@ -1,3 +1,4 @@
+import argparse
 import logging
 import multiprocessing
 from pathlib import Path
@@ -13,7 +14,6 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training")
 out_dir = Path(__file__).parents[2] / "out"
 RUN_CONFIGS = {
     "Ant_TC-v3": {
@@ -117,6 +117,10 @@ def worker(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("log_dir", type=str)
+    args = parser.parse_args()
+    log_dir = Path(args.log_dir)
     results = []
     with multiprocessing.Pool(20) as pool:
         for env_name, run_config in RUN_CONFIGS.items():

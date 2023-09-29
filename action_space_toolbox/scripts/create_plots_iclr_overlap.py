@@ -1,3 +1,4 @@
+import argparse
 import logging
 import multiprocessing
 from pathlib import Path
@@ -15,7 +16,6 @@ from run_configs import RUN_CONFIGS
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training")
 out_dir = Path(__file__).parents[2] / "out"
 PLOT_CONFIGS = {
     "overlap_0100000_100evs": {
@@ -46,6 +46,7 @@ def worker(
     separate_legend: bool,
     num_same_color_plots: int,
     fontsize: int,
+    linewidth: float,
     fill_in_data: Dict[int, float],
     out: Path,
 ):
@@ -65,6 +66,7 @@ def worker(
             separate_legend,
             num_same_color_plots,
             fontsize,
+            linewidth,
             fill_in_data,
             out,
             {100000: "$t_1"},
@@ -76,6 +78,10 @@ def worker(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("log_dir", type=str)
+    args = parser.parse_args()
+    log_dir = Path(args.log_dir)
     results = []
     with multiprocessing.Pool(20) as pool:
         for env_name, run_config in RUN_CONFIGS.items():
@@ -132,7 +138,8 @@ if __name__ == "__main__":
                                 True,
                                 True,
                                 plot_config.get("num_same_color_plots", 1),
-                                plot_config.get("fontsize", 16),
+                                plot_config.get("fontsize", 26),
+                                plot_config.get("linewidth", 3),
                                 plot_config.get("fill_in_data", {}),
                                 out_path,
                             ),

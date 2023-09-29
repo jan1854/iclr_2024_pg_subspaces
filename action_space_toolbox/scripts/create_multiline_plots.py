@@ -65,6 +65,21 @@ def create_multiline_plots(
             run_dirs = [
                 d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
             ]
+
+        for xpos, annotation in annotations.items():
+            ax.axvline(x=xpos, color="gray", linestyle="--")
+            plt.text(
+                xpos,
+                0.5,
+                "$t_1$",
+                verticalalignment="center",
+                horizontalalignment="center",
+                color="gray",
+                bbox=dict(
+                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
+                ),
+            )
+
         if len(run_dirs) > 0:
             tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
             event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
@@ -136,20 +151,6 @@ def create_multiline_plots(
                 smooth([s[1].value for s in scalar], smoothing_weight),
             )
 
-        for xpos, annotation in annotations.items():
-            ax.axvline(x=xpos, color="gray", linestyle="--")
-            plt.text(
-                xpos,
-                0.5,
-                "$t_1$",
-                verticalalignment="center",
-                horizontalalignment="center",
-                color="gray",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
-                ),
-            )
-
         if not xaxis_log:
             ax.ticklabel_format(
                 style="sci", axis="x", scilimits=(-4, 4), useMathText=True
@@ -190,7 +191,7 @@ def create_multiline_plots(
         fig.savefig(out.with_suffix(".pdf"))
         if legend is not None and separate_legend:
             legend_plt = ax.legend(
-                legend, frameon=False, ncol=1, bbox_to_anchor=(2.0, 2.0)
+                legend, frameon=False, ncol=1, bbox_to_anchor=(2.0, 2.0),
             )
             legend_fig = legend_plt.figure
             legend_fig.canvas.draw()
@@ -198,7 +199,7 @@ def create_multiline_plots(
                 legend_fig.dpi_scale_trans.inverted()
             )
             legend_fig.savefig(
-                out.parent / (out.name[:-4] + "_legend.pdf"),
+                out.parent / (out.name + "_legend.pdf"),
                 bbox_inches=bbox,
             )
     finally:
@@ -222,6 +223,8 @@ if __name__ == "__main__":
     parser.add_argument("--separate-legend", action="store_true")
     parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--marker", default="d")
+    parser.add_argument("--fontsize", type=int, default=18)
+    parser.add_argument("--linewidth", type=float, default=1.5)
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
@@ -243,6 +246,8 @@ if __name__ == "__main__":
         args.separate_legend,
         args.num_same_color_plots,
         args.marker,
+        args.fontsize,
+        args.linewidth,
         {},
         out,
     )

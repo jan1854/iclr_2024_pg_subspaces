@@ -21,6 +21,7 @@ RUN_CONFIGS = {
         "xmax": 2_000_000,
         "policy_size": 5708,
         "value_function_size": 5377,
+        "analysis_run_ids": {"ppo": "repeat_low_sample", "sac": "default"},
     },
     "dmc_Cheetah-run_TC-v1": {
         "log_dirs": {"ppo": "2022-11-08/18-05-00"},

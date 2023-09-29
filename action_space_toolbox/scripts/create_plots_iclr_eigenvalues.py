@@ -1,3 +1,4 @@
+import argparse
 import time
 from pathlib import Path
 
@@ -6,10 +7,8 @@ import numpy as np
 
 from run_configs import RUN_CONFIGS
 
-log_dir = Path("/is", "ei", "jschneider", "action_space_toolbox_logs", "training")
 
-
-def create_plots_iclr_eigenvalues():
+def create_plots_iclr_eigenvalues(log_dir, out_dir):
     for env_name, run_config in RUN_CONFIGS.items():
         if "Finger-spin" not in env_name and "Walker2d" not in env_name:
             continue
@@ -69,7 +68,7 @@ def create_plots_iclr_eigenvalues():
         for loss_type, eigenvals in zip(
             ["policy", "value_function"], [eigenvals_policy_all, eigenvals_vf_all]
         ):
-            plt.rc("font", size=14)
+            plt.rc("font", size=26)
             fig, ax = plt.subplots()
             bins = 10.0 ** np.arange(-2, 5, 1)
             bins = np.concatenate((-bins, [0], bins))
@@ -90,11 +89,33 @@ def create_plots_iclr_eigenvalues():
             else:
                 env_name_out = "gym_walker2d_tc"
             fig.savefig(
-                f"/home/jschneider/Documents/project_optimal_action_spaces/action-space-toolbox/out/histograms/ppo_{env_name_out}_eigenspectrum_{loss_type}.pdf",
+                out_dir / f"ppo_{env_name_out}_eigenspectrum_{loss_type}.pdf",
+                bbox_inches="tight",
+            )
+            plt.close(fig)
+
+            fig, ax = plt.subplots()
+
+            def subsampling_criterion(i):
+                return i <= 200 or i >= len(eigenvals) - 200 or i % 10 == 0
+
+            eigenvals_subsampled = np.array([ev for i, ev in enumerate(reversed(eigenvals)) if subsampling_criterion(i)])
+            ev_indices = np.array([i for i in range(len(eigenvals)) if subsampling_criterion(i)])
+            max_abs_ev = np.abs(eigenvals_subsampled).max()
+            ax.set_ylim(-max_abs_ev * 1.15, max_abs_ev * 1.15)
+            ax.set_xlabel("Index")
+            ax.set_ylabel("Eigenvalue")
+            ax.scatter(ev_indices, eigenvals_subsampled)
+            fig.savefig(
+                out_dir / f"ppo_{env_name_out}_eigenspectrum_{loss_type}_plot.pdf",
                 bbox_inches="tight",
             )
             plt.close(fig)
 
 
 if __name__ == "__main__":
-    create_plots_iclr_eigenvalues()
+    parser = ArgumentParser()
+    parser.add_argument("log_dir", type=str)
+    parser.add_argument("out_dir", type=str)
+    args = parser.parse_args()
+    create_plots_iclr_eigenvalues(Path(args.log_dir), Path(args.out_dir))

@@ -1,3 +1,4 @@
+import argparse
 import pickle
 from pathlib import Path
 
@@ -57,12 +58,16 @@ class ConvergenceCriterion:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("vis_dir", type=str)
+    parser.add_argument("cache_file", type=str)
+    args = parser.parse_args()
     criterion = ConvergenceCriterion(20000, 0.1, 0.9)
     vis_dir = Path(
-        "/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/vis"
+        args.vis_dir
     )
     for cache_file in Path(
-        "/home/jschneider/Seafile/PhD/project_optimal_action_spaces/iclr_2024/learning_curve_cache"
+        args.cache_file
     ).iterdir():
         with cache_file.open("rb") as f:
             res = pickle.load(f)

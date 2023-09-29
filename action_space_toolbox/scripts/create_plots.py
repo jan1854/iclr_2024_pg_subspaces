@@ -63,6 +63,19 @@ def create_plots(
         ax.margins(x=0)
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
+        for xpos, annotation in annotations.items():
+            ax.axvline(x=xpos, color="gray", linestyle="--")
+            plt.text(
+                xpos,
+                0.5,
+                "$t_1$",
+                verticalalignment="center",
+                horizontalalignment="center",
+                color="gray",
+                bbox=dict(
+                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
+                ),
+            )
         for i, log_path in enumerate(log_paths):
             if i % num_same_color_plots == 0:
                 color = next(ax._get_lines.prop_cycler)["color"]
@@ -151,19 +164,7 @@ def create_plots(
                         color=color,
                         linestyle=linestyles[i % num_same_color_plots],
                     )
-        for xpos, annotation in annotations.items():
-            ax.axvline(x=xpos, color="gray", linestyle="--")
-            plt.text(
-                xpos,
-                0.5,
-                "$t_1$",
-                verticalalignment="center",
-                horizontalalignment="center",
-                color="gray",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
-                ),
-            )
+
         if not xaxis_log:
             ax.ticklabel_format(
                 style="sci", axis="x", scilimits=(-4, 4), useMathText=True
