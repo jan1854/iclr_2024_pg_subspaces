@@ -8,13 +8,11 @@ from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen, HessianEigen
-from pg_subspaces.sb3_utils import flatten_parameters
+from pg_subspaces.sb3_utils.common.parameters import flatten_parameters, combine_actor_critic_parameter_vectors
 from stable_baselines3.common.type_aliases import (
     RolloutBufferSamples,
     ReplayBufferSamples,
 )
-
-from pg_subspaces.sb3_utils import combine_actor_critic_parameter_vectors
 
 
 class CachedEigenIterator:

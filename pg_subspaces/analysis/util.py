@@ -6,7 +6,7 @@ import numpy as np
 
 from pg_subspaces.sb3_utils.a2c.a2c_loss import a2c_loss
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
-from pg_subspaces.sb3_utils import get_episode_length, fill_rollout_buffer
+from pg_subspaces.sb3_utils.common.buffer import get_episode_length, fill_rollout_buffer
 from pg_subspaces.sb3_utils.common.training import maybe_create_agent
 from pg_subspaces.sb3_utils.ppo.ppo_loss import ppo_loss
 import stable_baselines3.common.buffers

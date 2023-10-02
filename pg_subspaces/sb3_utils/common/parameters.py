@@ -4,6 +4,8 @@ import numpy as np
 import stable_baselines3.common.base_class
 import torch
 
+from pg_subspaces.sb3_utils.ppo.ppo_parameters import get_actor_parameter_names, get_critic_parameter_names
+
 
 def flatten_parameters(param_seq: Iterable[torch.nn.Parameter]) -> torch.Tensor:
     return torch.cat([s.flatten() for s in param_seq])
@@ -46,11 +48,11 @@ def get_actor_critic_parameters(
     agent: stable_baselines3.common.base_class.BaseAlgorithm,
 ) -> Tuple[List[torch.nn.Parameter], List[torch.nn.Parameter]]:
     if isinstance(agent, stable_baselines3.PPO):
-        actor_parameter_names = pg_subspaces.sb3_utils.ppo.ppo_parameters.get_actor_parameter_names(
+        actor_parameter_names = get_actor_parameter_names(
             agent.policy.named_parameters()
         )
         critic_parameter_names = (
-            pg_subspaces.sb3_utils.ppo.ppo_parameters.get_critic_parameter_names(
+            get_critic_parameter_names(
                 agent.policy.named_parameters()
             )
         )
