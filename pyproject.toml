@@ -3,10 +3,10 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"" = "action_space_toolbox"}
+package-dir = {"" = "pg_subspaces"}
 
 [project]
-name = "action_space_toolbox"
+name = "pg_subspaces"
 description = ""
 version = "0.0.1"
 authors = [
@@ -14,20 +14,17 @@ authors = [
 ]
 dependencies = [
     "dm_control",
-    "dmc2gym",
+    "dmc2gym @ git+https://github.com/jan1854/dmc2gym",
     "filelock",
-    "gym[mujoco]",
+    "gym[mujoco]==0.21.0",
     "hydra-core",
-    "kaleido",
     "numpy",
     "omegaconf",
     "Pillow",
-    "plotly",
     "scipy",
-    "scikit-image",
-    "stable-baselines3[extra]",
+    "stable-baselines3[extra]==1.8.0",
     "tensorboard",
-    "torch",
+    "torch==2.0.1",
     "tqdm"
 ]
 

@@ -1,8 +1,0 @@
-defaults:
-  - hess_eigen: hess_eigen_lanczos
-
-_target_: rl_subspace_optimization.gradient_subspace.high_curvature_subspace.HighCurvatureSubspace
-subspace_dimension: 100
-hess_eigen: ???
-split_eigenvectors_policy: 0.5
-max_num_samples: null

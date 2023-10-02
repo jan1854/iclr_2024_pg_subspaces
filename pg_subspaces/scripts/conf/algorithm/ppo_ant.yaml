@@ -1,0 +1,15 @@
+# This is just mujoco-defaults + normalize in rl-baselines3-zoo, so might not be tuned properly
+name: "ppo"
+
+defaults:
+  - env_wrappers:
+      - vec_normalize
+
+algorithm:
+  _target_: stable_baselines3.PPO
+  policy: "MlpPolicy"
+  device: "auto"
+
+training:
+  steps: 5_000_000
+  n_envs: 1

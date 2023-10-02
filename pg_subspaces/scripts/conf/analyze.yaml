@@ -1,0 +1,27 @@
+defaults:
+  - _self_
+  - analysis: gradient_analysis
+
+
+train_logs: ??
+sync_train_logs: true
+
+min_interval: 200_000
+first_checkpoint: 0
+last_checkpoint: null
+checkpoints_to_analyze: null
+num_workers: 1
+device: null
+overwrite_results: false
+
+log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
+
+# Disable the creation of the log directory
+hydra:
+  run:
+    dir: ${train_logs}/analysis_output/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: true
+  verbose: [
+    __main__
+  ]

@@ -1,5 +1,0 @@
-ppo_torque_control: dmc_Hopper-hop_TC-v1/2022-12-14/17-04-39
-ppo_position_control: dmc_Hopper-hop_PC-v1/2022-12-16/15-11-28
-ppo_variable_position_control_fixed_d_gains: dmc_Hopper-hop_VarPC-v1/2022-12-17/19-11-15
-ppo_variable_position_control_variable_d_gains: dmc_Hopper-hop_VarPC-v1/2022-12-18/02-01-59
-ppo_variable_velocity_control: dmc_Hopper-hop_VarVC-v1/2022-12-17/12-33-57

@@ -1,5 +1,0 @@
-ppo_torque_control: dmc_Reacher-hard_TC-v1/2022-12-16/19-44-45
-ppo_position_control: dmc_Reacher-hard_PC-v1/2022-12-16/21-21-41
-ppo_variable_position_control_fixed_d_gains: dmc_Reacher-hard_VarPC-v1/2022-12-17/12-04-25
-ppo_variable_position_control_variable_d_gains: dmc_Reacher-hard_VarPC-v1/2022-12-17/13-50-18
-ppo_variable_velocity_control: dmc_Reacher-hard_VarVC-v1/2022-12-17/10-21-49

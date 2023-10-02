@@ -7,14 +7,14 @@ import pytest
 import stable_baselines3.common.buffers
 import torch
 
-from action_space_toolbox.analysis.hessian.hessian_eigen_cached_calculator import (
+from pg_subspaces.analysis.hessian.hessian_eigen_cached_calculator import (
     HessianEigenCachedCalculator,
 )
-from action_space_toolbox.analysis.high_curvature_subspace_analysis.high_curvature_subspace_analysis import (
+from pg_subspaces.analysis.high_curvature_subspace_analysis.high_curvature_subspace_analysis import (
     HighCurvatureSubspaceAnalysis,
 )
-from sb3_utils.common.buffer import fill_rollout_buffer
-from sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
+from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
 
 
 def test_high_curvature_overlap():

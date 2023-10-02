@@ -1,5 +1,0 @@
-ppo_torque_control: dmc_Finger-spin_TC-v1/2022-12-21/20-44-24
-ppo_position_control: dmc_Finger-spin_PC-v1/2022-12-16/18-19-26
-ppo_variable_position_control_fixed_d_gains: dmc_Finger-spin_VarPC-v1/2022-12-17/06-52-08
-ppo_variable_position_control_variable_d_gains: dmc_Finger-spin_VarPC-v1/2022-12-17/07-33-34
-ppo_variable_velocity_control: dmc_Finger-spin_VarVC-v1/2022-12-17/06-11-59

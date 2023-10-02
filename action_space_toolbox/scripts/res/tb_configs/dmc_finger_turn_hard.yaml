@@ -1,5 +1,0 @@
-ppo_torque_control: dmc_Finger-turn_hard_TC-v1/2022-12-17/02-39-05
-ppo_position_control: dmc_Finger-turn_hard_PC-v1/2022-12-17/04-20-56
-ppo_variable_position_control_fixed_d_gains: dmc_Finger-turn_hard_VarPC-v1/2022-12-17/22-53-14
-ppo_variable_position_control_variable_d_gains: dmc_Finger-turn_hard_VarPC-v1/2022-12-18/00-44-18
-ppo_variable_velocity_control: dmc_Finger-turn_hard_VarVC-v1/2022-12-17/21-05-36

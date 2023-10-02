@@ -1,5 +1,0 @@
-ppo_torque_control: dmc_Reacher-easy_TC-v1/2022-12-21/20-51-06
-ppo_position_control: dmc_Reacher-easy_PC-v1/2022-12-16/19-02-27
-ppo_variable_position_control_fixed_d_gains: dmc_Reacher-easy_VarPC-v1/2022-12-17/08-56-32
-ppo_variable_position_control_variable_d_gains: dmc_Reacher-easy_VarPC-v1/2022-12-17/09-39-07
-ppo_variable_velocity_control: dmc_Reacher-easy_VarVC-v1/2022-12-17/08-15-13

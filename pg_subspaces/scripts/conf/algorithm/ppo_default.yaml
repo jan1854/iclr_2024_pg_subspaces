@@ -1,0 +1,16 @@
+# TODO: Most parameters should be in a default PPO config
+name: "ppo"
+
+defaults:
+  - env_wrappers: []
+
+algorithm:
+  _target_: stable_baselines3.PPO
+  policy: "MlpPolicy"
+  learning_rate: 3e-4
+  device: "auto"
+  tensorboard_log: tensorboard
+
+training:
+  steps: 1000000
+  n_envs: 1

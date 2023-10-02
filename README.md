@@ -12,35 +12,14 @@ Make sure that the system packages `libosmesa6-dev` and `patchelf` are installed
 sudo apt-get install libosmesa6-dev
 sudo apt-get install patchelf
 ```
-
-Install the `action-space-toolbox` package.
+Install poetry 
 ```
+curl -sSL https://install.python-poetry.org | python3 -
+```
+Install the `pg_subspaces` package.
+```
+cd iclr_2024_pg_subspaces
 pip install .
 ```
 
 ## Usage
-All supported environments are registered in gym and can be created with `gym.make()`.
-The environment identifier is constructed as `{original_env_id}_{control_mode_id}-v{version}`.
-The control_mode_id is TC for torque control, PC for position control, and VC for velocity control.
-For dm-control environments, the original_env_id is `dmc_{domain}-{task}`and the version is 1.
-
-Instantiating a position-controlled version of gym's Pendulum:
-```
-import action_space_toolbox
-import gym
-
-env = gym.make("Pendulum_PC-v1")
-```
-
-Instantiating a velocity-controlled version of dm_controls Pendulum-swingup:
-```
-import action_space_toolbox
-import gym
-
-env = gym.make("dmc_Pendulum-swingup_VC-v1")
-```
-
-## Supported environments
-OpenAI Gym: Pendulum-v1, Ant-v3, HalfCheetah-v3, Hopper-v3, Reacher-v2, Walker2d-v3
-
-DeepMind Control Suite: All benchmarking environments, except for ball-in-cup, fish, manipulator, and point_mass.

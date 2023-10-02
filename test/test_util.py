@@ -4,11 +4,11 @@ import pytest
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from action_space_toolbox.analysis.util import (
+from pg_subspaces.analysis.util import (
     evaluate_agent_returns,
 )
-from action_space_toolbox.util.angles import normalize_angle
-from action_space_toolbox.util.tensorboard_logs import merge_dicts
+from pg_subspaces.metrics.angles import normalize_angle
+from pg_subspaces.metrics.tensorboard_logs import merge_dicts
 
 
 class DummyEnv(gym.Env):
