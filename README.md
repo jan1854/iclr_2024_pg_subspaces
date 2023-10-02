@@ -23,3 +23,23 @@ pip install .
 ```
 
 ## Usage
+
+### Training an agent
+To train an agent, use the following command
+```
+python -m pg_subspaces.scripts.train [arguments]
+```
+Important arguments include
+
+| Argument              | Description                                                                                                                     |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `env`                 | The environment to train on (use `dmc_{Domain}-{task}-v1` for DMC environments, e.g., `dmc_Finger-spin-v1`)                     | 
+| `algorithm`           | The algorithm configuration to use (this includes the algorithm and hyperparameters), see `scripts/conf/algorithm` for examples |
+| `checkpoint_interval` | The interval at which to store checkpoints for later analysis                                                                   |
+
+### Running the analysis
+To run the analysis, use the following command
+```
+python -m pg_subspaces.scripts.analyze train_logs=/path/to/trainlogs [arguments]
+```
+where `/path/to/trainlogs` should be replaced by the path to the log directory created by the train command from section [Training an agent](#Training an agent).
