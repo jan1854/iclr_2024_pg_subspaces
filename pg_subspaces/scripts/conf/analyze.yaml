@@ -6,7 +6,7 @@ defaults:
 train_logs: ??
 sync_train_logs: true
 
-min_interval: 200_000
+min_interval: 100_000
 first_checkpoint: 0
 last_checkpoint: null
 checkpoints_to_analyze: null

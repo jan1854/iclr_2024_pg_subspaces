@@ -8,7 +8,7 @@ seed: null
 show_progress: true
 num_eval_episodes: 10
 eval_interval: 10000
-checkpoint_interval: null
+checkpoint_interval: 100_000
 save_replay_buffer: false
 
 log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
