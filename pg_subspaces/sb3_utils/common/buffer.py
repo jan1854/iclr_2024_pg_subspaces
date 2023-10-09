@@ -1,12 +1,15 @@
 import collections
 import functools
 import math
-from typing import Callable, Optional, Union, Sequence
+import re
+from pathlib import Path
+from typing import Callable, List, Optional, Union, Sequence, Tuple
 
 import gym
 import numpy as np
 import stable_baselines3
 import stable_baselines3.common.buffers
+import stable_baselines3.common.off_policy_algorithm
 import stable_baselines3.common.vec_env
 import torch
 from stable_baselines3.common.type_aliases import (
@@ -320,3 +323,52 @@ def concatenate_buffer_samples(
                 for field in RolloutBufferSamples._fields
             )
         )
+
+
+class ReplayBufferDiffCheckpointer:
+    def __init__(self, algorithm: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm, checkpoint_dir: Path):
+        self.algorithm = algorithm
+        self.checkpoint_dir = checkpoint_dir
+
+    def save(self) -> None:
+        prev_checkpoints = self._get_replay_buffer_checkpoints(self.checkpoint_dir, include_current=False)
+        last_checkpoint = prev_checkpoints[-1] if prev_checkpoints[-1][0] != self.algorithm.num_timesteps else prev_checkpoints[-2]
+        first_pos_to_save = last_checkpoint[0] % self.algorithm.replay_buffer.buffer_size
+
+        np.savez_compressed(
+            str(self.checkpoint_dir / self._replay_buffer_checkpoint_name(self.algorithm.num_timesteps)),
+            observations=self.algorithm.replay_buffer.observations[first_pos_to_save:self.algorithm.replay_buffer.pos],
+            actions=self.algorithm.replay_buffer.actions[first_pos_to_save:self.algorithm.replay_buffer.pos],
+            rewards=self.algorithm.replay_buffer.rewards[first_pos_to_save:self.algorithm.replay_buffer.pos],
+            dones=self.algorithm.replay_buffer.dones[first_pos_to_save:self.algorithm.replay_buffer.pos],
+            next_observations=self.algorithm.replay_buffer.next_observations[first_pos_to_save:self.algorithm.replay_buffer.pos],
+        )
+
+    def load(self) -> None:
+        checkpoints = self._get_replay_buffer_checkpoints()
+        for checkpoint in checkpoints:
+            data = np.load(checkpoint, allow_pickle=True)
+            self._add_samples_to_buffer(data["observations"], data["actions"], data["rewards"], data["dones"], data["next_observations"])
+
+    def _add_samples_to_buffer(self, observations: np.ndarray, actions: np.ndarray, rewards: np.ndarray, dones: np.ndarray, next_observations: np.ndarray) -> None:
+        rb = self.algorithm.replay_buffer
+        num_samples_buffer_start = max(rb.pos + len(observations) - rb.buffer_size, 0)
+        num_samples_buffer_end = len(observations) - num_samples_buffer_start
+        fields = [(rb.observations, observations), (rb.actions, actions), (rb.rewards, rewards), (rb.dones, dones), (rb.next_observations, next_observations)]
+        for rp_field, data_field in fields:
+            rp_field[rb.pos:rb.pos + num_samples_buffer_end] = data_field[:num_samples_buffer_end]
+            rp_field[:num_samples_buffer_start] = data_field[num_samples_buffer_end:]
+        rb.full = rb.full or rb.pos + len(observations) >= rb.buffer_size
+        rb.pos = (rb.pos + len(observations)) % rb.buffer_size
+
+
+    def _replay_buffer_checkpoint_name(self, num_timesteps: Union[str, int]) -> str:
+        return f"{type(self.algorithm).__name__.lower()}_replay_buffer_{num_timesteps}_steps_diff.npz"
+
+    def _get_replay_buffer_checkpoints(self) -> List[Tuple[int, Path]]:
+        checkpoints = self.checkpoint_dir.glob(self._replay_buffer_checkpoint_name("*"))
+        steps_checkpoints = [
+            (int(re.search("_[0-9]+_", c.name).group()[1:-1]), c) for c in checkpoints
+        ]
+        steps_checkpoints.sort(key=lambda x: x[0])
+        return [(s, c) for s, c in steps_checkpoints if s <= self.algorithm.num_timesteps]
