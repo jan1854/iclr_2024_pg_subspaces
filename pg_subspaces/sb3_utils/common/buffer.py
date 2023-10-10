@@ -328,6 +328,7 @@ def concatenate_buffer_samples(
 class ReplayBufferDiffCheckpointer:
     def __init__(self, algorithm: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm, name_prefix: str, checkpoint_dir: Path):
         self.algorithm = algorithm
+        assert not self.algorithm.optimize_memory_usage
         self.name_prefix = name_prefix
         self.checkpoint_dir = checkpoint_dir
 
@@ -336,14 +337,16 @@ class ReplayBufferDiffCheckpointer:
         prev_checkpoints = self._get_replay_buffer_checkpoints(None)
         # The first checkpoint
         if len(prev_checkpoints) == 0:
-            last_checkpoint = 0
+            last_stored_sample = 0
         # In case there already exists a checkpoint for the current timestep
         elif prev_checkpoints[-1][0] == self.algorithm.num_timesteps:
-            last_checkpoint = prev_checkpoints[-2][0]
+            # The replay buffer is always saved before the current step is added to the buffer
+            #   --> At timestep t, the buffer contains t - 1 steps
+            last_stored_sample = prev_checkpoints[-2][0] - 1
         else:
-            last_checkpoint = prev_checkpoints[-1][0]
-        assert self.algorithm.num_timesteps - last_checkpoint <= rb.buffer_size
-        first_pos_to_save = last_checkpoint % self.algorithm.replay_buffer.buffer_size
+            last_stored_sample = prev_checkpoints[-1][0] - 1
+        assert (self.algorithm.num_timesteps - 1) - last_stored_sample <= rb.buffer_size
+        first_pos_to_save = last_stored_sample % self.algorithm.replay_buffer.buffer_size
 
         fields = [(rb.observations, "observations"), (rb.actions, "actions"), (rb.rewards, "rewards"), (rb.dones, "dones"),
                   (rb.next_observations, "next_observations")]

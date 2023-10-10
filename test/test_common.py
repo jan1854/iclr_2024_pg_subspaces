@@ -228,16 +228,17 @@ def test_combine_actor_critic_parameter_vectors():
 
 def test_replay_buffer_checkpointing():
     env = gym.make("Pendulum-v1")
-    algo = stable_baselines3.SAC("MlpPolicy", env, buffer_size=100)
+    algo = stable_baselines3.SAC("MlpPolicy", env, buffer_size=20, policy_kwargs={"net_arch": [32, 32]})
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
-        callbacks = [CustomCheckpointCallback(75, [25], tempdir, "sac", True),
-                     CheckpointCallback(75, tempdir, "sac", True)]
+        callbacks = [CustomCheckpointCallback(19, [], tempdir, "sac", True),
+                     CheckpointCallback(19, tempdir, "sac", True)]
         algo.learn(500, callbacks)
 
         for checkpoint in tempdir.glob("sac_[0-9]*_steps.zip"):
             step = int(re.search("_[0-9]+_", checkpoint.name).group()[1:-1])
             algo = stable_baselines3.SAC.load(checkpoint)
+            algo.load_replay_buffer(tempdir / f"sac_replay_buffer_{step}_steps.pkl")
             replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(algo, "sac", tempdir)
 
             # The replay buffer loaded with the regular sb3 checkpointing
@@ -266,5 +267,3 @@ def test_replay_buffer_checkpointing():
             assert np.all(algo.replay_buffer.dones == done_complete)
             assert algo.replay_buffer.pos == pos_complete
             assert algo.replay_buffer.full == full_complete
-
-
