@@ -112,7 +112,6 @@ class CheckpointAgentSpec(AgentSpec):
                     self.checkpoints_dir
                     / f"{agent_name}_replay_buffer_{self.timestep}_steps.pkl"
                 )
-                agent.load_replay_buffer(replay_buffer_path)
                 if replay_buffer_path.exists():
                     agent.load_replay_buffer(replay_buffer_path)
                     agent.replay_buffer.device = self.device
