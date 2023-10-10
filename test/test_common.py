@@ -17,7 +17,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from pg_subspaces.callbacks.custom_checkpoint_callback import CustomCheckpointCallback
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
-from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer, ReplayBufferDiffCheckpointer
+from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
+    ReplayBufferDiffCheckpointer,
+)
 from pg_subspaces.sb3_utils.common.loss import actor_critic_gradient
 from pg_subspaces.sb3_utils.common.parameters import (
     get_actor_critic_parameters,
@@ -228,18 +230,24 @@ def test_combine_actor_critic_parameter_vectors():
 
 def test_replay_buffer_checkpointing():
     env = gym.make("Pendulum-v1")
-    algo = stable_baselines3.SAC("MlpPolicy", env, buffer_size=20, policy_kwargs={"net_arch": [32, 32]})
+    algo = stable_baselines3.SAC(
+        "MlpPolicy", env, buffer_size=20, policy_kwargs={"net_arch": [32, 32]}
+    )
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
-        callbacks = [CustomCheckpointCallback(19, [], tempdir, "sac", True),
-                     CheckpointCallback(19, tempdir, "sac", True)]
+        callbacks = [
+            CustomCheckpointCallback(19, [], tempdir, "sac", True),
+            CheckpointCallback(19, tempdir, "sac", True),
+        ]
         algo.learn(500, callbacks)
 
         for checkpoint in tempdir.glob("sac_[0-9]*_steps.zip"):
             step = int(re.search("_[0-9]+_", checkpoint.name).group()[1:-1])
             algo = stable_baselines3.SAC.load(checkpoint)
             algo.load_replay_buffer(tempdir / f"sac_replay_buffer_{step}_steps.pkl")
-            replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(algo, "sac", tempdir)
+            replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(
+                algo, "sac", tempdir
+            )
 
             # The replay buffer loaded with the regular sb3 checkpointing
             obs_complete = algo.replay_buffer.observations.copy()
@@ -251,9 +259,13 @@ def test_replay_buffer_checkpointing():
             full_complete = algo.replay_buffer.full
 
             # Make sure that the replay buffer is modified
-            algo.replay_buffer.observations = np.zeros_like(algo.replay_buffer.observations)
+            algo.replay_buffer.observations = np.zeros_like(
+                algo.replay_buffer.observations
+            )
             algo.replay_buffer.actions = np.zeros_like(algo.replay_buffer.actions)
-            algo.replay_buffer.next_observations = np.zeros_like(algo.replay_buffer.next_observations)
+            algo.replay_buffer.next_observations = np.zeros_like(
+                algo.replay_buffer.next_observations
+            )
             algo.replay_buffer.rewards = np.zeros_like(algo.replay_buffer.rewards)
             algo.replay_buffer.dones = np.zeros_like(algo.replay_buffer.dones)
             algo.replay_buffer.pos = -1

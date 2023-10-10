@@ -1,3 +1,4 @@
+import functools
 import logging
 import random
 import subprocess
@@ -27,6 +28,7 @@ from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
+from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraAgentSpec
 
 logger = logging.getLogger(__name__)
 
@@ -117,11 +119,33 @@ def train(cfg: omegaconf.DictConfig) -> None:
         torch.cuda.manual_seed(cfg.seed)
         env.seed(cfg.seed)
 
-    algorithm_cfg = obj_config_to_type_and_kwargs(
-        omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
-    )
-
-    algorithm = hydra.utils.instantiate(algorithm_cfg, env=env, _convert_="partial")
+    algorithm_cfg = {
+        "algorithm": obj_config_to_type_and_kwargs(
+            omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
+        )
+    }
+    checkpoints_path = Path("checkpoints")
+    # If checkpoints exist, load the checkpoint else train an agent from scratch
+    if checkpoints_path.exists():
+        checkpoints = [
+            int(p.name[len(f"{cfg.algorithm.name}_") : -len("_steps.zip")])
+            for p in checkpoints_path.iterdir()
+            if p.suffix == ".zip"
+        ]
+        checkpoint_to_load = max(checkpoints)
+        algorithm = CheckpointAgentSpec(
+            hydra.utils.get_class(cfg.algorithm.algorithm._target_),
+            checkpoints_path,
+            checkpoint_to_load,
+            cfg.algorithm.algorithm.device,
+        ).create_agent(env)
+        algorithm.num_timesteps = checkpoint_to_load
+    else:
+        algorithm = HydraAgentSpec(algorithm_cfg, None, None, None).create_agent(env)
+        checkpoints_path.mkdir()
+        # Save the initial agent
+        path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
+        algorithm.save(path)
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )
@@ -133,31 +157,6 @@ def train(cfg: omegaconf.DictConfig) -> None:
             base_env_timestep_factor,
         )
     )
-    checkpoints_path = Path("checkpoints")
-    if checkpoints_path.exists():
-        checkpoints = [
-            int(p.name[len(f"{cfg.algorithm.name}_") : -len("_steps.zip")])
-            for p in checkpoints_path.iterdir()
-            if p.suffix == ".zip"
-        ]
-        checkpoint_to_load = max(checkpoints)
-        algorithm.load(
-            checkpoints_path / f"{cfg.algorithm.name}_{checkpoint_to_load}_steps.zip",
-            device=cfg.algorithm.algorithm.device,
-        )
-        algorithm.num_timesteps = checkpoint_to_load
-        if isinstance(
-            algorithm, stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm
-        ):
-            algorithm.load_replay_buffer(
-                checkpoints_path
-                / f"{cfg.algorithm.name}_replay_buffer_{checkpoint_to_load}_steps.pkl",
-            )
-    else:
-        checkpoints_path.mkdir()
-        # Save the initial agent
-        path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
-        algorithm.save(path)
     eval_env = make_vec_env(cfg)
     eval_callback = stable_baselines3.common.callbacks.EvalCallback(
         eval_env,

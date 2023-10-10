@@ -36,12 +36,10 @@ def analysis_worker(
 
     env = gym.make(train_cfg.env, **train_cfg.env_args)
 
-    agent_checkpoint = (
-        run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps"
-    )
     agent_spec = CheckpointAgentSpec(
         hydra.utils.get_class(train_cfg.algorithm.algorithm._target_),
-        agent_checkpoint,
+        run_dir / "checkpoints",
+        agent_step,
         device,
         agent_kwargs={"tensorboard_logs": None},
     )

@@ -3,7 +3,9 @@ from typing import Sequence
 
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from pg_subspaces.sb3_utils.common.buffer import ReplayBufferDiffCheckpointer
+from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
+    ReplayBufferDiffCheckpointer,
+)
 
 
 class CustomCheckpointCallback(CheckpointCallback):
@@ -30,30 +32,51 @@ class CustomCheckpointCallback(CheckpointCallback):
         save_vecnormalize: bool = False,
         verbose: int = 0,
     ):
-        super().__init__(save_freq, save_path, name_prefix, save_replay_buffer, save_vecnormalize, verbose)
+        super().__init__(
+            save_freq,
+            save_path,
+            name_prefix,
+            save_replay_buffer,
+            save_vecnormalize,
+            verbose,
+        )
         self.additional_checkpoints = additional_checkpoints
         self.replay_buffer_checkpointer = None
 
     def _init_callback(self) -> None:
         super()._init_callback()
-        self.replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(self.model, self.name_prefix, Path(self.save_path))
+        self.replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(
+            self.model, self.name_prefix, Path(self.save_path)
+        )
 
     def _on_step(self) -> bool:
-        if self.n_calls % self.save_freq == 0 or self.n_calls in self.additional_checkpoints:
+        if (
+            self.n_calls % self.save_freq == 0
+            or self.n_calls in self.additional_checkpoints
+        ):
             model_path = self._checkpoint_path(extension="zip")
             self.model.save(model_path)
             if self.verbose >= 2:
                 print(f"Saving model checkpoint to {model_path}")
 
-            if self.save_replay_buffer and hasattr(self.model, "replay_buffer") and self.model.replay_buffer is not None:
+            if (
+                self.save_replay_buffer
+                and hasattr(self.model, "replay_buffer")
+                and self.model.replay_buffer is not None
+            ):
                 # If model has a replay buffer, save it too
                 self.replay_buffer_checkpointer.save()
                 if self.verbose > 1:
                     print(f"Saving model replay buffer checkpoint")
 
-            if self.save_vecnormalize and self.model.get_vec_normalize_env() is not None:
+            if (
+                self.save_vecnormalize
+                and self.model.get_vec_normalize_env() is not None
+            ):
                 # Save the VecNormalize statistics
-                vec_normalize_path = self._checkpoint_path("vecnormalize_", extension="pkl")
+                vec_normalize_path = self._checkpoint_path(
+                    "vecnormalize_", extension="pkl"
+                )
                 self.model.get_vec_normalize_env().save(vec_normalize_path)
                 if self.verbose >= 2:
                     print(f"Saving model VecNormalize to {vec_normalize_path}")
