@@ -45,9 +45,14 @@ class CustomCheckpointCallback(CheckpointCallback):
 
     def _init_callback(self) -> None:
         super()._init_callback()
-        self.replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(
-            self.model, self.name_prefix, Path(self.save_path)
-        )
+        if (
+            self.save_replay_buffer
+            and hasattr(self.model, "replay_buffer")
+            and self.model.replay_buffer is not None
+        ):
+            self.replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(
+                self.model, self.name_prefix, Path(self.save_path)
+            )
 
     def _on_step(self) -> bool:
         if (
