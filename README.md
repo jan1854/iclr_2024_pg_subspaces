@@ -42,7 +42,7 @@ To run the analysis, use the following command
 ```
 python -m pg_subspaces.scripts.analyze train_logs=/path/to/trainlogs [arg=value ...]
 ```
-where `/path/to/trainlogs` should be replaced by the path to the log directory created by the train command from section [Training an agent](#Training an agent).
+where `/path/to/trainlogs` should be replaced by the path to the log directory created by the train command from section [Training an agent](#training-an-agent).
 
 Important arguments include
 
