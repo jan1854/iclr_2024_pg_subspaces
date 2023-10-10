@@ -1,4 +1,7 @@
 import itertools
+import re
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Union
 
 import gym
@@ -9,11 +12,13 @@ import torch
 from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+from pg_subspaces.callbacks.custom_checkpoint_callback import CustomCheckpointCallback
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
-from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer
+from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer, ReplayBufferDiffCheckpointer
+from pg_subspaces.sb3_utils.common.loss import actor_critic_gradient
 from pg_subspaces.sb3_utils.common.parameters import (
     get_actor_critic_parameters,
     flatten_parameters,
@@ -24,7 +29,6 @@ from pg_subspaces.sb3_utils.common.parameters import (
     combine_actor_critic_parameter_vectors,
     get_trained_parameters,
 )
-from sb3_utils.common.loss import actor_critic_gradient
 
 
 def tensor_in(a: torch.Tensor, seq: Sequence[torch.Tensor]) -> bool:
@@ -220,3 +224,47 @@ def test_combine_actor_critic_parameter_vectors():
         assert (
             params_combined == flatten_parameters(get_trained_parameters(agent))
         ).all()
+
+
+def test_replay_buffer_checkpointing():
+    env = gym.make("Pendulum-v1")
+    algo = stable_baselines3.SAC("MlpPolicy", env, buffer_size=100)
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = Path(tempdir)
+        callbacks = [CustomCheckpointCallback(75, [25], tempdir, "sac", True),
+                     CheckpointCallback(75, tempdir, "sac", True)]
+        algo.learn(500, callbacks)
+
+        for checkpoint in tempdir.glob("sac_[0-9]*_steps.zip"):
+            step = int(re.search("_[0-9]+_", checkpoint.name).group()[1:-1])
+            algo = stable_baselines3.SAC.load(checkpoint)
+            replay_buffer_checkpointer = ReplayBufferDiffCheckpointer(algo, "sac", tempdir)
+
+            # The replay buffer loaded with the regular sb3 checkpointing
+            obs_complete = algo.replay_buffer.observations.copy()
+            act_complete = algo.replay_buffer.actions.copy()
+            next_obs_complete = algo.replay_buffer.next_observations.copy()
+            reward_complete = algo.replay_buffer.rewards.copy()
+            done_complete = algo.replay_buffer.dones.copy()
+            pos_complete = algo.replay_buffer.pos
+            full_complete = algo.replay_buffer.full
+
+            # Make sure that the replay buffer is modified
+            algo.replay_buffer.observations = np.zeros_like(algo.replay_buffer.observations)
+            algo.replay_buffer.actions = np.zeros_like(algo.replay_buffer.actions)
+            algo.replay_buffer.next_observations = np.zeros_like(algo.replay_buffer.next_observations)
+            algo.replay_buffer.rewards = np.zeros_like(algo.replay_buffer.rewards)
+            algo.replay_buffer.dones = np.zeros_like(algo.replay_buffer.dones)
+            algo.replay_buffer.pos = -1
+            algo.replay_buffer.full = None
+
+            replay_buffer_checkpointer.load(step)
+            assert np.all(algo.replay_buffer.observations == obs_complete)
+            assert np.all(algo.replay_buffer.actions == act_complete)
+            assert np.all(algo.replay_buffer.next_observations == next_obs_complete)
+            assert np.all(algo.replay_buffer.rewards == reward_complete)
+            assert np.all(algo.replay_buffer.dones == done_complete)
+            assert algo.replay_buffer.pos == pos_complete
+            assert algo.replay_buffer.full == full_complete
+
+

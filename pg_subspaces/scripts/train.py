@@ -20,8 +20,8 @@ import torch
 from pg_subspaces.callbacks.additional_training_metrics_callback import (
     AdditionalTrainingMetricsCallback,
 )
-from pg_subspaces.callbacks.additional_checkpoints_callback import (
-    AdditionalCheckpointsCallback,
+from pg_subspaces.callbacks.custom_checkpoint_callback import (
+    CustomCheckpointCallback,
 )
 from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
@@ -171,7 +171,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
     ]
     if cfg.checkpoint_interval is not None:
         callbacks.append(
-            AdditionalCheckpointsCallback(
+            CustomCheckpointCallback(
                 cfg.checkpoint_interval,
                 cfg.additional_checkpoints,
                 str(checkpoints_path),
