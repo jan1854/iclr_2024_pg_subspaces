@@ -5,13 +5,12 @@ from pathlib import Path
 from typing import Optional, Sequence, Tuple
 
 import yaml
+from tqdm import tqdm
 
 from pg_subspaces.scripts.create_plots import create_plots
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
-
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -142,7 +141,7 @@ if __name__ == "__main__":
                                 plot_config["key"],
                                 plot_config["smoothing_weight"],
                                 True,
-                                True,
+                                False,
                                 plot_config.get("num_same_color_plots", 1),
                                 plot_config.get("fontsize", 22),
                                 plot_config.get("linewidth", 1.5),

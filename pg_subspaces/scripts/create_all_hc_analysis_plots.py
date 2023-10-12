@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 out_dir = Path(__file__).parents[2] / "out"
+
 PLOT_CONFIGS = {
     "gradient_subspace_fraction_precise_vs_low_sample_hessian": {
         # "title": "Subspace frac., precise vs. low-sample Hessian",
@@ -298,7 +299,7 @@ if __name__ == "__main__":
                                     False,
                                     keys,
                                     0.3,
-                                    True,
+                                    False,
                                     plot_config.get("num_same_color_plots", 1),
                                     plot_config.get("marker"),
                                     plot_config.get("fontsize", 22),
