@@ -83,7 +83,7 @@ def combine_metrics(log_path: Path) -> None:
                 remove_new_data_indicator(run_dir)
         except Exception as e:
             logger.warning(
-                f"Failed to combine metrics in {combined_dir.parent}. Got exception: {e}."
+                f"Failed to combine metrics in {combined_dir.parent}. Got exception: {e}"
             )
 
 
