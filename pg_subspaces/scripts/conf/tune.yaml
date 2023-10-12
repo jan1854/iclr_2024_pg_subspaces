@@ -1,0 +1,73 @@
+defaults:
+  - _self_
+  - algorithm: ppo_default
+  - override hydra/launcher: joblib
+  - override hydra/sweeper: ax
+
+env: Pendulum-v1
+env_args: {}
+seed: null
+show_progress: true
+num_eval_episodes: 10
+eval_interval: 10000
+checkpoint_interval: null
+additional_checkpoints: []
+save_replay_buffer: false
+
+log_dir: ${oc.env:PG_SUBSPACES_TUNING_LOG_DIR,logs_tuning}
+run_log_dir: ${log_dir}/training/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${run_log_dir}
+  sweep:
+    dir: ${run_log_dir}
+  job:
+    chdir: true
+  verbose:
+    - __main__
+  launcher:
+    n_jobs: 5
+  sweeper:
+    ax_config:
+      max_trials: 100
+      params:
+        algorithm.algorithm.learning_rate:
+          type: range
+          bounds: [1e-5, 1e-1]
+          value_type: float
+          log_scale: true
+        algorithm.algorithm.n_steps:
+          type: choice
+          values: [256, 512, 1024, 2048, 4096]
+          value_type: int
+        algorithm.algorithm.batch_size:
+          type: choice
+          values: [32, 64, 128, 256]
+          value_type: int
+        algorithm.algorithm.n_epochs:
+          type: choice
+          values: [5, 10, 20]
+          value_type: int
+        algorithm.algorithm.gamma:
+          type: range
+          bounds: [0.9, 1]
+          value_type: float
+          log_scale: false
+        algorithm.algorithm.gae_lambda:
+          type: range
+          bounds: [0.9, 1]
+          value_type: float
+        algorithm.algorithm.clip_range:
+          type: choice
+          values: [0.1, 0.2, 0.3]
+          value_type: float
+        algorithm.algorithm.ent_coef:
+          type: range
+          bounds: [1e-8, 1e-2]
+          value_type: float
+          log_scale: true
+        algorithm.algorithm.policy_kwargs.net_arch:
+          type: choice
+          values: [64, 128, 256]    # The sweeper cannot handle list-type parameters
+          value_type: int
