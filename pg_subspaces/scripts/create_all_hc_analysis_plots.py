@@ -240,7 +240,7 @@ if __name__ == "__main__":
     with multiprocessing.Pool(20) as pool:
         for env_name, run_config in RUN_CONFIGS.items():
             for algo_name, algo_log_dir in run_config["log_dirs"].items():
-                curr_log_dir = log_dir / env_name / algo_log_dir
+                curr_log_dir = log_dir / "training" / env_name / algo_log_dir
                 env_file_name = env_name[:-3].lower().replace("-", "_")
                 if not env_name.startswith("dmc"):
                     env_file_name = "gym_" + env_file_name

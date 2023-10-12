@@ -103,7 +103,7 @@ if __name__ == "__main__":
                         worker,
                         (
                             [
-                                Path(log_dir, env_name, experiment_dir)
+                                Path(log_dir, "training", env_name, experiment_dir)
                                 for experiment_dir in run_config["log_dirs"].values()
                             ],
                             [
