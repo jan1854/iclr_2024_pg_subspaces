@@ -1,24 +1,18 @@
 import argparse
 import logging
-import multiprocessing
 import pickle
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
+import yaml
 from matplotlib import pyplot as plt
 from matplotlib import patches
 
-from scripts.convergence_criterion import ConvergenceCriterion
-from scripts.create_plots import create_plots
-from util.tensorboard_logs import create_event_accumulators, read_scalar
+from pg_subspaces.scripts.convergence_criterion import ConvergenceCriterion
+from pg_subspaces.metrics.tensorboard_logs import create_event_accumulators, read_scalar
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
-
-from tqdm import tqdm
-
-from run_configs import RUN_CONFIGS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -204,7 +198,11 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
     global bar_xpos
     if not cache_file.exists():
         results = {}
-        for env_name, run_config in RUN_CONFIGS.items():
+        with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+            "r"
+        ) as run_configs_file:
+            run_configs = yaml.safe_load(run_configs_file)
+        for env_name, run_config in run_configs.items():
             results[env_name] = {}
             curr_results_env = results[env_name]
             for algorithm_name, algorthm_log_path in run_config["log_dirs"].items():
@@ -253,13 +251,10 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                                 curr_rewards,
                             )
                             for i in range(len(values_split)):
-                                values_split[i].append(
-                                    np.mean(curr_values_split[i])
-                                )
+                                values_split[i].append(np.mean(curr_values_split[i]))
 
                         curr_results_loss[grad_hess_type] = [
-                            {"mean": np.mean(v), "std": np.std(v)}
-                            for v in values_split
+                            {"mean": np.mean(v), "std": np.std(v)} for v in values_split
                         ]
 
         with cache_file.open("wb") as f:
@@ -321,7 +316,11 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                 patches.Patch(color=COLORSCHEME[0], label="Initial phase")
             )
             legend_handles.append(
-                patches.Patch(facecolor=LIGHT_GREY, edgecolor=GREY, label="True gradient, true Hessian")
+                patches.Patch(
+                    facecolor=LIGHT_GREY,
+                    edgecolor=GREY,
+                    label="True gradient, true Hessian",
+                )
             )
             legend_handles.append(
                 patches.Patch(color=COLORSCHEME[1], label="Training phase")
@@ -334,7 +333,9 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                     label="Estimated gradient, true Hessian",
                 )
             )
-            legend_handles.append(patches.Patch(color=COLORSCHEME[2], label="Convergence phase"))
+            legend_handles.append(
+                patches.Patch(color=COLORSCHEME[2], label="Convergence phase")
+            )
             legend_handles.append(
                 patches.Patch(
                     facecolor=LIGHT_GREY,
@@ -366,9 +367,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
             # bbox = legend_plt.get_window_extent().transformed(
             #     legend_fig.dpi_scale_trans.inverted()
             # )
-            out_path = Path(
-                out_dir / f"gradient_subspace_fraction_{loss_type}"
-            )
+            out_path = Path(out_dir / f"gradient_subspace_fraction_{loss_type}")
             # legend_fig.savefig(
             #     out_path.parent / (out_path.name + "_legend.pdf"), bbox_inches=bbox
             # )
@@ -381,4 +380,6 @@ if __name__ == "__main__":
     parser.add_argument("cache_file", type=str)
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir))
+    create_plots_iclr_gradient_subspace_fraction(
+        Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir)
+    )

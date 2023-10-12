@@ -4,14 +4,13 @@ import multiprocessing
 from pathlib import Path
 from typing import Dict, Optional, Sequence, Tuple
 
-from scripts.create_plots import create_plots
+import yaml
+from tqdm import tqdm
+
+from pg_subspaces.scripts.create_plots import create_plots
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
-
-from tqdm import tqdm
-
-from run_configs import RUN_CONFIGS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -83,8 +82,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     log_dir = Path(args.log_dir)
     results = []
+    with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+        "r"
+    ) as run_configs_file:
+        run_configs = yaml.safe_load(run_configs_file)
     with multiprocessing.Pool(20) as pool:
-        for env_name, run_config in RUN_CONFIGS.items():
+        for env_name, run_config in run_configs.items():
             env_file_name = env_name[:-3].lower().replace("-", "_")
             if not env_name.startswith("dmc"):
                 env_file_name = "gym_" + env_file_name

@@ -1,24 +1,18 @@
 import argparse
 import logging
-import multiprocessing
 import pickle
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
+import yaml
 from matplotlib import pyplot as plt
 from matplotlib import patches
 
-from scripts.convergence_criterion import ConvergenceCriterion
-from scripts.create_plots import create_plots
-from util.tensorboard_logs import create_event_accumulators, read_scalar
+from pg_subspaces.scripts.convergence_criterion import ConvergenceCriterion
+from pg_subspaces.metrics.tensorboard_logs import create_event_accumulators, read_scalar
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
-
-from tqdm import tqdm
-
-from run_configs import RUN_CONFIGS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -204,7 +198,11 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
     global bar_xpos
     if not cache_file.exists():
         results = {}
-        for env_name, run_config in RUN_CONFIGS.items():
+        with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+            "r"
+        ) as run_configs_file:
+            run_configs = yaml.safe_load(run_configs_file)
+        for env_name, run_config in run_configs.items():
             if env_name in "dmc_Finger-spin_TC-v1" or env_name in "Walker2d_TC-v3":
                 results[env_name] = {}
                 curr_results_env = results[env_name]
@@ -319,7 +317,11 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
             patches.Patch(color=COLORSCHEME[0], label="Initial phase")
         )
         legend_handles.append(
-            patches.Patch(facecolor=LIGHT_GREY, edgecolor=GREY, label="True gradient, true Hessian")
+            patches.Patch(
+                facecolor=LIGHT_GREY,
+                edgecolor=GREY,
+                label="True gradient, true Hessian",
+            )
         )
         legend_handles.append(
             patches.Patch(color=COLORSCHEME[1], label="Training phase")
@@ -332,7 +334,9 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                 label="Estimated gradient, true Hessian",
             )
         )
-        legend_handles.append(patches.Patch(color=COLORSCHEME[2], label="Convergence phase"))
+        legend_handles.append(
+            patches.Patch(color=COLORSCHEME[2], label="Convergence phase")
+        )
         legend_handles.append(
             patches.Patch(
                 facecolor=LIGHT_GREY,
@@ -364,9 +368,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
         # bbox = legend_plt.get_window_extent().transformed(
         #     legend_fig.dpi_scale_trans.inverted()
         # )
-        out_path = Path(
-            out_dir / f"gradient_subspace_fraction_{loss_type}"
-        )
+        out_path = Path(out_dir / f"gradient_subspace_fraction_{loss_type}")
         # legend_fig.savefig(
         #     out_path.parent / (out_path.name + "_legend.pdf"), bbox_inches=bbox
         # )
@@ -379,4 +381,6 @@ if __name__ == "__main__":
     parser.add_argument("cache_file", type=str)
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir))
+    create_plots_iclr_gradient_subspace_fraction(
+        Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir)
+    )

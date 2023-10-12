@@ -4,9 +4,8 @@ import multiprocessing
 from pathlib import Path
 from typing import Dict, Optional, Sequence, Tuple
 
+import yaml
 from tqdm import tqdm
-
-from pg_subspaces.scripts.run_configs import RUN_CONFIGS
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
@@ -236,9 +235,14 @@ if __name__ == "__main__":
     parser.add_argument("log_dir", type=str)
     args = parser.parse_args()
     log_dir = Path(args.log_dir)
+    with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+        "r"
+    ) as run_configs_file:
+        run_configs = yaml.safe_load(run_configs_file)
+
     results = []
     with multiprocessing.Pool(20) as pool:
-        for env_name, run_config in RUN_CONFIGS.items():
+        for env_name, run_config in run_configs.items():
             for algo_name, algo_log_dir in run_config["log_dirs"].items():
                 curr_log_dir = log_dir / "training" / env_name / algo_log_dir
                 env_file_name = env_name[:-3].lower().replace("-", "_")
@@ -259,7 +263,9 @@ if __name__ == "__main__":
                         if "analysis_run_ids" in run_config and isinstance(
                             run_config["analysis_run_ids"], dict
                         ):
-                            analysis_run_id = run_config["analysis_run_ids"][algo_name]
+                            analysis_run_id = run_config["analysis_run_ids"].get(
+                                algo_name, "default"
+                            )
                         else:
                             analysis_run_id = run_config.get(
                                 "anlysis_run_ids", "default"
