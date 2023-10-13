@@ -1,7 +1,8 @@
 .idea
 __pycache__
 logs
-out
+logs_tuning
 logs_test
+out
 *.egg-info
 build
