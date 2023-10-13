@@ -4,8 +4,8 @@ main:
 ablation_network_size:
   ppo: PPO
   sac: SAC
-  ppo_large_network: "PPO (SAC network size)"
-  sac_large_network: "SAC (PPO network size)"
+  ppo_large: "PPO (SAC network size)"
+  sac_small: "SAC (PPO network size)"
 ablation_sac_on_off_policy:
   ppo: PPO
   sac: SAC
