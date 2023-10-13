@@ -27,7 +27,7 @@ hydra:
   verbose:
     - __main__
   launcher:
-    n_jobs: 5
+    n_jobs: 15
   sweeper:
     ax_config:
       max_trials: 100
