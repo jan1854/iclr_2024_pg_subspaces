@@ -8,6 +8,27 @@ algorithm:
   _target_: stable_baselines3.SAC
   policy: "MlpPolicy"
   learning_rate: 3e-4
+  buffer_size: 1000000
+  learning_starts: 100
+  batch_size: 256
+  tau: 0.005
+  gamma: 0.99
+  train_freq: 1
+  gradient_steps: ${train_freq}
+  action_noise: null
+  replay_buffer_class: null
+  replay_buffer_kwargs: null
+  optimize_memory_usage: False
+  ent_coef: "auto"
+  target_update_interval: 1
+  target_entropy: "auto"
+  use_sde: false
+  sde_sample_freq: -1
+  use_sde_at_warmup: false
+  stats_window_size: 100
+  policy_kwargs:
+    net_arch: [256, 256]
+  verbose: 0
   device: "auto"
   tensorboard_log: tensorboard
 
