@@ -17,10 +17,9 @@ algorithm.algorithm.gamma:
   value_type: float
   log_scale: false
 algorithm.algorithm.tau:
-  type: range
-  bounds: [0.005, 0.01, 0.02]
+  type: choice
+  values: [0.005, 0.01, 0.02]
   value_type: float
-  log_scale: false
 algorithm.algorithm.learning_starts:
   type: choice
   values: [100, 1000, 10000]
