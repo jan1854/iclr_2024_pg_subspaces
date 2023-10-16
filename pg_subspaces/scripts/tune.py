@@ -26,13 +26,18 @@ def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> flo
     try:
         os.chdir(working_directory)
         train(cfg)
+    except Exception as e:
+        logger.warning(f"Run {working_directory} failed with exception: {e}")
+        return np.inf
     finally:
         os.chdir(orig_dir)
     _, event_accumulator = create_event_accumulators(
         [working_directory / "tensorboard"]
     )[0]
     scalar = read_scalar(event_accumulator, "eval/mean_reward")
-    return -sum(v.value for s, v in scalar.items() if s > 0)
+    return -sum(
+        v.value for s, v in scalar.items() if 0 < s < cfg.algorithm.training.steps
+    )
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="tune")
