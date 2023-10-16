@@ -17,10 +17,11 @@ logger = logging.getLogger(__name__)
 def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> float:
     cfg = copy.deepcopy(cfg)
     cfg.seed = seed
-    # Hack: The sweeper cannot handle list-type parameters, so pass a single number and convert it to a list
-    cfg.algorithm.algorithm.policy_kwargs.net_arch = omegaconf.ListConfig(
-        [cfg.algorithm.algorithm.policy_kwargs.net_arch]
-    )
+    if isinstance(cfg.algorithm.algorithm.policy_kwargs.net_arch, int):
+        # Hack: The sweeper cannot handle list-type parameters, so pass a single number and convert it to a list
+        cfg.algorithm.algorithm.policy_kwargs.net_arch = omegaconf.ListConfig(
+            [cfg.algorithm.algorithm.policy_kwargs.net_arch]
+        )
     orig_dir = Path.cwd()
     working_directory.mkdir()
     try:
