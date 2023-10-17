@@ -241,6 +241,10 @@ if __name__ == "__main__":
         "r"
     ) as run_configs_file:
         run_configs = yaml.safe_load(run_configs_file)
+    with (Path(__file__).parent / "res" / "experiment_configs.yaml").open(
+        "r"
+    ) as experiment_configs_file:
+        experiment_configs = yaml.safe_load(experiment_configs_file)
 
     results = []
     with multiprocessing.Pool(20) as pool:
@@ -258,8 +262,18 @@ if __name__ == "__main__":
                         ("policy_loss", "policy"),
                         ("value_function_loss", "vf"),
                     ]:
+                        experiment_out_dir = None
+                        for (
+                            experiment_name,
+                            experiment_config,
+                        ) in experiment_configs.items():
+                            if (
+                                experiment_out_dir is None or experiment_name == "main"
+                            ) and algo_name in experiment_config:
+                                experiment_out_dir = experiment_name
                         out_path = (
                             out_dir
+                            / experiment_name
                             / plot_config["out_dir"]
                             / loss_type
                             / f"{algo_name}_{env_file_name}_{out_filename}_{loss_type_short}.pdf"
