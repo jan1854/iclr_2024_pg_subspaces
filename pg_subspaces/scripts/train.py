@@ -31,10 +31,16 @@ from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraA
 
 logger = logging.getLogger(__name__)
 
+omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
+omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
+omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
+omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
+omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+
 
 def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
-    stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise we need to checkpoint
+    stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise, we need to checkpoint
     the entire object to allow save / load. Therefore, replace each object in the config by a <obj>_type and
     <obj>_kwargs to allow creating them in the algorithm's constructor.
 
