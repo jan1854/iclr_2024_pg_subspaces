@@ -80,6 +80,7 @@ def worker(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
+    parser.add_argument("envs", type=str, nargs="+", default=["*"])
     args = parser.parse_args()
     log_dir = Path(args.log_dir)
     with (Path(__file__).parent / "res" / "run_configs.yaml").open(
@@ -94,6 +95,8 @@ if __name__ == "__main__":
     results = []
     with multiprocessing.Pool(20) as pool:
         for env_name, run_config in run_configs.items():
+            if env_name not in args.envs and "*" not in args.envs:
+                continue
             env_file_name = env_name[:-3].lower().replace("-", "_")
             if not env_name.startswith("dmc"):
                 env_file_name = "gym_" + env_file_name
