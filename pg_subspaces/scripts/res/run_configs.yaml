@@ -4,11 +4,13 @@ Ant-v3:
     sac: 2023-09-26/16-54-05
     ppo_large: 2023-10-11/07-08-45
     sac_small: 2023-10-11/04-32-14
+    on_policy_sac: 2023-10-18/03-32-06
   xmax: 3_000_000
 HalfCheetah-v3:
   log_dirs:
     ppo: 2023-07-14/21-58-53
     sac: 2023-09-19/11-08-06
+    on_policy_sac: 2023-10-18/09-17-06
   xmax: 3_000_000
   analysis_run_ids:
     ppo: repeat_low_sample
@@ -19,7 +21,7 @@ Pendulum-v1:
     sac: 2023-09-22/19-13-25
     ppo_large: 2023-10-11/15-07-07
     sac_small: 2023-10-11/15-19-50
-    on_policy_sac: 2023-10-11/18-44-23
+    on_policy_sac: 2023-10-17/18-05-27
   xmax: 300_000
 Walker2d-v3:
   log_dirs:
@@ -36,6 +38,7 @@ dmc_Ball_in_cup-catch-v1:
     sac: 2023-09-24/20-17-17
     ppo_large: 2023-10-11/00-35-35
     sac_small: 2023-10-10/23-05-28
+    on_policy_sac: 2023-10-17/23-24-19
   xmax: 1_000_000
 dmc_Finger-spin-v1:
   log_dirs:
@@ -43,7 +46,7 @@ dmc_Finger-spin-v1:
     sac: 2023-09-21/10-34-29
     ppo_large: 2023-10-10/18-02-05
     sac_small: 2023-10-10/17-43-10
-    on_policy_sac: 2023-10-13/06-25-12
+    on_policy_sac: 2023-10-17/18-46-53
   xmax: 1_000_000
   analysis_run_ids:
     ppo: repeat_low_sample
