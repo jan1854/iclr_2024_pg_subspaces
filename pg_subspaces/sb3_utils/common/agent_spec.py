@@ -19,7 +19,7 @@ SB3Agent = TypeVar(
     "SB3Agent", bound=stable_baselines3.common.on_policy_algorithm.BaseAlgorithm
 )
 
-logger = logging.getLogger("__name__")
+logger = logging.getLogger(__name__)
 
 
 class AgentSpec(abc.ABC):
