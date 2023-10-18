@@ -16,7 +16,7 @@ from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
 )
 
 SB3Agent = TypeVar(
-    "SB3Agent", bound=stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+    "SB3Agent", bound=stable_baselines3.common.on_policy_algorithm.BaseAlgorithm
 )
 
 logger = logging.getLogger("__name__")
