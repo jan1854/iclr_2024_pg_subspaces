@@ -17,6 +17,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from pg_subspaces.callbacks.custom_checkpoint_callback import CustomCheckpointCallback
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
+from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer
 from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     ReplayBufferDiffCheckpointer,
 )
