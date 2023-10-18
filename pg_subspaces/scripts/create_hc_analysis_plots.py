@@ -273,7 +273,7 @@ if __name__ == "__main__":
                                 experiment_out_dir = experiment_name
                         out_path = (
                             out_dir
-                            / experiment_name
+                            / experiment_out_dir
                             / plot_config["out_dir"]
                             / loss_type
                             / f"{algo_name}_{env_file_name}_{out_filename}_{loss_type_short}.pdf"
