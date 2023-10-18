@@ -1,6 +1,7 @@
 import logging
 import random
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -199,6 +200,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
             progress_bar=cfg.show_progress,
             reset_num_timesteps=False,
         )
+        time.sleep(1)  # To give the tensorboard loggers time to finish writing
     finally:
         (Path.cwd() / "done").touch()
 
