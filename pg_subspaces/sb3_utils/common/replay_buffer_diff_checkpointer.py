@@ -19,50 +19,57 @@ class ReplayBufferDiffCheckpointer:
         self.checkpoint_dir = checkpoint_dir
 
     def save(self) -> None:
-        rb = self.algorithm.replay_buffer
-        prev_checkpoints = self._get_replay_buffer_checkpoints(None)
-        # The first checkpoint
-        if len(prev_checkpoints) == 0:
-            last_stored_sample = 0
-        # In case there already exists a checkpoint for the current timestep
-        elif prev_checkpoints[-1][0] == self.algorithm.num_timesteps:
-            # The replay buffer is always saved before the current step is added to the buffer
-            #   --> At timestep t, the buffer contains t - 1 steps
-            last_stored_sample = prev_checkpoints[-2][0] - 1
-        else:
-            last_stored_sample = prev_checkpoints[-1][0] - 1
-        assert (self.algorithm.num_timesteps - 1) - last_stored_sample <= rb.buffer_size
-        first_pos_to_save = (
-            last_stored_sample % self.algorithm.replay_buffer.buffer_size
-        )
-
-        fields = [
-            (rb.observations, "observations"),
-            (rb.actions, "actions"),
-            (rb.rewards, "rewards"),
-            (rb.dones, "dones"),
-            (rb.next_observations, "next_observations"),
-        ]
-
-        data = {}
-        for field, name in fields:
-            if rb.pos > first_pos_to_save:
-                data[name] = field[first_pos_to_save : rb.pos]
+        if self.algorithm.num_timesteps > 0:
+            rb = self.algorithm.replay_buffer
+            prev_checkpoints = self._get_replay_buffer_checkpoints(None)
+            # The first checkpoint
+            if (
+                len(prev_checkpoints) == 0
+                or len(prev_checkpoints) == 1
+                and prev_checkpoints[0][0] == self.algorithm.num_timesteps
+            ):
+                last_stored_sample = 0
+            # In case there already exists a checkpoint for the current timestep
+            elif prev_checkpoints[-1][0] == self.algorithm.num_timesteps:
+                # The replay buffer is always saved before the current step is added to the buffer
+                #   --> At timestep t, the buffer contains t - 1 steps
+                last_stored_sample = prev_checkpoints[-2][0] - 1
             else:
-                data[name] = np.concatenate(
-                    (field[first_pos_to_save : rb.buffer_size], field[: rb.pos])
-                )
+                last_stored_sample = prev_checkpoints[-1][0] - 1
+            assert (
+                self.algorithm.num_timesteps - 1
+            ) - last_stored_sample <= rb.buffer_size
+            first_pos_to_save = (
+                last_stored_sample % self.algorithm.replay_buffer.buffer_size
+            )
 
-        data["pos"] = rb.pos
-        data["full"] = rb.full
+            fields = [
+                (rb.observations, "observations"),
+                (rb.actions, "actions"),
+                (rb.rewards, "rewards"),
+                (rb.dones, "dones"),
+                (rb.next_observations, "next_observations"),
+            ]
 
-        np.savez_compressed(
-            str(
-                self.checkpoint_dir
-                / self._replay_buffer_checkpoint_name(self.algorithm.num_timesteps)
-            ),
-            **data,
-        )
+            data = {}
+            for field, name in fields:
+                if rb.pos > first_pos_to_save:
+                    data[name] = field[first_pos_to_save : rb.pos]
+                else:
+                    data[name] = np.concatenate(
+                        (field[first_pos_to_save : rb.buffer_size], field[: rb.pos])
+                    )
+
+            data["pos"] = rb.pos
+            data["full"] = rb.full
+
+            np.savez_compressed(
+                str(
+                    self.checkpoint_dir
+                    / self._replay_buffer_checkpoint_name(self.algorithm.num_timesteps)
+                ),
+                **data,
+            )
 
     def load(self, timestep: Optional[int] = None) -> None:
         checkpoints = self._get_replay_buffer_checkpoints(timestep)
@@ -72,7 +79,7 @@ class ReplayBufferDiffCheckpointer:
             )
         self.algorithm.replay_buffer.pos = 0
         self.algorithm.replay_buffer.full = False
-        # TODO: Inefficient, we might avoid writing earlier checkpoints to the buffer if they are overwritten anyway
+        # TODO: Inefficient, we might avoid reading earlier checkpoints to the buffer if they are overwritten anyway
         for checkpoint in checkpoints:
             data = np.load(checkpoint[1], allow_pickle=True)
             assert (
