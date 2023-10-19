@@ -64,7 +64,7 @@ def create_plots(
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
         for xpos, annotation in annotations.items():
-            ax.axvline(x=xpos, color="gray", linestyle="--")
+            ax.axvline(x=xpos, color="gray", linestyle="--", label="_nolegend_")
             plt.text(
                 xpos,
                 0.5,
@@ -75,6 +75,7 @@ def create_plots(
                 bbox=dict(
                     facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
                 ),
+                zorder=999,
             )
         for i, log_path in enumerate(log_paths):
             if i % num_same_color_plots == 0:
@@ -195,8 +196,8 @@ def create_plots(
                 legend_fig.dpi_scale_trans.inverted()
             )
             # For some reason this is necessary since otherwise the legend pdf is empty (don't ask why :D)
-            bbox.x0 -= 0.01
-            bbox.x1 += 0.01
+            bbox.x0 -= 0.1
+            bbox.x1 += 0.1
             legend_fig.savefig(
                 out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox
             )
