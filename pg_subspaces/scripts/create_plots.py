@@ -194,6 +194,9 @@ def create_plots(
             bbox = legend_plt.get_window_extent().transformed(
                 legend_fig.dpi_scale_trans.inverted()
             )
+            # For some reason this is necessary since otherwise the legend pdf is empty (don't ask why :D)
+            bbox.x0 -= 0.01
+            bbox.x1 += 0.01
             legend_fig.savefig(
                 out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox
             )
@@ -219,6 +222,7 @@ if __name__ == "__main__":
     parser.add_argument("--separate-legend", action="store_true")
     parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--fontsize", type=int, default=12)
+    parser.add_argument("--linewidth", type=float, default=1.5)
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
@@ -244,5 +248,7 @@ if __name__ == "__main__":
         args.separate_legend,
         args.num_same_color_plots,
         args.fontsize,
+        args.linewidth,
+        {},
         out,
     )

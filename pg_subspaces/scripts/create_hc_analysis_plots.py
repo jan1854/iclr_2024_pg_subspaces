@@ -316,7 +316,7 @@ if __name__ == "__main__":
                                     False,
                                     keys,
                                     0.3,
-                                    False,
+                                    True,
                                     plot_config.get("num_same_color_plots", 1),
                                     plot_config.get("marker"),
                                     plot_config.get("fontsize", 22),

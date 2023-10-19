@@ -191,13 +191,19 @@ def create_multiline_plots(
         fig.savefig(out.with_suffix(".pdf"))
         if legend is not None and separate_legend:
             legend_plt = ax.legend(
-                legend, frameon=False, ncol=1, bbox_to_anchor=(2.0, 2.0),
+                legend,
+                frameon=False,
+                ncol=1,
+                bbox_to_anchor=(2.0, 2.0),
             )
             legend_fig = legend_plt.figure
             legend_fig.canvas.draw()
             bbox = legend_plt.get_window_extent().transformed(
                 legend_fig.dpi_scale_trans.inverted()
             )
+            # For some reason this is necessary since otherwise the legend pdf is empty (don't ask why :D)
+            bbox.x0 -= 0.01
+            bbox.x1 += 0.01
             legend_fig.savefig(
                 out.parent / (out.name + "_legend.pdf"),
                 bbox_inches=bbox,

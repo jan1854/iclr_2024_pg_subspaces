@@ -144,7 +144,7 @@ if __name__ == "__main__":
                                 plot_config["key"],
                                 plot_config["smoothing_weight"],
                                 True,
-                                False,
+                                True,
                                 plot_config.get("num_same_color_plots", 1),
                                 plot_config.get("fontsize", 22),
                                 plot_config.get("linewidth", 1.5),
