@@ -9,4 +9,4 @@ ablation_network_size:
 ablation_sac_on_off_policy:
   ppo: PPO
   sac: SAC
-  on_policy_sac: "SAC (on-policy)"
+  sac_on_policy: "SAC (on-policy)"
