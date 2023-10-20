@@ -64,7 +64,9 @@ def create_plots(
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
         for xpos, annotation in annotations.items():
-            ax.axvline(x=xpos, color="gray", linestyle="--", label="_nolegend_")
+            ax.axvline(
+                x=xpos, color="gray", linestyle="--", label="_nolegend_", zorder=0
+            )
             plt.text(
                 xpos,
                 0.5,
@@ -75,7 +77,7 @@ def create_plots(
                 bbox=dict(
                     facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
                 ),
-                zorder=999,
+                zorder=1,
             )
         for i, log_path in enumerate(log_paths):
             if i % num_same_color_plots == 0:
