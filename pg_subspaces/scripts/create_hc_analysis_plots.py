@@ -127,6 +127,7 @@ PLOT_CONFIGS = {
         "ymax": 1.0,
         "smoothing_weight": 0.0,
         "fill_in_data": {100000: 1.0},
+        "annotations": {100000: "$t_1$"},
     },
     "subspace_overlap_0010000": {
         # "title": "Subspace overlap, $t_1 = 10^{4}$",
