@@ -14,7 +14,7 @@ algorithm:
   tau: 0.005
   gamma: 0.99
   train_freq: 1
-  gradient_steps: ${train_freq}
+  gradient_steps: ${.train_freq}
   action_noise: null
   replay_buffer_class: null
   replay_buffer_kwargs: null

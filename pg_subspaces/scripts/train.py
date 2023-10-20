@@ -129,7 +129,8 @@ def train(cfg: omegaconf.DictConfig) -> None:
         "algorithm": obj_config_to_type_and_kwargs(
             omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
         )
-    }
+    } | {k: v for k, v in cfg.algorithm.items() if k != "algorithm"}
+    algorithm_cfg = omegaconf.DictConfig(algorithm_cfg)
     checkpoints_path = Path("checkpoints")
     # If checkpoints exist, load the checkpoint else train an agent from scratch
     if checkpoints_path.exists():

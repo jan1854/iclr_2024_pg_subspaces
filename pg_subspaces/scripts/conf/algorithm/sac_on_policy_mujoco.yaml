@@ -13,9 +13,9 @@ algorithm:
   gamma: 0.99
   device: "auto"
   train_freq: 2048
-  buffer_size: ${train_freq}
+  buffer_size: ${.train_freq}
   batch_size: 256
-  gradient_steps: ${INTDIV:${MUL:10,${train_freq}},${batch_size}} # (10 * train_freq // batch_size)
+  gradient_steps: ${INTDIV:${MUL:${..epochs},${.train_freq}},${.batch_size}} # (10 * train_freq // batch_size)
   action_noise: null
   replay_buffer_class: null
   replay_buffer_kwargs: null
