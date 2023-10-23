@@ -70,14 +70,20 @@ def create_plots(
             plt.text(
                 xpos,
                 0.5,
-                "$t_1$",
+                " ",
+                bbox=dict(
+                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
+                ),
+                zorder=1,
+            )
+            plt.text(
+                xpos,
+                0.5,
+                annotation,
                 verticalalignment="center",
                 horizontalalignment="center",
                 color="gray",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
-                ),
-                zorder=1,
+                zorder=2,
             )
         for i, log_path in enumerate(log_paths):
             if i % num_same_color_plots == 0:

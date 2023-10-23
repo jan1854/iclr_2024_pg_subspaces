@@ -70,17 +70,26 @@ def create_multiline_plots(
             ax.axvline(
                 x=xpos, color="gray", linestyle="--", label="_nolegend_", zorder=0
             )
+            # We want the text to be in front of the graphs but the white bounding box should just be in front of the
+            # vertical line (but behind the graphs), this is achieved by the following hack that first adds an empty
+            # text box with white bounding box and then adds the text (without bounding box).
             plt.text(
                 xpos,
                 0.5,
-                "$t_1$",
+                " ",
+                bbox=dict(
+                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
+                ),
+                zorder=1,
+            )
+            plt.text(
+                xpos,
+                0.5,
+                annotation,
                 verticalalignment="center",
                 horizontalalignment="center",
                 color="gray",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.0"
-                ),
-                zorder=1,
+                zorder=2,
             )
 
         if len(run_dirs) > 0:
@@ -118,6 +127,7 @@ def create_multiline_plots(
                     markersize=2,
                     color=color,
                     linestyle=linestyles[i % num_same_color_plots],
+                    zorder=10 + i,
                 )
                 if value_std is not None:
                     ax.fill_between(
@@ -127,6 +137,7 @@ def create_multiline_plots(
                         alpha=0.2,
                         label="_nolegend_",
                         color=color,
+                        zorder=10 + i,
                     )
         else:
             if (log_path / "tensorboard").exists():
