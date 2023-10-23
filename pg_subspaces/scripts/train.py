@@ -150,10 +150,11 @@ def train(cfg: omegaconf.DictConfig, root_path=".") -> None:
         algorithm.num_timesteps = checkpoint_to_load
     else:
         algorithm = HydraAgentSpec(algorithm_cfg, None, None, None).create_agent(env)
-        checkpoints_path.mkdir()
-        # Save the initial agent
-        path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
-        algorithm.save(path)
+        if cfg.checkpoint_interval is not None:
+            checkpoints_path.mkdir()
+            # Save the initial agent
+            path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
+            algorithm.save(path)
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         "tensorboard"
     )
