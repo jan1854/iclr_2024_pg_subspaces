@@ -1,6 +1,5 @@
 import copy
 import logging
-import os
 from pathlib import Path
 
 import hydra
@@ -24,7 +23,7 @@ def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> flo
         )
     working_directory.mkdir()
     try:
-        train(cfg, working_directory)
+        train(cfg, root_path=str(working_directory))
     except Exception as e:
         logger.warning(f"Run {working_directory} failed with exception: {e}")
         return np.inf
@@ -44,11 +43,10 @@ def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> flo
 @hydra.main(version_base=None, config_path="conf", config_name="tune")
 def tune_hyperparams(cfg: omegaconf.DictConfig):
     num_seeds = 5
-    seeds = range(num_seeds)
     results = Parallel(n_jobs=num_seeds, backend="sequential")(
         # Need to pass the working directory here since otherwise loky messes up the paths for some reason
         delayed(worker)(cfg, seed, Path.cwd().absolute() / str(seed))
-        for seed in seeds
+        for seed in range(num_seeds)
     )
 
     return np.mean(results)

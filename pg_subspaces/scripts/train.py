@@ -105,7 +105,11 @@ def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
-def train(cfg: omegaconf.DictConfig, root_path=".") -> None:
+def main(cfg: omegaconf.DictConfig) -> None:
+    train(cfg)
+
+
+def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
     root_path = Path(root_path)
     result_commit = subprocess.run(
         ["git", "-C", f"{Path(__file__).parent}", "rev-parse", "HEAD"],
@@ -156,7 +160,7 @@ def train(cfg: omegaconf.DictConfig, root_path=".") -> None:
             path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
             algorithm.save(path)
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
-        "tensorboard"
+        str(root_path / "tensorboard")
     )
     base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
     algorithm.set_logger(
@@ -209,4 +213,4 @@ def train(cfg: omegaconf.DictConfig, root_path=".") -> None:
 
 
 if __name__ == "__main__":
-    train()
+    main()
