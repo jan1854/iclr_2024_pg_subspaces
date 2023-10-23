@@ -105,7 +105,8 @@ def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
-def train(cfg: omegaconf.DictConfig) -> None:
+def train(cfg: omegaconf.DictConfig, root_path=".") -> None:
+    root_path = Path(root_path)
     result_commit = subprocess.run(
         ["git", "-C", f"{Path(__file__).parent}", "rev-parse", "HEAD"],
         stdout=subprocess.PIPE,
@@ -114,7 +115,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
     )
 
-    logger.info(f"Log directory: {Path.cwd()}")
+    logger.info(f"Log directory: {root_path.absolute()}")
 
     env = make_vec_env(cfg)
 
@@ -131,7 +132,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         )
     } | {k: v for k, v in cfg.algorithm.items() if k != "algorithm"}
     algorithm_cfg = omegaconf.DictConfig(algorithm_cfg)
-    checkpoints_path = Path("checkpoints")
+    checkpoints_path = root_path / "checkpoints"
     # If checkpoints exist, load the checkpoint else train an agent from scratch
     if checkpoints_path.exists():
         checkpoints = [
@@ -159,7 +160,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
     base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
     algorithm.set_logger(
         SB3CustomLogger(
-            "tensorboard",
+            str(root_path / "tensorboard"),
             [tb_output_format],
             base_env_timestep_factor,
         )
@@ -203,7 +204,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         )
         time.sleep(1)  # To give the tensorboard loggers time to finish writing
     finally:
-        (Path.cwd() / "done").touch()
+        (root_path / "done").touch()
 
 
 if __name__ == "__main__":

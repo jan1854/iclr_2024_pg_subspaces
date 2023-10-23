@@ -22,20 +22,20 @@ def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> flo
         cfg.algorithm.algorithm.policy_kwargs.net_arch = omegaconf.ListConfig(
             [cfg.algorithm.algorithm.policy_kwargs.net_arch]
         )
-    orig_dir = Path.cwd()
     working_directory.mkdir()
     try:
-        os.chdir(working_directory)
-        train(cfg)
+        train(cfg, working_directory)
     except Exception as e:
         logger.warning(f"Run {working_directory} failed with exception: {e}")
         return np.inf
-    finally:
-        os.chdir(orig_dir)
     _, event_accumulator = create_event_accumulators(
         [working_directory / "tensorboard"]
     )[0]
     scalar = read_scalar(event_accumulator, "eval/mean_reward")
+    if len(scalar) == 1:
+        logger.warning(
+            f"Logs at {working_directory / 'tensorboard'} contain only a single value."
+        )
     return -sum(
         v.value for s, v in scalar.items() if 0 < s < cfg.algorithm.training.steps
     )
