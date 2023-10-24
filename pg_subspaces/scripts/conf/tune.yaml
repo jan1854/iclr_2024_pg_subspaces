@@ -14,6 +14,8 @@ eval_interval: 10000
 checkpoint_interval: null
 additional_checkpoints: []
 save_replay_buffer: false
+num_seeds: 3
+num_configurations: 50
 
 log_dir: ${oc.env:PG_SUBSPACES_TUNING_LOG_DIR,logs}
 run_log_dir: ${log_dir}/tuning/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
@@ -31,6 +33,6 @@ hydra:
     n_jobs: 15
   sweeper:
     ax_config:
-      max_trials: 100
+      max_trials: ${num_configurations}
       params:
         ${tuning}

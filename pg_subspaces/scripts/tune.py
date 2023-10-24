@@ -42,11 +42,10 @@ def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> flo
 
 @hydra.main(version_base=None, config_path="conf", config_name="tune")
 def tune_hyperparams(cfg: omegaconf.DictConfig):
-    num_seeds = 5
-    results = Parallel(n_jobs=num_seeds, backend="sequential")(
+    results = Parallel(n_jobs=cfg.num_seeds, backend="sequential")(
         # Need to pass the working directory here since otherwise loky messes up the paths for some reason
         delayed(worker)(cfg, seed, Path.cwd().absolute() / str(seed))
-        for seed in range(num_seeds)
+        for seed in range(cfg.num_seeds)
     )
 
     return np.mean(results)
