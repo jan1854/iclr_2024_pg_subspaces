@@ -17,6 +17,7 @@ dependencies = [
     "dmc2gym @ git+https://github.com/jan1854/dmc2gym",
     "filelock",
     "gym[mujoco]==0.21.0",
+    "joblib",
     "hydra-core",
     "numpy==1.24.1",
     "omegaconf",
