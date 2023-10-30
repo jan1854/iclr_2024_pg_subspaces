@@ -2,6 +2,7 @@ import logging
 import random
 import subprocess
 import time
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -32,11 +33,20 @@ from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraA
 
 logger = logging.getLogger(__name__)
 
+
+def env_with_prefix(key: str, prefix: str, default: str) -> str:
+    value = os.getenv(key)
+    if value:
+        return prefix + value
+    return default
+
+
 omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
 omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
 omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
 omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
 omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
 
 
 def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
