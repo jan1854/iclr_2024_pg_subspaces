@@ -18,7 +18,7 @@ dependencies = [
     "filelock",
     "gym[mujoco]==0.21.0",
     "hydra-core",
-    "numpy",
+    "numpy==1.24.1",
     "omegaconf",
     "Pillow",
     "scipy",
