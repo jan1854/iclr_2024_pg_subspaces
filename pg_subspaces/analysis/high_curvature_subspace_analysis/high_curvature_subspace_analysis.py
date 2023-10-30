@@ -25,8 +25,15 @@ from pg_subspaces.analysis.hessian.hessian_eigen_cached_calculator import (
 )
 from pg_subspaces.metrics.tensorboard_logs import TensorboardLogs
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
-from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer, concatenate_buffer_samples
-from pg_subspaces.sb3_utils.common.parameters import flatten_parameters, project_orthonormal, combine_actor_critic_parameter_vectors
+from pg_subspaces.sb3_utils.common.buffer import (
+    fill_rollout_buffer,
+    concatenate_buffer_samples,
+)
+from pg_subspaces.sb3_utils.common.parameters import (
+    flatten_parameters,
+    project_orthonormal,
+    combine_actor_critic_parameter_vectors,
+)
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 from pg_subspaces.sb3_utils.common.loss import actor_critic_gradient
 
@@ -440,22 +447,21 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         self,
         agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
     ) -> Tuple[ReplayBufferSamples, List[ReplayBufferSamples]]:
-        # If the replay buffer is empty (step 0), collect some random data
-        if not agent.replay_buffer.full and agent.replay_buffer.pos == 0:
-            env = DummyVecEnv([lambda: self.env_factory()])
-            agent._last_obs = env.reset()
-            # collect_rollouts requires a callback for some reason
-            callback = CallbackList([])
-            callback.init_callback(agent)
-            agent._total_timesteps = 50_000
-            agent.collect_rollouts(
-                env,
-                callback,
-                TrainFreq(50_000, TrainFrequencyUnit.STEP),
-                agent.replay_buffer,
-                agent.action_noise,
-                50_000,
+        # If the replay buffer is too small, assume that the agent is an "on-policy" variant of the off-policy algorithm
+        # and replace the replay buffer by one of size num_samples_true_loss samples and fill it with on-policy data.
+        if agent.replay_buffer.buffer_size < 50000:
+            agent.replay_buffer = stable_baselines3.common.buffers.ReplayBuffer(
+                self.num_samples_true_loss,
+                agent.observation_space,
+                agent.action_space,
+                agent.device,
             )
+            self._collect_on_policy_data_off_policy_algorithm(
+                agent, self.num_samples_true_loss
+            )
+        # If the replay buffer is empty (step 0), collect some random data
+        elif not agent.replay_buffer.full and agent.replay_buffer.pos == 0:
+            self._collect_on_policy_data_off_policy_algorithm(agent, 50_000)
         max_idx = (
             agent.replay_buffer.buffer_size
             if agent.replay_buffer.full
@@ -467,3 +473,23 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             agent.replay_buffer.sample(agent.batch_size)
             for _ in range(2048 // agent.batch_size)
         ]
+
+    def _collect_on_policy_data_off_policy_algorithm(
+        self,
+        agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
+        num_samples: int,
+    ) -> None:
+        env = DummyVecEnv([lambda: self.env_factory()])
+        agent._last_obs = env.reset()
+        # collect_rollouts requires a callback for some reason
+        callback = CallbackList([])
+        callback.init_callback(agent)
+        agent._total_timesteps = num_samples
+        agent.collect_rollouts(
+            env,
+            callback,
+            TrainFreq(num_samples, TrainFrequencyUnit.STEP),
+            agent.replay_buffer,
+            agent.action_noise,
+            num_samples,
+        )
