@@ -28,3 +28,7 @@ algorithm.algorithm.policy_kwargs.net_arch:
   type: choice
   values: [64, 128, 256]    # The sweeper cannot handle list-type parameters
   value_type: int
+algorithm.epochs:
+  type: choice
+  values: [5, 10, 20]
+  value_type: int
