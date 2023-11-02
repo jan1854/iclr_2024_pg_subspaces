@@ -209,7 +209,7 @@ def create_plots(
             bbox.x0 -= 0.1
             bbox.x1 += 0.1
             legend_fig.savefig(
-                out.parent / (out.name + "_legend.pdf"), bbox_inches=bbox
+                out.parent / (out.stem + "_legend.pdf"), bbox_inches=bbox
             )
     finally:
         plt.close(fig)
