@@ -429,8 +429,9 @@ if __name__ == "__main__":
                     env_file_name = "gym_" + env_file_name
                 log_paths = [
                     log_dir / "training" / env_name / run_config["log_dirs"][algo_name]
-                    for algo_name in experiment_config.keys()
                     if algo_name in run_config["log_dirs"]
+                    else None
+                    for algo_name in experiment_config.keys()
                 ]
                 analysis_run_ids = [
                     a_id
