@@ -91,7 +91,7 @@ def create_multiline_plots(
                 verticalalignment="center",
                 horizontalalignment="center",
                 color="gray",
-                zorder=2,
+                zorder=100,
             )
 
         if len(run_dirs) > 0:

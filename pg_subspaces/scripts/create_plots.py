@@ -85,7 +85,7 @@ def create_plots(
                 verticalalignment="center",
                 horizontalalignment="center",
                 color="gray",
-                zorder=2,
+                zorder=100,
             )
         for i, log_path in enumerate(log_paths):
             if i % num_same_color_plots == 0:
