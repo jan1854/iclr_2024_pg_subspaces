@@ -38,7 +38,7 @@ def create_plots(
     xlimits: Tuple[float, float],
     ylimits: Tuple[float, float],
     xaxis_log: bool,
-    keys: List[str],
+    keys: Sequence[str],
     smoothing_weight: float,
     only_complete_steps: bool,
     separate_legend: bool,
