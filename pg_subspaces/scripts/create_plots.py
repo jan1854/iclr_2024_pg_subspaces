@@ -93,7 +93,7 @@ def create_plots(
             if log_path is not None:
                 run_dirs = [
                     d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
-                ]
+                ][:2]
                 if len(run_dirs) > 0:
                     tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
                     event_accumulators = [
@@ -115,7 +115,7 @@ def create_plots(
                             f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
                         )
                         # Empty plot to advance the color cycle (so that future plots have the correct color)
-                        ax.plot([], [])
+                        ax.plot([], [], color=color)
                         continue
                     key = keys[key_indices[0].item()]
                     (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
