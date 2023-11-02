@@ -445,7 +445,9 @@ if __name__ == "__main__":
                     if algo_name in run_config["log_dirs"]
                 ]
                 analysis_run_ids = [
-                    a_id for a_id in run_config["analysis_run_ids"] if a_id != "default"
+                    a_id
+                    for a_id in run_config.get("analysis_run_ids", {})
+                    if a_id != "default"
                 ] + ["default"]
                 for out_filename, plot_config in PLOT_CONFIGS_MULTIPLE_RUNS.items():
                     for loss_type, loss_type_short in [
