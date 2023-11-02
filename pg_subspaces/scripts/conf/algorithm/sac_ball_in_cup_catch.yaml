@@ -1,0 +1,37 @@
+# TODO: Most parameters should be in a default SAC config
+name: "sac"
+
+defaults:
+  - env_wrappers: []
+
+algorithm:
+  _target_: stable_baselines3.SAC
+  policy: "MlpPolicy"
+  learning_rate: 6e-3
+  buffer_size: 1000000
+  learning_starts: 10000
+  batch_size: 256
+  tau: 0.02
+  gamma: 0.96
+  train_freq: 64
+  gradient_steps: ${.train_freq}
+  action_noise: null
+  replay_buffer_class: null
+  replay_buffer_kwargs: null
+  optimize_memory_usage: False
+  ent_coef: "auto"
+  target_update_interval: 1
+  target_entropy: "auto"
+  use_sde: false
+  sde_sample_freq: -1
+  use_sde_at_warmup: false
+  stats_window_size: 100
+  policy_kwargs:
+    net_arch: [128, 128]
+  verbose: 0
+  device: "auto"
+  tensorboard_log: tensorboard
+
+training:
+  steps: 1000000
+  n_envs: 1
