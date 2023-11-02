@@ -197,22 +197,6 @@ PLOT_CONFIGS_MULTIPLE_RUNS = {
         "ymax": 1.0,
         "smoothing_weight": 0.0,
     },
-    "subspace_overlap_010evs_checkpoint_0010000": {
-        "out_dir": "subspace_overlap",
-        "key": "overlaps_top100_checkpoint0010000",
-        "ylabel": "Subspace overlap",
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-    },
-    "subspace_overlap_100evs_checkpoint_0010000": {
-        "out_dir": "subspace_overlap",
-        "key": "overlaps_top100_checkpoint0010000",
-        "ylabel": "Subspace overlap",
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-    },
     "subspace_overlap_010evs_checkpoint_0100000": {
         "out_dir": "subspace_overlap",
         "key": "overlaps_top100_checkpoint0100000",
@@ -220,6 +204,8 @@ PLOT_CONFIGS_MULTIPLE_RUNS = {
         "ymin": 0.0,
         "ymax": 1.0,
         "smoothing_weight": 0.0,
+        "fill_in_data": {100000: 1.0},
+        "annotations": {100000: "$t_1$"},
     },
     "subspace_overlap_100evs_checkpoint_0100000": {
         "out_dir": "subspace_overlap",
@@ -228,6 +214,8 @@ PLOT_CONFIGS_MULTIPLE_RUNS = {
         "ymin": 0.0,
         "ymax": 1.0,
         "smoothing_weight": 0.0,
+        "fill_in_data": {100000: 1.0},
+        "annotations": {100000: "$t_1$"},
     },
 }
 
