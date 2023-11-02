@@ -77,6 +77,8 @@ def create_multiline_plots(
                 xpos,
                 0.5,
                 " ",
+                verticalalignment="center",
+                horizontalalignment="center",
                 bbox=dict(
                     facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
                 ),
