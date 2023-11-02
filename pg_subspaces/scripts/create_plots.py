@@ -1,7 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
