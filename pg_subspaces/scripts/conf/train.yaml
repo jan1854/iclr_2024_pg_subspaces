@@ -13,7 +13,6 @@ additional_checkpoints: [10_000]
 save_replay_buffer: false
 
 log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
-#run_log_dir: ${log_dir}/training/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 run_log_dir: ${log_dir}/training/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}${env_with_prefix:CONDOR_JOB_ID,"_",""}
 
 hydra:
