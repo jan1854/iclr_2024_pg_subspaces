@@ -1,0 +1,24 @@
+defaults:
+  - _self_
+  - algorithm: min_offline_sac_default
+
+logs_dataset: ??
+seed: null
+show_progress: true
+num_eval_episodes: 10
+eval_interval: 10000
+checkpoint_interval: 100_000
+additional_checkpoints: [10_000]
+
+log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
+run_log_dir: ${log_dir}/training/offline_rl/${now:%Y-%m-%d}/${now:%H-%M-%S}${env_with_prefix:CONDOR_JOB_ID,"_",""}
+
+hydra:
+  run:
+    dir: ${run_log_dir}
+  sweep:
+    dir: ${run_log_dir}
+  job:
+    chdir: true
+  verbose:
+    - __main__

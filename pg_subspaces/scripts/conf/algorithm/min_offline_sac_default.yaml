@@ -1,0 +1,22 @@
+# TODO: Most parameters should be in a default SAC config
+name: "min_offline_sac"
+
+algorithm:
+  _target_: pg_subspaces.offline_rl.minimalistic_offline_sac.MinimalisticOfflineSAC
+  policy: "MlpPolicy"
+  learning_rate: 3e-4
+  batch_size: 256
+  tau: 0.005
+  gamma: 0.99
+  action_noise: null
+  ent_coef: "auto"
+  target_update_interval: 1
+  target_entropy: "auto"
+  policy_kwargs:
+    net_arch: [256, 256]
+  verbose: 0
+  device: "auto"
+  tensorboard_log: tensorboard
+
+training:
+  steps: 1000000
