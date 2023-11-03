@@ -40,6 +40,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
+        policy_rl_objective_weight: float = 2.5,
         action_noise: Optional[ActionNoise] = None,
         ent_coef: Union[str, float] = "auto",
         target_update_interval: int = 1,
@@ -67,6 +68,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
             seed,
             device,
         )
+        self.policy_rl_objective_weight = policy_rl_objective_weight
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.target_entropy = target_entropy
@@ -201,7 +203,15 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         # Min over all critic networks
         q_values_pi = torch.cat(self.critic(batch.observations, actions_pi), dim=1)
         min_qf_pi, _ = torch.min(q_values_pi, dim=1, keepdim=True)
-        actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+        policy_mean, policy_log_std, _ = self.actor.get_action_dist_params(
+            batch.observations
+        )
+        self.actor.action_dist.proba_distribution(policy_mean, policy_log_std)
+        bc_log_prob = self.actor.action_dist.log_prob(batch.actions)
+        actor_loss = (
+            self.policy_rl_objective_weight * (ent_coef * log_prob - min_qf_pi)
+            - bc_log_prob
+        ).mean()
         actor_losses.append(actor_loss.item())
 
         # Optimize the actor
