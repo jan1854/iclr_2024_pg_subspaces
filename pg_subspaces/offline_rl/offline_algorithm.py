@@ -1,4 +1,3 @@
-import collections
 import sys
 import time
 from collections import deque
@@ -142,9 +141,9 @@ class OfflineAlgorithm:
             for batch in self.sample_epoch_from_buffer():
                 if self.num_timesteps >= total_timesteps:
                     break
-                callback.on_step()
                 self.train(batch)
                 self.num_timesteps += 1
+                callback.on_step()
                 if log_interval is not None and self.num_timesteps % log_interval == 0:
                     self._dump_logs()
 
@@ -346,7 +345,7 @@ class OfflineAlgorithm:
 
     def set_logger(self, logger: Logger) -> None:
         """
-        Setter for for logger object.
+        Setter for the logger object.
 
         .. warning::
 
