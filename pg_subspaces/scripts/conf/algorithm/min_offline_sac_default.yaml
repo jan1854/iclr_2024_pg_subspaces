@@ -8,7 +8,7 @@ algorithm:
   batch_size: 256
   tau: 0.005
   gamma: 0.99
-  policy_rl_objective_weight: 2.5
+  actor_rl_objective_weight: 2.5
   action_noise: null
   ent_coef: "auto"
   target_update_interval: 1

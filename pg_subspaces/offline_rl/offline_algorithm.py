@@ -1,4 +1,5 @@
 import collections
+import sys
 import time
 from collections import deque
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
@@ -27,6 +28,7 @@ from stable_baselines3.common.utils import (
     set_random_seed,
     get_device,
     update_learning_rate,
+    safe_mean,
 )
 from stable_baselines3.sac.policies import SACPolicy
 
@@ -121,7 +123,7 @@ class OfflineAlgorithm:
         self,
         total_timesteps: int,
         callback: MaybeCallback = None,
-        log_interval: int = 4,
+        log_interval: int = 5000,
         tb_log_name: str = "run",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
@@ -143,6 +145,8 @@ class OfflineAlgorithm:
                 callback.on_step()
                 self.train(batch)
                 self.num_timesteps += 1
+                if log_interval is not None and self.num_timesteps % log_interval == 0:
+                    self._dump_logs()
 
         callback.on_training_end()
 
@@ -299,6 +303,38 @@ class OfflineAlgorithm:
 
         callback.init_callback(self)
         return callback
+
+    def _dump_logs(self) -> None:
+        """
+        Write log.
+        """
+        time_elapsed = max(
+            (time.time_ns() - self.start_time) / 1e9, sys.float_info.epsilon
+        )
+        fps = int((self.num_timesteps - self._num_timesteps_at_start) / time_elapsed)
+        # self.logger.record("time/episodes", self._episode_num, exclude="tensorboard")
+        if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
+            self.logger.record(
+                "rollout/ep_rew_mean",
+                safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]),
+            )
+            self.logger.record(
+                "rollout/ep_len_mean",
+                safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]),
+            )
+        self.logger.record("time/fps", fps)
+        self.logger.record(
+            "time/time_elapsed", int(time_elapsed), exclude="tensorboard"
+        )
+        self.logger.record(
+            "time/total_timesteps", self.num_timesteps, exclude="tensorboard"
+        )
+        if len(self.ep_success_buffer) > 0:
+            self.logger.record(
+                "rollout/success_rate", safe_mean(self.ep_success_buffer)
+            )
+        # Pass the number of timesteps for tensorboard
+        self.logger.dump(step=self.num_timesteps)
 
     def sample_epoch_from_buffer(self):
         indices = np.random.permutation(np.arange(self.replay_buffer.buffer_size))

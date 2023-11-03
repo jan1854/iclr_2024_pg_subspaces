@@ -40,7 +40,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
-        policy_rl_objective_weight: float = 2.5,
+        actor_rl_objective_weight: float = 2.5,
         action_noise: Optional[ActionNoise] = None,
         ent_coef: Union[str, float] = "auto",
         target_update_interval: int = 1,
@@ -68,7 +68,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
             seed,
             device,
         )
-        self.policy_rl_objective_weight = policy_rl_objective_weight
+        self.actor_rl_objective_weight = actor_rl_objective_weight
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.target_entropy = target_entropy
@@ -208,10 +208,13 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         )
         self.actor.action_dist.proba_distribution(policy_mean, policy_log_std)
         bc_log_prob = self.actor.action_dist.log_prob(batch.actions)
-        actor_loss = (
-            self.policy_rl_objective_weight * (ent_coef * log_prob - min_qf_pi)
-            - bc_log_prob
-        ).mean()
+        policy_entropy_loss = (ent_coef * log_prob).mean()
+        rl_objective_weight_scaled = (
+            self.actor_rl_objective_weight / min_qf_pi.detach().abs().mean()
+        )
+        policy_q_value_loss = -(rl_objective_weight_scaled * min_qf_pi).mean()
+        policy_bc_loss = -bc_log_prob.mean()
+        actor_loss = policy_entropy_loss + policy_q_value_loss + policy_bc_loss
         actor_losses.append(actor_loss.item())
 
         # Optimize the actor
@@ -235,6 +238,9 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         self.logger.record("train/critic_loss", np.mean(critic_losses))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
+        self.logger.record("train/actor_loss_entropy", policy_entropy_loss.item())
+        self.logger.record("train/actor_loss_q_value", policy_q_value_loss.item())
+        self.logger.record("train/actor_loss_behavioral_cloning", policy_bc_loss.item())
 
     def _excluded_save_params(self) -> List[str]:
         return super()._excluded_save_params() + ["actor", "critic", "critic_target"]
@@ -252,7 +258,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         self,
         total_timesteps: int,
         callback: MaybeCallback = None,
-        log_interval: int = 4,
+        log_interval: int = 5000,
         tb_log_name: str = "MinOfflineSAC",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
