@@ -27,7 +27,6 @@ from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
-from pg_subspaces.sb3_utils.common.agent_spec import HydraAgentSpec
 from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     get_replay_buffer_checkpoints,
     load_replay_buffer,
