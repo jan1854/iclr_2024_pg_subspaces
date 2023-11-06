@@ -9,7 +9,6 @@ from pg_subspaces.sb3_utils.hessian.calculate_hessian import calculate_hessian
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import HessianEigenLanczos
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_power_method import HessianEigenPowerMethod
 from pg_subspaces.sb3_utils.ppo.ppo_loss import ppo_loss
 
 
