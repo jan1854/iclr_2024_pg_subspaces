@@ -40,13 +40,6 @@ def load_replay_buffer(
             data["dones"],
             data["next_observations"],
         )
-        replay_buffer_to_fill.full = (
-            replay_buffer_to_fill.pos + len(data["observations"])
-            >= replay_buffer_to_fill.buffer_size
-        )
-        replay_buffer_to_fill.pos = (
-            replay_buffer_to_fill.pos + len(data["observations"])
-        ) % replay_buffer_to_fill.buffer_size
         assert different_buffer or replay_buffer_to_fill.pos == data["pos"]
         assert different_buffer or replay_buffer_to_fill.full == data["full"]
 
