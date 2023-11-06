@@ -81,9 +81,6 @@ def make_single_env(
     env = gym.make(env_cfg, **kwargs)
     if action_transformation_cfg is not None:
         env = hydra.utils.instantiate(action_transformation_cfg, env=env)
-    # To get the training code working for environments not wrapped with a ControllerBaseWrapper.
-    if not hasattr(env, "base_env_timestep_factor"):
-        env.base_env_timestep_factor = 1
     return env
 
 
@@ -172,12 +169,10 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         str(root_path / "tensorboard")
     )
-    base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
     algorithm.set_logger(
         SB3CustomLogger(
             str(root_path / "tensorboard"),
             [tb_output_format],
-            base_env_timestep_factor,
         )
     )
     eval_env = make_vec_env(cfg)
@@ -208,13 +203,12 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         algorithm, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
     ):
         callbacks.append(AdditionalTrainingMetricsCallback())
-    training_steps = cfg.algorithm.training.steps // base_env_timestep_factor
     try:
         # Hack to get the evaluation of the initial policy in addition
         eval_callback.init_callback(algorithm)
         eval_callback._on_step()
         algorithm.learn(
-            total_timesteps=training_steps - algorithm.num_timesteps,
+            total_timesteps=cfg.algorithm.training.steps - algorithm.num_timesteps,
             callback=callbacks,
             progress_bar=cfg.show_progress,
             reset_num_timesteps=False,

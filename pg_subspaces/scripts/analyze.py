@@ -49,13 +49,7 @@ def analysis_worker(
         agent_spec=agent_spec,
         run_dir=run_dir,
     )
-    if hasattr(env, "base_env_timestep_factor"):
-        base_env_timestep_factor = env.base_env_timestep_factor
-    else:
-        base_env_timestep_factor = 1
-    return analysis.do_analysis(
-        agent_step * base_env_timestep_factor, overwrite_results, show_progress
-    )
+    return analysis.do_analysis(agent_step, overwrite_results, show_progress)
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
@@ -104,14 +98,6 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
 
-    # Determine the base_env_timestep_factor to load the correct checkpoints
-    train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
-    env = gym.make(train_cfg.env, **train_cfg.env_args)
-    if hasattr(env, "base_env_timestep_factor"):
-        base_env_timestep_factor = env.base_env_timestep_factor
-    else:
-        base_env_timestep_factor = 1
-
     jobs = []
     summary_writers = {}
     for log_dir in run_logs:
@@ -125,9 +111,7 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         checkpoints_to_analyze = []
         if cfg.checkpoints_to_analyze is not None:
             for checkpoint in cfg.checkpoints_to_analyze:
-                checkpoint_no_action_repeat = (
-                    int(checkpoint) // base_env_timestep_factor
-                )
+                checkpoint_no_action_repeat = int(checkpoint)
                 if checkpoint_no_action_repeat in checkpoint_steps:
                     checkpoints_to_analyze.append(
                         (log_dir, checkpoint_no_action_repeat)
@@ -137,25 +121,24 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
                         f"Did not find checkpoint {checkpoint} in {checkpoints_dir}, skipping."
                     )
         else:
-            for agent_step in checkpoint_steps:
-                env_step = agent_step * base_env_timestep_factor
+            for step in checkpoint_steps:
 
                 if (
-                    env_step >= cfg.first_checkpoint
-                    and (cfg.last_checkpoint is None or env_step <= cfg.last_checkpoint)
-                    and env_step - cfg.first_checkpoint
+                    step >= cfg.first_checkpoint
+                    and (cfg.last_checkpoint is None or step <= cfg.last_checkpoint)
+                    and step - cfg.first_checkpoint
                     >= len(checkpoints_to_analyze) * cfg.min_interval
                 ):
-                    checkpoints_to_analyze.append((log_dir, agent_step))
+                    checkpoints_to_analyze.append((log_dir, step))
         jobs.extend(checkpoints_to_analyze)
     jobs.sort(key=lambda j: (j[1], j[0]))
 
     if cfg.num_workers == 1:
-        for log_dir, agent_step in tqdm(jobs, desc="Analyzing logs"):
+        for log_dir, step in tqdm(jobs, desc="Analyzing logs"):
             logs = analysis_worker(
                 cfg.analysis,
                 log_dir,
-                agent_step,
+                step,
                 cfg.device,
                 cfg.overwrite_results,
                 show_progress=True,
@@ -168,19 +151,19 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         )
         try:
             results = []
-            for log_dir, agent_step in jobs:
+            for log_dir, step in jobs:
                 results.append(
                     pool.submit(
                         analysis_worker,
                         cfg.analysis,
                         log_dir,
-                        agent_step,
+                        step,
                         cfg.device,
                         cfg.overwrite_results,
                         show_progress=False,
                     )
                 )
-            for result, (log_dir, agent_step) in tqdm(
+            for result, (log_dir, step) in tqdm(
                 zip(results, jobs),
                 total=len(jobs),
                 desc="Analyzing logs",

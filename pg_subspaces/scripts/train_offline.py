@@ -82,9 +82,7 @@ def make_single_env(
     env = gym.make(env_cfg, **kwargs)
     if action_transformation_cfg is not None:
         env = hydra.utils.instantiate(action_transformation_cfg, env=env)
-    # To get the training code working for environments not wrapped with a ControllerBaseWrapper.
-    if not hasattr(env, "base_env_timestep_factor"):
-        env.base_env_timestep_factor = 1
+
     return env
 
 
@@ -208,7 +206,6 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         SB3CustomLogger(
             str(root_path / "tensorboard"),
             [tb_output_format],
-            1,
         )
     )
     eval_callback = stable_baselines3.common.callbacks.EvalCallback(
