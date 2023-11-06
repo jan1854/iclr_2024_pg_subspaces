@@ -232,7 +232,11 @@ def test_combine_actor_critic_parameter_vectors():
 def test_replay_buffer_checkpointing():
     env = gym.make("Pendulum-v1")
     algo = stable_baselines3.SAC(
-        "MlpPolicy", env, buffer_size=20, policy_kwargs={"net_arch": [32, 32]}
+        "MlpPolicy",
+        env,
+        buffer_size=20,
+        policy_kwargs={"net_arch": [32, 32]},
+        device="cpu",
     )
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
