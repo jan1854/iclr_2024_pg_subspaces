@@ -1,19 +1,19 @@
 defaults:
   - _self_
-  - algorithm: ppo_default
+  - algorithm: min_offline_sac_default
 
-env: Pendulum-v1
-env_args: {}
+logs_dataset: ??
 seed: null
 show_progress: true
 num_eval_episodes: 10
 eval_interval: 10000
 checkpoint_interval: 100_000
 additional_checkpoints: [10_000]
-save_replay_buffer: false
+normalize_states: true
+state_normalization_eps: 1e-3
 
 log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
-run_log_dir: ${log_dir}/training/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}${env_with_prefix:CONDOR_JOB_ID,"_",""}
+run_log_dir: ${log_dir}/training/offline_rl/${now:%Y-%m-%d}/${now:%H-%M-%S}${env_with_prefix:CONDOR_JOB_ID,"_",""}
 
 hydra:
   run:

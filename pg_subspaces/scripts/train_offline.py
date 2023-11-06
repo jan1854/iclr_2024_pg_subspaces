@@ -4,7 +4,7 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import gym
 import hydra
@@ -18,10 +18,8 @@ import stable_baselines3.common.on_policy_algorithm
 import stable_baselines3.common.vec_env
 import stable_baselines3.common.off_policy_algorithm
 import torch
+from stable_baselines3.common.buffers import ReplayBuffer
 
-from pg_subspaces.callbacks.additional_training_metrics_callback import (
-    AdditionalTrainingMetricsCallback,
-)
 from pg_subspaces.callbacks.custom_checkpoint_callback import (
     CustomCheckpointCallback,
 )
@@ -29,7 +27,10 @@ from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
-from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraAgentSpec
+from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
+    get_replay_buffer_checkpoints,
+    load_replay_buffer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,12 +115,29 @@ def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.
     return env
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="train")
+def load_dataset(
+    log_path_dataset: Path,
+    observation_space: gym.spaces.Space,
+    action_space: gym.spaces.Space,
+    device: Union[str, torch.device],
+) -> ReplayBuffer:
+    name_prefix = "sac"
+    checkpoint_dir = log_path_dataset / "checkpoints"
+    rb_checkpoints = get_replay_buffer_checkpoints(name_prefix, None, checkpoint_dir)
+    buffer_size = rb_checkpoints[-1][0]
+    replay_buffer = ReplayBuffer(buffer_size, observation_space, action_space, device)
+    load_replay_buffer(
+        checkpoint_dir, name_prefix, replay_buffer, None, different_buffer=True
+    )
+    return replay_buffer
+
+
+@hydra.main(version_base=None, config_path="conf", config_name="train_offline")
 def main(cfg: omegaconf.DictConfig) -> None:
-    train(cfg)
+    train_offline(cfg)
 
 
-def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
+def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
     root_path = Path(root_path)
     result_commit = subprocess.run(
         ["git", "-C", f"{Path(__file__).parent}", "rev-parse", "HEAD"],
@@ -131,14 +149,17 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
     logger.info(f"Log directory: {root_path.absolute()}")
 
-    env = make_vec_env(cfg)
+    dataset_logs_path = Path(cfg.logs_dataset)
+    dataset_cfg_path = dataset_logs_path / ".hydra" / "config.yaml"
+    dataset_cfg = omegaconf.OmegaConf.load(dataset_cfg_path)
+    eval_env = make_vec_env(dataset_cfg)
 
     if cfg.seed is not None:
         random.seed(cfg.seed)
         np.random.seed(cfg.seed)
         torch.manual_seed(cfg.seed)
         torch.cuda.manual_seed(cfg.seed)
-        env.seed(cfg.seed)
+        eval_env.seed(cfg.seed)
 
     algorithm_cfg = {
         "algorithm": obj_config_to_type_and_kwargs(
@@ -149,21 +170,32 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
     checkpoints_path = root_path / "checkpoints"
     # If checkpoints exist, load the checkpoint else train an agent from scratch
     if checkpoints_path.exists():
-        checkpoints = [
-            int(p.name[len(f"{cfg.algorithm.name}_") : -len("_steps.zip")])
-            for p in checkpoints_path.iterdir()
-            if p.suffix == ".zip"
-        ]
-        checkpoint_to_load = max(checkpoints)
-        algorithm = CheckpointAgentSpec(
-            hydra.utils.get_class(cfg.algorithm.algorithm._target_),
-            checkpoints_path,
-            checkpoint_to_load,
-            cfg.algorithm.algorithm.device,
-        ).create_agent(env)
-        algorithm.num_timesteps = checkpoint_to_load
+        raise NotImplementedError(
+            "Checkpoint loading is not yet implemented for offline algorithms"
+        )
+        # checkpoints = [
+        #     int(p.name[len(f"{cfg.algorithm.name}_") : -len("_steps.zip")])
+        #     for p in checkpoints_path.iterdir()
+        #     if p.suffix == ".zip"
+        # ]
+        # checkpoint_to_load = max(checkpoints)
+        # algorithm = CheckpointAgentSpec(
+        #     hydra.utils.get_class(cfg.algorithm.algorithm._target_),
+        #     checkpoints_path,
+        #     checkpoint_to_load,
+        #     cfg.algorithm.algorithm.device,
+        # ).create_agent(env)
+        # algorithm.num_timesteps = checkpoint_to_load
     else:
-        algorithm = HydraAgentSpec(algorithm_cfg, None, None, None).create_agent(env)
+        replay_buffer = load_dataset(
+            dataset_logs_path,
+            eval_env.observation_space,
+            eval_env.action_space,
+            cfg.algorithm.algorithm.device,
+        )
+        algorithm = hydra.utils.instantiate(
+            algorithm_cfg.algorithm, replay_buffer=replay_buffer, _convert_="partial"
+        )
         if cfg.checkpoint_interval is not None:
             checkpoints_path.mkdir()
             # Save the initial agent
@@ -172,17 +204,13 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         str(root_path / "tensorboard")
     )
-    base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
     algorithm.set_logger(
         SB3CustomLogger(
             str(root_path / "tensorboard"),
             [tb_output_format],
-            base_env_timestep_factor,
+            1,
         )
     )
-    eval_env = make_vec_env(cfg)
-    if cfg.seed is not None:
-        eval_env.seed(cfg.seed + 1)  # Use a different seed for the eval environment
     eval_callback = stable_baselines3.common.callbacks.EvalCallback(
         eval_env,
         n_eval_episodes=cfg.num_eval_episodes,
@@ -200,21 +228,14 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
                 cfg.additional_checkpoints,
                 str(checkpoints_path),
                 cfg.algorithm.name,
-                save_replay_buffer=cfg.save_replay_buffer,
-                save_vecnormalize=True,
             )
         )
-    if isinstance(
-        algorithm, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
-    ):
-        callbacks.append(AdditionalTrainingMetricsCallback())
-    training_steps = cfg.algorithm.training.steps // base_env_timestep_factor
     try:
         # Hack to get the evaluation of the initial policy in addition
         eval_callback.init_callback(algorithm)
         eval_callback._on_step()
         algorithm.learn(
-            total_timesteps=training_steps - algorithm.num_timesteps,
+            total_timesteps=cfg.algorithm.training.steps - algorithm.num_timesteps,
             callback=callbacks,
             progress_bar=cfg.show_progress,
             reset_num_timesteps=False,
