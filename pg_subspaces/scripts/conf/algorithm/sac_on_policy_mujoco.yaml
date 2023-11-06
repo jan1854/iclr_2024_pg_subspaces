@@ -1,5 +1,6 @@
 # TODO: Most parameters should be in a default SAC config
 name: "sac"
+epochs: 10  # This belongs to the algorithm, but we cannot put it there; otherwise it would be passed to the constructor
 
 defaults:
   - env_wrappers: []
