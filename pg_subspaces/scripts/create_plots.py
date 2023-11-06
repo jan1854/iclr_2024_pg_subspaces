@@ -93,7 +93,7 @@ def create_plots(
             if log_path is not None:
                 run_dirs = [
                     d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
-                ][:2]
+                ]
                 if len(run_dirs) > 0:
                     tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
                     event_accumulators = [
