@@ -7,8 +7,12 @@ import torch
 from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer
 from pg_subspaces.sb3_utils.hessian.calculate_hessian import calculate_hessian
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import HessianEigenLanczos
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import (
+    HessianEigenExplicit,
+)
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import (
+    HessianEigenLanczos,
+)
 from pg_subspaces.sb3_utils.ppo.ppo_loss import ppo_loss
 
 
@@ -169,6 +173,7 @@ def test_hessian_ev_calculation():
             assert eigen.policy.eigenvectors[:, i] * eigen.value_function.eigenvectors[
                 :, j
             ] == pytest.approx(0.0)
+
 
 def test_compare_lanczos_to_explicit():
     hess_eigen_lanczos = HessianEigenLanczos(1e-5, 10000, None)
