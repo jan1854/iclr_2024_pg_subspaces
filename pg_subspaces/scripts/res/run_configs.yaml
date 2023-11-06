@@ -21,7 +21,7 @@ Pendulum-v1:
     sac: 2023-09-22/19-13-25
     ppo_large: 2023-10-11/15-07-07
     sac_small: 2023-10-11/15-19-50
-    sac_on_policy: 2023-10-17/18-05-27
+    sac_on_policy: 2023-11-06/13-28-53    # tuned
   xmax: 300_000
 Walker2d-v3:
   log_dirs:
