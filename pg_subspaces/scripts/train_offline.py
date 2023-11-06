@@ -4,7 +4,7 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 
 import gym
 import hydra
@@ -31,6 +31,7 @@ from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     get_replay_buffer_checkpoints,
     load_replay_buffer,
 )
+from pg_subspaces.scripts.train import make_vec_env
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,6 @@ def env_with_prefix(key: str, prefix: str, default: str) -> str:
     if value:
         return prefix + value
     return default
-
-
-omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
-omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
 
 
 def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -72,45 +65,6 @@ def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
         else:
             new_conf[key] = obj_config_to_type_and_kwargs(conf_dict[key])
     return new_conf
-
-
-def make_single_env(
-    env_cfg: omegaconf.DictConfig,
-    action_transformation_cfg: Optional[omegaconf.DictConfig],
-    **kwargs,
-):
-    env = gym.make(env_cfg, **kwargs)
-    if action_transformation_cfg is not None:
-        env = hydra.utils.instantiate(action_transformation_cfg, env=env)
-
-    return env
-
-
-def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
-    if cfg.algorithm.training.n_envs == 1:
-        env = stable_baselines3.common.vec_env.DummyVecEnv(
-            [
-                lambda: stable_baselines3.common.monitor.Monitor(
-                    make_single_env(
-                        cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                    )
-                )
-            ]
-        )
-    else:
-        env = stable_baselines3.common.vec_env.SubprocVecEnv(
-            [
-                lambda: make_single_env(
-                    cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                )
-                for _ in range(cfg.algorithm.training.n_envs)
-            ]
-        )
-        env = stable_baselines3.common.vec_env.VecMonitor(env)
-    if "env_wrappers" in cfg.algorithm:
-        for wrapper in cfg.algorithm.env_wrappers.values():
-            env = hydra.utils.instantiate(wrapper, venv=env)
-    return env
 
 
 def load_dataset(
@@ -243,4 +197,11 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
 
 if __name__ == "__main__":
+    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
+    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
+    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
+    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
+    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+    omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
+
     main()

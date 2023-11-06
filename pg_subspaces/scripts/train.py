@@ -41,14 +41,6 @@ def env_with_prefix(key: str, prefix: str, default: str) -> str:
     return default
 
 
-omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
-omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
-
-
 def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
     stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise, we need to checkpoint
@@ -219,4 +211,11 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
 
 if __name__ == "__main__":
+    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
+    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
+    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
+    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
+    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+    omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
+
     main()
