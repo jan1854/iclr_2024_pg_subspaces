@@ -27,6 +27,10 @@ from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
+from pg_subspaces.offline_rl.fixed_normalization_wrapper import (
+    normalize,
+    FixedNormalizationVecWrapper,
+)
 from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     get_replay_buffer_checkpoints,
     load_replay_buffer,
@@ -153,6 +157,24 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
             # Save the initial agent
             path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
             algorithm.save(path)
+
+    states_buffer = (
+        replay_buffer.observations
+        if replay_buffer.full
+        else replay_buffer.observations[: replay_buffer.pos]
+    )
+    states_mean = np.mean(states_buffer, axis=0)
+    states_std = np.std(states_buffer, axis=0)
+    replay_buffer.observations = normalize(
+        replay_buffer.observations,
+        states_mean,
+        states_std,
+        cfg.state_normalization_eps,
+    )
+    eval_env = FixedNormalizationVecWrapper(
+        eval_env, states_mean, states_std, cfg.state_normalization_eps
+    )
+
     tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
         str(root_path / "tensorboard")
     )
