@@ -1,4 +1,4 @@
-# TODO: Most parameters should be in a default SAC config
+# TODO: Most parameters should be in a default MinOfflineSAC config
 name: "min_offline_sac"
 
 algorithm:
@@ -15,6 +15,7 @@ algorithm:
   target_entropy: "auto"
   policy_kwargs:
     net_arch: [256, 256]
+  stats_window_size: 100
   verbose: 0
   device: "auto"
   tensorboard_log: tensorboard
