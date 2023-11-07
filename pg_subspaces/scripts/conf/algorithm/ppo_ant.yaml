@@ -8,7 +8,7 @@ defaults:
 algorithm:
   _target_: stable_baselines3.PPO
   policy: "MlpPolicy"
-  device: "auto"
+  device: ${device}
 
 training:
   steps: 5_000_000

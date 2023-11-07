@@ -24,7 +24,7 @@ algorithm:
   target_kl: null
   policy_kwargs:
     net_arch: [64, 64]
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
 
 training:

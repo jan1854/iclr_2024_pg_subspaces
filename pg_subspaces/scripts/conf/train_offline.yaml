@@ -4,6 +4,7 @@ defaults:
 
 logs_dataset: ??
 seed: null
+device: auto
 show_progress: true
 num_eval_episodes: 10
 eval_interval: 10000

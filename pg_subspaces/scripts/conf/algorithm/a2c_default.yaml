@@ -7,7 +7,7 @@ defaults:
 algorithm:
   _target_: stable_baselines3.A2C
   policy: "MlpPolicy"
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
 
 training:

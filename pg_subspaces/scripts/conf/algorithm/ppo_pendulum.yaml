@@ -24,7 +24,7 @@ algorithm:
   target_kl: null
   tensorboard_log: tensorboard
   verbose: 0
-  device: "auto"
+  device: ${device}
 
 env_wrappers: ???
 

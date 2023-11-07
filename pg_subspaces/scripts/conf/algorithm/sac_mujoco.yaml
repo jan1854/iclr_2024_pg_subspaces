@@ -8,7 +8,7 @@ algorithm:
   _target_: stable_baselines3.SAC
   policy: "MlpPolicy"
   learning_rate: 3e-4
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
   learning_starts: 10000
 

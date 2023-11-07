@@ -12,7 +12,7 @@ algorithm:
   learning_starts: 100
   tau: 0.01
   gamma: 0.93
-  device: "auto"
+  device: ${device}
   train_freq: 2048
   buffer_size: ${.train_freq}
   batch_size: 64

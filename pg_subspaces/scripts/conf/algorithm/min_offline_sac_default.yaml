@@ -17,7 +17,7 @@ algorithm:
     net_arch: [256, 256]
   stats_window_size: 100
   verbose: 0
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
 
 training:

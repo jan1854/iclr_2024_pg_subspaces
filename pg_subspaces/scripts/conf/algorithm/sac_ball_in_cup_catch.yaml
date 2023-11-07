@@ -29,7 +29,7 @@ algorithm:
   policy_kwargs:
     net_arch: [128, 128]
   verbose: 0
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
 
 training:
