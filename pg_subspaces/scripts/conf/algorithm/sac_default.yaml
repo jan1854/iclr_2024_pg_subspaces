@@ -18,7 +18,7 @@ algorithm:
   action_noise: null
   replay_buffer_class: null
   replay_buffer_kwargs: null
-  optimize_memory_usage: False
+  optimize_memory_usage: false
   ent_coef: "auto"
   target_update_interval: 1
   target_entropy: "auto"
