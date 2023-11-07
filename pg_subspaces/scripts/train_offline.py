@@ -117,6 +117,7 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         torch.cuda.manual_seed(cfg.seed)
         eval_env.seed(cfg.seed)
 
+    omegaconf.OmegaConf.resolve(cfg)
     algorithm_cfg = {
         "algorithm": obj_config_to_type_and_kwargs(
             omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
