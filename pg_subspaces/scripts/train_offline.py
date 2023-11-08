@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Union
 
+import d4rl  # Registers the environments with datasets
 import gym
 import hydra
 import numpy as np
@@ -35,7 +36,7 @@ from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     get_replay_buffer_checkpoints,
     load_replay_buffer,
 )
-from pg_subspaces.scripts.train import make_vec_env
+from pg_subspaces.scripts.train import make_vec_env, make_single_env
 
 logger = logging.getLogger(__name__)
 
@@ -105,10 +106,37 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
     logger.info(f"Log directory: {root_path.absolute()}")
 
-    dataset_logs_path = Path(cfg.logs_dataset)
-    dataset_cfg_path = dataset_logs_path / ".hydra" / "config.yaml"
-    dataset_cfg = omegaconf.OmegaConf.load(dataset_cfg_path)
-    eval_env = make_vec_env(dataset_cfg)
+    if cfg.logs_dataset.startswith("d4rl"):
+        env_name = cfg.logs_dataset[len("d4rl_") :]
+        eval_env = stable_baselines3.common.vec_env.DummyVecEnv(
+            [lambda: stable_baselines3.common.monitor.Monitor(gym.make(env_name))]
+        )
+        dataset = eval_env.envs[0].get_dataset()
+        replay_buffer = stable_baselines3.common.buffers.ReplayBuffer(
+            dataset["observations"].shape[0],
+            eval_env.observation_space,
+            eval_env.action_space,
+            cfg.device,
+        )
+        replay_buffer.observations = dataset["observations"][:, None, :]
+        replay_buffer.actions = dataset["actions"][:, None, :]
+        replay_buffer.rewards = dataset["rewards"][:, None]
+        replay_buffer.dones = np.logical_or(dataset["terminals"], dataset["timeouts"])[
+            :, None
+        ]
+        replay_buffer.pos = 0
+        replay_buffer.full = True
+    else:
+        dataset_logs_path = Path(cfg.logs_dataset)
+        dataset_cfg_path = dataset_logs_path / ".hydra" / "config.yaml"
+        dataset_cfg = omegaconf.OmegaConf.load(dataset_cfg_path)
+        eval_env = make_vec_env(dataset_cfg)
+        replay_buffer = load_dataset(
+            dataset_logs_path,
+            eval_env.observation_space,
+            eval_env.action_space,
+            cfg.device,
+        )
 
     if cfg.seed is not None:
         random.seed(cfg.seed)
@@ -144,12 +172,6 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         # ).create_agent(env)
         # algorithm.num_timesteps = checkpoint_to_load
     else:
-        replay_buffer = load_dataset(
-            dataset_logs_path,
-            eval_env.observation_space,
-            eval_env.action_space,
-            cfg.algorithm.algorithm.device,
-        )
         algorithm = hydra.utils.instantiate(
             algorithm_cfg.algorithm, replay_buffer=replay_buffer, _convert_="partial"
         )
