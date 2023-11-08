@@ -114,7 +114,12 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         eval_env = stable_baselines3.common.vec_env.DummyVecEnv(
             [lambda: stable_baselines3.common.monitor.Monitor(gym.make(env_name))]
         )
-        dataset = eval_env.envs[0].get_dataset()
+        dataset_path = (
+            Path.home() / ".d4rl" / "datasets" / "walker2d_medium_expert-v2.hdf5"
+        )
+        dataset = eval_env.envs[0].get_dataset(
+            h5path=dataset_path if dataset_path.exists() else None
+        )
         replay_buffer = stable_baselines3.common.buffers.ReplayBuffer(
             dataset["observations"].shape[0],
             eval_env.observation_space,
