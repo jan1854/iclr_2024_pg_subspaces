@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Union
 
-import d4rl  # Registers the environments with datasets
 import gym
 import hydra
 import numpy as np
@@ -36,7 +35,7 @@ from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     get_replay_buffer_checkpoints,
     load_replay_buffer,
 )
-from pg_subspaces.scripts.train import make_vec_env, make_single_env
+from pg_subspaces.scripts.train import make_vec_env
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +94,10 @@ def main(cfg: omegaconf.DictConfig) -> None:
 
 
 def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
+    # Registers the environments with datasets. This needs to be here since otherwise the environments are for some
+    # reason not registered when running multiple runs concurrently with hydra-joblib-launcher.
+    import d4rl
+
     root_path = Path(root_path)
     result_commit = subprocess.run(
         ["git", "-C", f"{Path(__file__).parent}", "rev-parse", "HEAD"],
