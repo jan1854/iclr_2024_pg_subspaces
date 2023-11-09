@@ -35,7 +35,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
     def __init__(
         self,
         policy: Union[str, Type[SACPolicy]],
-        replay_buffer: ReplayBuffer,
+        dataset: ReplayBuffer,
         learning_rate: Union[float, Schedule] = 3e-4,
         batch_size: int = 256,
         tau: float = 0.005,
@@ -55,7 +55,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
     ):
         super().__init__(
             policy,
-            replay_buffer,
+            dataset,
             learning_rate,
             batch_size,
             tau,
@@ -271,11 +271,3 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
         )
-
-    def save(
-        self,
-        path: Union[str, Path, io.BufferedIOBase],
-        exclude: Optional[Iterable[str]] = None,
-        include: Optional[Iterable[str]] = None,
-    ) -> None:
-        logging.warning("Saving is not implemented yet")

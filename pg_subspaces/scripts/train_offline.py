@@ -4,7 +4,7 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, Tuple
 
 import gym
 import hydra
@@ -71,21 +71,53 @@ def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
     return new_conf
 
 
-def load_dataset(
-    log_path_dataset: Path,
-    observation_space: gym.spaces.Space,
-    action_space: gym.spaces.Space,
+def load_env_dataset(
+    dataset_spec: str,
     device: Union[str, torch.device],
-) -> ReplayBuffer:
-    name_prefix = "sac"
-    checkpoint_dir = log_path_dataset / "checkpoints"
-    rb_checkpoints = get_replay_buffer_checkpoints(name_prefix, None, checkpoint_dir)
-    buffer_size = rb_checkpoints[-1][0]
-    replay_buffer = ReplayBuffer(buffer_size, observation_space, action_space, device)
-    load_replay_buffer(
-        checkpoint_dir, name_prefix, replay_buffer, None, different_buffer=True
-    )
-    return replay_buffer
+) -> Tuple[gym.Env, ReplayBuffer]:
+    if dataset_spec.startswith("d4rl"):
+        env_name = dataset_spec[len("d4rl_") :]
+        eval_env = stable_baselines3.common.vec_env.DummyVecEnv(
+            [lambda: stable_baselines3.common.monitor.Monitor(gym.make(env_name))]
+        )
+        dataset_path = (
+            Path.home() / ".d4rl" / "datasets" / "walker2d_medium_expert-v2.hdf5"
+        )
+        dataset = eval_env.envs[0].get_dataset(
+            h5path=dataset_path if dataset_path.exists() else None
+        )
+        replay_buffer = stable_baselines3.common.buffers.ReplayBuffer(
+            dataset["observations"].shape[0],
+            eval_env.observation_space,
+            eval_env.action_space,
+            device,
+        )
+        replay_buffer.observations = dataset["observations"][:, None, :]
+        replay_buffer.actions = dataset["actions"][:, None, :]
+        replay_buffer.rewards = dataset["rewards"][:, None]
+        replay_buffer.dones = np.logical_or(dataset["terminals"], dataset["timeouts"])[
+            :, None
+        ]
+        replay_buffer.pos = 0
+        replay_buffer.full = True
+    else:
+        dataset_logs_path = Path(dataset_spec)
+        dataset_cfg_path = dataset_logs_path / ".hydra" / "config.yaml"
+        dataset_cfg = omegaconf.OmegaConf.load(dataset_cfg_path)
+        eval_env = make_vec_env(dataset_cfg)
+        name_prefix = "sac"
+        checkpoint_dir = dataset_logs_path / "checkpoints"
+        rb_checkpoints = get_replay_buffer_checkpoints(
+            name_prefix, None, checkpoint_dir
+        )
+        buffer_size = rb_checkpoints[-1][0]
+        replay_buffer = ReplayBuffer(
+            buffer_size, eval_env.observation_space, eval_env.action_space, device
+        )
+        load_replay_buffer(
+            checkpoint_dir, name_prefix, replay_buffer, None, different_buffer=True
+        )
+    return eval_env, replay_buffer
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train_offline")
@@ -106,45 +138,10 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
     logger.debug(
         f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
     )
-
     logger.info(f"Log directory: {root_path.absolute()}")
 
-    if cfg.logs_dataset.startswith("d4rl"):
-        env_name = cfg.logs_dataset[len("d4rl_") :]
-        eval_env = stable_baselines3.common.vec_env.DummyVecEnv(
-            [lambda: stable_baselines3.common.monitor.Monitor(gym.make(env_name))]
-        )
-        dataset_path = (
-            Path.home() / ".d4rl" / "datasets" / "walker2d_medium_expert-v2.hdf5"
-        )
-        dataset = eval_env.envs[0].get_dataset(
-            h5path=dataset_path if dataset_path.exists() else None
-        )
-        replay_buffer = stable_baselines3.common.buffers.ReplayBuffer(
-            dataset["observations"].shape[0],
-            eval_env.observation_space,
-            eval_env.action_space,
-            cfg.device,
-        )
-        replay_buffer.observations = dataset["observations"][:, None, :]
-        replay_buffer.actions = dataset["actions"][:, None, :]
-        replay_buffer.rewards = dataset["rewards"][:, None]
-        replay_buffer.dones = np.logical_or(dataset["terminals"], dataset["timeouts"])[
-            :, None
-        ]
-        replay_buffer.pos = 0
-        replay_buffer.full = True
-    else:
-        dataset_logs_path = Path(cfg.logs_dataset)
-        dataset_cfg_path = dataset_logs_path / ".hydra" / "config.yaml"
-        dataset_cfg = omegaconf.OmegaConf.load(dataset_cfg_path)
-        eval_env = make_vec_env(dataset_cfg)
-        replay_buffer = load_dataset(
-            dataset_logs_path,
-            eval_env.observation_space,
-            eval_env.action_space,
-            cfg.device,
-        )
+    eval_env, replay_buffer = load_env_dataset(cfg.logs_dataset, cfg.device)
+
     episode_returns_dataset = [0.0]
     for r, done in zip(replay_buffer.rewards, replay_buffer.dones):
         episode_returns_dataset[-1] += r
