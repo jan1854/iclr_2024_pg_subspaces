@@ -29,13 +29,13 @@ class Analysis(abc.ABC):
         self,
         analysis_name: str,
         analysis_run_id: str,
-        env_factory: Callable[[], gym.Env],
+        env_factory_or_dataset: Callable[[], gym.Env],
         agent_spec: AgentSpec,
         run_dir: Path,
     ):
         self.analysis_name = analysis_name
         self.analysis_run_id = analysis_run_id
-        self.env_factory = env_factory
+        self.env_factory_or_dataset = env_factory_or_dataset
         self.agent_spec = agent_spec
         self.run_dir = run_dir
         self._analyses_log_file = run_dir / ".analyses.yaml"

@@ -7,6 +7,10 @@ from stable_baselines3.common.type_aliases import (
     RolloutBufferSamples,
 )
 
+from pg_subspaces.offline_rl.minimalistic_offline_sac import (
+    MinimalisticOfflineSAC,
+    min_offline_sac_loss,
+)
 from pg_subspaces.sb3_utils.common.parameters import (
     get_actor_critic_parameters,
     get_trained_parameters,
@@ -27,6 +31,8 @@ def actor_critic_loss(
         combined_loss, actor_loss, critic_loss = td3_loss(agent, data)
     elif isinstance(agent, stable_baselines3.SAC):
         combined_loss, actor_loss, critic_loss = sac_loss(agent, data)
+    elif isinstance(agent, MinimalisticOfflineSAC):
+        combined_loss, actor_loss, critic_loss = min_offline_sac_loss(agent, data)
     else:
         raise ValueError(f"Unsupported agent {type(agent)}")
     return combined_loss, actor_loss, critic_loss

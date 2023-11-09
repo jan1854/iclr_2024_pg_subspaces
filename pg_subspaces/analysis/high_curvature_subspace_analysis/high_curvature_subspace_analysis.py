@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import gym
 import numpy as np
@@ -44,7 +44,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
     def __init__(
         self,
         analysis_run_id: str,
-        env_factory: Callable[[], gym.Env],
+        env_factory_or_dataset: Union[
+            Callable[[], gym.Env], stable_baselines3.common.buffers.ReplayBuffer
+        ],
         agent_spec: AgentSpec,
         run_dir: Path,
         num_samples_true_loss: int,
@@ -57,7 +59,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         super().__init__(
             "high_curvature_subspace_analysis",
             analysis_run_id,
-            env_factory,
+            env_factory_or_dataset,
             agent_spec,
             run_dir,
         )
@@ -82,20 +84,36 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         overwrite_results: bool,
         verbose: bool,
     ) -> TensorboardLogs:
-
-        agent = self.agent_spec.create_agent(self.env_factory())
         if isinstance(
-            agent, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+            self.env_factory_or_dataset, stable_baselines3.common.buffers.ReplayBuffer
         ):
-            (
-                data_true_loss,
-                data_estimated_loss,
-            ) = self._collect_data_on_policy_algorithm(agent)
+            agent = self.agent_spec.create_agent(
+                replay_buffer=self.env_factory_or_dataset
+            )
+            max_idx = (
+                agent.replay_buffer.buffer_size
+                if agent.replay_buffer.full
+                else agent.replay_buffer.pos
+            )
+            data_true_loss = agent.replay_buffer._get_samples(np.arange(max_idx))
+            data_estimated_loss = [
+                agent.replay_buffer.sample(agent.batch_size)
+                for _ in range(2048 // agent.batch_size)
+            ]
         else:
-            (
-                data_true_loss,
-                data_estimated_loss,
-            ) = self._collect_data_off_policy_algorithm(agent)
+            agent = self.agent_spec.create_agent(env=self.env_factory_or_dataset())
+            if isinstance(
+                agent, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+            ):
+                (
+                    data_true_loss,
+                    data_estimated_loss,
+                ) = self._collect_data_on_policy_algorithm(agent)
+            else:
+                (
+                    data_true_loss,
+                    data_estimated_loss,
+                ) = self._collect_data_off_policy_algorithm(agent)
 
         hess_eigen_calculator = HessianEigenCachedCalculator(
             self.run_dir,
@@ -424,7 +442,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             agent.gamma,
         )
         fill_rollout_buffer(
-            self.env_factory,
+            self.env_factory_or_dataset,
             self.agent_spec,
             rollout_buffer_true_loss,
         )
@@ -437,7 +455,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                 agent.device,
             )
         )
-        fill_rollout_buffer(self.env_factory, agent, rollout_buffer_gradient_estimates)
+        fill_rollout_buffer(
+            self.env_factory_or_dataset, agent, rollout_buffer_gradient_estimates
+        )
 
         return next(rollout_buffer_true_loss.get()), list(
             rollout_buffer_gradient_estimates.get(agent.batch_size)
@@ -479,7 +499,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
         num_samples: int,
     ) -> None:
-        env = DummyVecEnv([lambda: self.env_factory()])
+        env = DummyVecEnv([lambda: self.env_factory_or_dataset()])
         agent._last_obs = env.reset()
         # collect_rollouts requires a callback for some reason
         callback = CallbackList([])

@@ -7,8 +7,15 @@ import torch
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import ActorCriticEigen, HessianEigen
-from pg_subspaces.sb3_utils.common.parameters import flatten_parameters, combine_actor_critic_parameter_vectors
+from pg_subspaces.offline_rl.offline_algorithm import OfflineAlgorithm
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import (
+    ActorCriticEigen,
+    HessianEigen,
+)
+from pg_subspaces.sb3_utils.common.parameters import (
+    flatten_parameters,
+    combine_actor_critic_parameter_vectors,
+)
 from stable_baselines3.common.type_aliases import (
     RolloutBufferSamples,
     ReplayBufferSamples,
@@ -94,7 +101,10 @@ class HessianEigenCachedCalculator:
         )
         assert (
             isinstance(data, ReplayBufferSamples)
-            and isinstance(agent, OffPolicyAlgorithm)
+            and (
+                isinstance(agent, OffPolicyAlgorithm)
+                or isinstance(agent, OfflineAlgorithm)
+            )
             or isinstance(data, RolloutBufferSamples)
             and isinstance(agent, OnPolicyAlgorithm)
         )

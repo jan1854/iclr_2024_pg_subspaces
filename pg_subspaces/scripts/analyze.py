@@ -17,6 +17,8 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from pg_subspaces.metrics.tensorboard_logs import TensorboardLogs
+from pg_subspaces.offline_rl.load_env_dataset import load_env_dataset
+from pg_subspaces.offline_rl.offline_algorithm import OfflineAlgorithm
 from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec
 
 logger = logging.getLogger(__name__)
@@ -34,18 +36,23 @@ def analysis_worker(
     if device is None:
         device = train_cfg.algorithm.algorithm.device
 
-    env = gym.make(train_cfg.env, **train_cfg.env_args)
-
+    agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
     agent_spec = CheckpointAgentSpec(
-        hydra.utils.get_class(train_cfg.algorithm.algorithm._target_),
+        agent_class,
         run_dir / "checkpoints",
         agent_step,
         device,
         agent_kwargs={"tensorboard_logs": None},
     )
+    if issubclass(agent_class, OfflineAlgorithm):
+        _, env_factory_or_dataset = load_env_dataset(train_cfg.logs_dataset, device)
+    else:
+        env_factory_or_dataset = functools.partial(
+            gym.make, train_cfg.env, **train_cfg.env_args
+        )
     analysis = hydra.utils.instantiate(
         analysis_cfg,
-        env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
+        env_factory_or_dataset=env_factory_or_dataset,
         agent_spec=agent_spec,
         run_dir=run_dir,
     )

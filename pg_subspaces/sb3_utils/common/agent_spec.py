@@ -6,11 +6,13 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union, Type, TypeVar
 import gym
 import hydra
 import omegaconf
+import stable_baselines3.common.buffers
 import stable_baselines3.common.on_policy_algorithm
 import stable_baselines3.common.off_policy_algorithm
 import stable_baselines3.common.vec_env
 import torch
 
+from pg_subspaces.offline_rl.offline_algorithm import OfflineAlgorithm
 from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     ReplayBufferDiffCheckpointer,
 )
@@ -39,8 +41,9 @@ class AgentSpec(abc.ABC):
     def create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
+        replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer] = None,
     ) -> SB3Agent:
-        agent = self._create_agent(env)
+        agent = self._create_agent(env, replay_buffer)
         if self.override_weights is not None:
             self._set_weights(agent, self.override_weights)
         return agent
@@ -57,6 +60,7 @@ class AgentSpec(abc.ABC):
     def _create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+        replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> SB3Agent:
         pass
 
@@ -87,16 +91,23 @@ class CheckpointAgentSpec(AgentSpec):
     def _create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+        replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> SB3Agent:
         agent_checkpoint_path = list(
             self.checkpoints_dir.glob(f"*_{self.timestep}_steps.zip")
         )
         assert len(agent_checkpoint_path) == 1
         agent_checkpoint_path = agent_checkpoint_path[0]
-        agent = self.agent_class.load(
-            agent_checkpoint_path, env, self.device, **self.agent_kwargs
-        )
-        if isinstance(
+        if issubclass(self.agent_class, OfflineAlgorithm):
+            agent = self.agent_class.load(
+                agent_checkpoint_path, replay_buffer, self.device, **self.agent_kwargs
+            )
+        else:
+            agent = self.agent_class.load(
+                agent_checkpoint_path, env, self.device, **self.agent_kwargs
+            )
+            agent.replay_buffer = replay_buffer
+        if replay_buffer is None and isinstance(
             agent, stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm
         ):
             agent_name = agent_checkpoint_path.name[
@@ -161,18 +172,31 @@ class HydraAgentSpec(AgentSpec):
     def _create_agent(
         self,
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+        replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> SB3Agent:
-        if env is None:
-            env = self.env_factory()
+        if issubclass(self.agent_class, OfflineAlgorithm):
+            agent = hydra.utils.instantiate(
+                self.agent_cfg["algorithm"],
+                policy="MlpPolicy",
+                dataset=replay_buffer,
+                device=self.device,
+                _convert_="partial",
+                **self.agent_kwargs,
+            )
+        else:
+            if env is None:
+                env = self.env_factory()
 
-        agent = hydra.utils.instantiate(
-            self.agent_cfg["algorithm"],
-            policy="MlpPolicy",
-            env=env,
-            device=self.device,
-            _convert_="partial",
-            **self.agent_kwargs,
-        )
+            agent = hydra.utils.instantiate(
+                self.agent_cfg["algorithm"],
+                policy="MlpPolicy",
+                env=env,
+                device=self.device,
+                _convert_="partial",
+                **self.agent_kwargs,
+            )
+            agent.replay_buffer = replay_buffer
+
         if self.weights_checkpoint_path is not None:
             agent_class = hydra.utils.get_class(self.agent_cfg["algorithm"]["_target_"])
             agent_checkpoint = agent_class.load(
