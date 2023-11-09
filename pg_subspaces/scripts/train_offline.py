@@ -145,6 +145,12 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
             eval_env.action_space,
             cfg.device,
         )
+    episode_returns_dataset = [0.0]
+    for r, done in zip(replay_buffer.rewards, replay_buffer.dones):
+        episode_returns_dataset[-1] += r
+        if done:
+            episode_returns_dataset.append(0.0)
+    print(f"Average dataset returns: {np.mean(episode_returns_dataset)}")
 
     if cfg.seed is not None:
         random.seed(cfg.seed)
