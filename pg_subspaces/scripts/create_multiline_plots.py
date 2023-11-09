@@ -1,7 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple, Literal
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -46,8 +46,9 @@ def create_multiline_plots(
     fontsize: int,
     linewidth: float,
     fill_in_data: Dict[int, float],
+    x_annotations: Sequence[Tuple[float, str, bool]],  # position, text, legend?
+    y_annotations: Sequence[Tuple[float, str, bool]],  # position, text, legend?
     out: Path,
-    annotations: Dict[int, str] = {},
 ) -> None:
     if legend is not None and len(keys) != len(legend):
         logger.warning(
@@ -65,34 +66,6 @@ def create_multiline_plots(
             run_dirs = [
                 d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
             ]
-
-        for xpos, annotation in annotations.items():
-            ax.axvline(
-                x=xpos, color="gray", linestyle="--", label="_nolegend_", zorder=0
-            )
-            # We want the text to be in front of the graphs but the white bounding box should just be in front of the
-            # vertical line (but behind the graphs), this is achieved by the following hack that first adds an empty
-            # text box with white bounding box and then adds the text (without bounding box).
-            plt.text(
-                xpos,
-                0.5,
-                " ",
-                verticalalignment="center",
-                horizontalalignment="center",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
-                ),
-                zorder=1,
-            )
-            plt.text(
-                xpos,
-                0.5,
-                annotation,
-                verticalalignment="center",
-                horizontalalignment="center",
-                color="gray",
-                zorder=100,
-            )
 
         if len(run_dirs) > 0:
             tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
@@ -182,6 +155,81 @@ def create_multiline_plots(
         ax.tick_params(axis="y", pad=8)
         ax.xaxis.set_major_locator(plt.MaxNLocator(6))
         ax.yaxis.set_major_locator(plt.MaxNLocator(6))
+
+        for pos, annotation, ann_legend in x_annotations:
+            y_low, y_high = ax.get_ylim()
+            ax.axvline(
+                x=pos,
+                color="gray",
+                linestyle="--",
+                label=annotation if ann_legend else "_nolegend_",
+                zorder=0,
+            )
+            if ann_legend:
+                legend.append(annotation)
+            else:
+                # We want the text to be in front of the graphs but the white bounding box should just be in front of
+                # the horizontal line (but behind the graphs), this is achieved by the following hack that first adds an
+                # empty text box with white bounding box and then adds the text (without bounding box).
+                plt.text(
+                    pos,
+                    (y_high + y_low) / 2,
+                    annotation,
+                    color="white",
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    bbox=dict(
+                        facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
+                    ),
+                    zorder=1,
+                )
+                plt.text(
+                    pos,
+                    (y_high + y_low) / 2,
+                    annotation,
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    color="gray",
+                    zorder=100,
+                )
+
+        for pos, annotation, ann_legend in y_annotations:
+            x_low, x_high = ax.get_xlim()
+            ax.axhline(
+                y=pos,
+                color="gray",
+                linestyle="--",
+                label=annotation if ann_legend else "_nolegend_",
+                zorder=0,
+            )
+            if ann_legend:
+                legend.append(annotation)
+            else:
+                # We want the text to be in front of the graphs but the white bounding box should just be in front of
+                # the vertical line (but behind the graphs), this is achieved by the following hack that first adds an
+                # empty text box with white bounding box and then adds the text (without bounding box).
+                plt.text(
+                    (x_high + x_low) / 2,
+                    pos,
+                    annotation,
+                    color="white",
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    bbox=dict(
+                        facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
+                    ),
+                    zorder=1,
+                )
+                plt.text(
+                    (x_high + x_low) / 2,
+                    pos,
+                    annotation,
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    color="gray",
+                    zorder=100,
+                )
+
         if legend is None:
             # The default legend entry consists of the parts that are the same in all keys
             keys_split = [key.split("/") for key in keys]
@@ -247,12 +295,22 @@ if __name__ == "__main__":
     parser.add_argument("--marker", default="d")
     parser.add_argument("--fontsize", type=int, default=18)
     parser.add_argument("--linewidth", type=float, default=1.5)
+    parser.add_argument("--annotations", type=str, default={}, nargs="+")
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
     out_dir = Path(__file__).parent.parent.parent / "out"
     out_dir.mkdir(exist_ok=True)
     out = out_dir / args.outname
+
+    x_annotations_parsed = []
+    y_annotations_parsed = []
+    for x_ann in args.x_annotations:
+        pos, annotation, legend = x_ann.split(":")
+        x_annotations_parsed.append((float(pos), annotation, legend.lower() == "true"))
+    for y_ann in args.y_annotations:
+        pos, annotation, legend = y_ann.split(":")
+        y_annotations_parsed.append((float(pos), annotation, legend.lower() == "true"))
 
     create_multiline_plots(
         Path(args.log_path),
@@ -271,5 +329,7 @@ if __name__ == "__main__":
         args.fontsize,
         args.linewidth,
         {},
+        x_annotations_parsed,
+        y_annotations_parsed,
         out,
     )

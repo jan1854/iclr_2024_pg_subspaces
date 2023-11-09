@@ -31,7 +31,7 @@ def smooth(
 
 def create_plots(
     log_paths: Sequence[Optional[Path]],
-    legend: Optional[Sequence[str]],
+    legend: Sequence[str],
     title: str,
     xlabel: str,
     ylabel: str,
@@ -46,11 +46,13 @@ def create_plots(
     fontsize: int,
     linewidth: float,
     fill_in_data: Dict[int, float],
+    x_annotations: Sequence[Tuple[float, str, bool]],  # position, text, legend?
+    y_annotations: Sequence[Tuple[float, str, bool]],  # position, text, legend?
     out: Path,
-    annotations: Dict[int, str] = {},
 ) -> None:
     log_paths_filtered = [l for l in log_paths if l is not None]
-    if legend is not None and len(log_paths_filtered) != len(legend):
+    legend = list(legend)
+    if len(legend) > 0 and len(log_paths_filtered) != len(legend):
         logger.warning(
             f'log_paths (without "skip"s) and legend do not have the same number of elements, '
             f"log_paths: {len(log_paths_filtered)}, legend: {len(legend)}"
@@ -63,30 +65,6 @@ def create_plots(
         ax.margins(x=0)
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
-        for xpos, annotation in annotations.items():
-            ax.axvline(
-                x=xpos, color="gray", linestyle="--", label="_nolegend_", zorder=0
-            )
-            plt.text(
-                xpos,
-                0.5,
-                " ",
-                verticalalignment="center",
-                horizontalalignment="center",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
-                ),
-                zorder=1,
-            )
-            plt.text(
-                xpos,
-                0.5,
-                annotation,
-                verticalalignment="center",
-                horizontalalignment="center",
-                color="gray",
-                zorder=100,
-            )
         for i, log_path in enumerate(log_paths):
             if i % num_same_color_plots == 0:
                 color = next(ax._get_lines.prop_cycler)["color"]
@@ -191,6 +169,81 @@ def create_plots(
         ax.tick_params(axis="y", pad=8)
         ax.xaxis.set_major_locator(plt.MaxNLocator(6))
         ax.yaxis.set_major_locator(plt.MaxNLocator(6))
+
+        for pos, annotation, ann_legend in x_annotations:
+            y_low, y_high = ax.get_ylim()
+            ax.axvline(
+                x=pos,
+                color="gray",
+                linestyle="--",
+                label=annotation if ann_legend else "_nolegend_",
+                zorder=0,
+            )
+            if ann_legend:
+                legend.append(annotation)
+            else:
+                # We want the text to be in front of the graphs but the white bounding box should just be in front of
+                # the horizontal line (but behind the graphs), this is achieved by the following hack that first adds an
+                # empty text box with white bounding box and then adds the text (without bounding box).
+                plt.text(
+                    pos,
+                    (y_high + y_low) / 2,
+                    annotation,
+                    color="white",
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    bbox=dict(
+                        facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
+                    ),
+                    zorder=1,
+                )
+                plt.text(
+                    pos,
+                    (y_high + y_low) / 2,
+                    annotation,
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    color="gray",
+                    zorder=100,
+                )
+
+        for pos, annotation, ann_legend in y_annotations:
+            x_low, x_high = ax.get_xlim()
+            ax.axhline(
+                y=pos,
+                color="gray",
+                linestyle="--",
+                label=annotation if ann_legend else "_nolegend_",
+                zorder=0,
+            )
+            if ann_legend:
+                legend.append(annotation)
+            else:
+                # We want the text to be in front of the graphs but the white bounding box should just be in front of
+                # the vertical line (but behind the graphs), this is achieved by the following hack that first adds an
+                # empty text box with white bounding box and then adds the text (without bounding box).
+                plt.text(
+                    (x_high + x_low) / 2,
+                    pos,
+                    annotation,
+                    color="white",
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    bbox=dict(
+                        facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
+                    ),
+                    zorder=1,
+                )
+                plt.text(
+                    (x_high + x_low) / 2,
+                    pos,
+                    annotation,
+                    verticalalignment="center",
+                    horizontalalignment="center",
+                    color="gray",
+                    zorder=100,
+                )
+
         if legend is not None and not separate_legend:
             ax.legend(legend, loc="lower right")
         fig.tight_layout(pad=0.1)
@@ -198,7 +251,10 @@ def create_plots(
         fig.savefig(out.with_suffix(".pdf"))
         if legend is not None and separate_legend:
             legend_plt = ax.legend(
-                legend, frameon=False, ncol=len(legend), bbox_to_anchor=(2.0, 2.0)
+                legend,
+                frameon=False,
+                ncol=len(legend),
+                bbox_to_anchor=(2.0, 2.0),
             )
             legend_fig = legend_plt.figure
             legend_fig.canvas.draw()
@@ -219,7 +275,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_paths", type=str, nargs="+")
     parser.add_argument("--key", type=str, nargs="+", default=["rollout/ep_rew_mean"])
-    parser.add_argument("--legend", type=str, nargs="+")
+    parser.add_argument("--legend", type=str, nargs="+", default=())
     parser.add_argument("--title", type=str, default="")
     parser.add_argument("--xlabel", type=str, default="Environment steps")
     parser.add_argument("--ylabel", type=str, default="")
@@ -234,12 +290,23 @@ if __name__ == "__main__":
     parser.add_argument("--num-same-color-plots", type=int, default=1)
     parser.add_argument("--fontsize", type=int, default=12)
     parser.add_argument("--linewidth", type=float, default=1.5)
+    parser.add_argument("--x-annotations", type=str, nargs="+", default=())
+    parser.add_argument("--y-annotations", type=str, nargs="+", default=())
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
     out_dir = Path(__file__).parent.parent.parent / "out"
     out_dir.mkdir(exist_ok=True)
     out = out_dir / args.outname
+
+    x_annotations_parsed = []
+    y_annotations_parsed = []
+    for x_ann in args.x_annotations:
+        pos, ann, legend = x_ann.split(":")
+        x_annotations_parsed.append((float(pos), ann, legend.lower() == "true"))
+    for y_ann in args.y_annotations:
+        pos, ann, legend = y_ann.split(":")
+        y_annotations_parsed.append((float(pos), ann, legend.lower() == "true"))
 
     create_plots(
         [
@@ -261,5 +328,7 @@ if __name__ == "__main__":
         args.fontsize,
         args.linewidth,
         {},
+        x_annotations_parsed,
+        y_annotations_parsed,
         out,
     )
