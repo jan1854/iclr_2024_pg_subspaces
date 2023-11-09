@@ -48,7 +48,7 @@ def sac_loss(
 
     # Compute actor loss
     # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
-    # Mean over all critic networks
+    # Min over all critic networks
     with torch.no_grad():
         q_values_pi = torch.cat(
             agent.critic(replay_data.observations, actions_pi), dim=1
