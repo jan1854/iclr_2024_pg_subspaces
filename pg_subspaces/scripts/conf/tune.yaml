@@ -8,6 +8,7 @@ defaults:
 env: Pendulum-v1
 env_args: {}
 seed: null
+device: auto
 show_progress: false
 num_eval_episodes: 10
 eval_interval: 10000
