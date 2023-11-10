@@ -1,5 +1,6 @@
 # TODO: Most parameters should be in a default SAC config
 name: "sac"
+grad_steps_per_env_step: 1
 
 defaults:
   - env_wrappers: []
@@ -14,7 +15,7 @@ algorithm:
   tau: 0.005
   gamma: 0.99
   train_freq: 1
-  gradient_steps: ${.train_freq}
+  gradient_steps: ${MUL:${.train_freq},${..grad_steps_per_env_step}}
   action_noise: null
   replay_buffer_class: null
   replay_buffer_kwargs: null
