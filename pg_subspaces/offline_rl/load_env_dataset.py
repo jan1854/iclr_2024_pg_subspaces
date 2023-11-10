@@ -25,9 +25,7 @@ def load_env_dataset(
         eval_env = stable_baselines3.common.vec_env.DummyVecEnv(
             [lambda: stable_baselines3.common.monitor.Monitor(gym.make(env_name))]
         )
-        dataset_path = (
-            Path.home() / ".d4rl" / "datasets" / "walker2d_medium_expert-v2.hdf5"
-        )
+        dataset_path = Path.home() / ".d4rl" / "datasets" / f"{env_name}.hdf5"
         dataset = eval_env.envs[0].get_dataset(
             h5path=dataset_path if dataset_path.exists() else None
         )
