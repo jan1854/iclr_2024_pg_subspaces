@@ -106,7 +106,8 @@ class CheckpointAgentSpec(AgentSpec):
             agent = self.agent_class.load(
                 agent_checkpoint_path, env, self.device, **self.agent_kwargs
             )
-            agent.replay_buffer = replay_buffer
+            if replay_buffer is not None:
+                agent.replay_buffer = replay_buffer
         if replay_buffer is None and isinstance(
             agent, stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm
         ):
@@ -196,7 +197,8 @@ class HydraAgentSpec(AgentSpec):
                 _convert_="partial",
                 **self.agent_kwargs,
             )
-            agent.replay_buffer = replay_buffer
+            if replay_buffer is not None:
+                agent.replay_buffer = replay_buffer
 
         if self.weights_checkpoint_path is not None:
             agent_checkpoint = agent_class.load(
