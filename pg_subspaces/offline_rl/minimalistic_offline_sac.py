@@ -139,6 +139,7 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         self.scale_actor_rl_objective_weight = scale_actor_rl_objective_weight
         self.actor_bc_objective_weight = actor_bc_objective_weight
         self.ent_coef = ent_coef
+        self.ent_coef_optimizer = None
         self.target_update_interval = target_update_interval
         self.target_entropy = target_entropy
         self.tensorboard_log = tensorboard_log
