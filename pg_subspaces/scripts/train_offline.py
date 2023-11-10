@@ -90,7 +90,7 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
     episode_returns_dataset = [0.0]
     for r, done in zip(replay_buffer.rewards, replay_buffer.dones):
-        episode_returns_dataset[-1] += r
+        episode_returns_dataset[-1] += r.item()
         if done:
             episode_returns_dataset.append(0.0)
     print(f"Average dataset returns: {np.mean(episode_returns_dataset)}")
