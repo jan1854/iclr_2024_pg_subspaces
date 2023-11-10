@@ -174,7 +174,8 @@ class HydraAgentSpec(AgentSpec):
         env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
         replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> SB3Agent:
-        if issubclass(self.agent_class, OfflineAlgorithm):
+        agent_class = hydra.utils.get_class(self.agent_cfg["algorithm"]["_target_"])
+        if issubclass(agent_class, OfflineAlgorithm):
             agent = hydra.utils.instantiate(
                 self.agent_cfg["algorithm"],
                 policy="MlpPolicy",
@@ -198,7 +199,6 @@ class HydraAgentSpec(AgentSpec):
             agent.replay_buffer = replay_buffer
 
         if self.weights_checkpoint_path is not None:
-            agent_class = hydra.utils.get_class(self.agent_cfg["algorithm"]["_target_"])
             agent_checkpoint = agent_class.load(
                 self.weights_checkpoint_path, env, self.device
             )
