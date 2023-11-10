@@ -20,7 +20,7 @@ def load_env_dataset(
     dataset_spec: str,
     device: Union[str, torch.device],
 ) -> Tuple[gym.Env, stable_baselines3.common.buffers.ReplayBuffer]:
-    if dataset_spec.startswith("d4rl"):
+    if dataset_spec.startswith("d4rl_"):
         env_name = dataset_spec[len("d4rl_") :]
         eval_env = stable_baselines3.common.vec_env.DummyVecEnv(
             [lambda: stable_baselines3.common.monitor.Monitor(gym.make(env_name))]
