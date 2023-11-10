@@ -52,4 +52,10 @@ def tune_hyperparams(cfg: omegaconf.DictConfig):
 
 
 if __name__ == "__main__":
+    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
+    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
+    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
+    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
+    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+
     tune_hyperparams()
