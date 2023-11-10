@@ -77,11 +77,14 @@ def min_offline_sac_loss(
     agent.actor.action_dist.proba_distribution(policy_mean, policy_log_std)
     bc_log_prob = agent.actor.action_dist.log_prob(replay_data.actions)
     policy_entropy_loss = (ent_coef * log_prob).mean()
-    rl_objective_weight_scaled = (
-        agent.actor_rl_objective_weight / min_qf_pi.detach().abs().mean()
-    )
-    policy_q_value_loss = -(rl_objective_weight_scaled * min_qf_pi).mean()
-    policy_bc_loss = -bc_log_prob.mean()
+    if agent.scale_actor_rl_objective_weight:
+        rl_objective_weight_scaled = (
+            agent.actor_rl_objective_weight / min_qf_pi.detach().abs().mean()
+        )
+    else:
+        rl_objective_weight_scaled = agent.actor_rl_objective_weight
+    policy_q_value_loss = -rl_objective_weight_scaled * min_qf_pi.mean()
+    policy_bc_loss = -agent.actor_bc_objective_weight * bc_log_prob.mean()
     actor_loss = policy_entropy_loss + policy_q_value_loss + policy_bc_loss
 
     return actor_loss + critic_loss, actor_loss, critic_loss
@@ -103,6 +106,8 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         tau: float = 0.005,
         gamma: float = 0.99,
         actor_rl_objective_weight: float = 2.5,
+        scale_actor_rl_objective_weight: bool = True,
+        actor_bc_objective_weight: float = 1.0,
         action_noise: Optional[ActionNoise] = None,
         ent_coef: Union[str, float] = "auto",
         target_update_interval: int = 1,
@@ -131,6 +136,8 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
             device,
         )
         self.actor_rl_objective_weight = actor_rl_objective_weight
+        self.scale_actor_rl_objective_weight = scale_actor_rl_objective_weight
+        self.actor_bc_objective_weight = actor_bc_objective_weight
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.target_entropy = target_entropy
@@ -271,11 +278,14 @@ class MinimalisticOfflineSAC(OfflineAlgorithm):
         self.actor.action_dist.proba_distribution(policy_mean, policy_log_std)
         bc_log_prob = self.actor.action_dist.log_prob(batch.actions)
         policy_entropy_loss = (ent_coef * log_prob).mean()
-        rl_objective_weight_scaled = (
-            self.actor_rl_objective_weight / min_qf_pi.detach().abs().mean()
-        )
-        policy_q_value_loss = -(rl_objective_weight_scaled * min_qf_pi).mean()
-        policy_bc_loss = -bc_log_prob.mean()
+        if self.scale_actor_rl_objective_weight:
+            rl_objective_weight_scaled = (
+                self.actor_rl_objective_weight / min_qf_pi.detach().abs().mean()
+            )
+        else:
+            rl_objective_weight_scaled = self.actor_rl_objective_weight
+        policy_q_value_loss = -rl_objective_weight_scaled * min_qf_pi.mean()
+        policy_bc_loss = -self.actor_bc_objective_weight * bc_log_prob.mean()
         actor_loss = policy_entropy_loss + policy_q_value_loss + policy_bc_loss
         actor_losses.append(actor_loss.item())
 

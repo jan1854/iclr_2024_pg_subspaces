@@ -35,6 +35,13 @@ def test_save_load():
     assert (
         algorithm_c.actor_rl_objective_weight == algorithm_l.actor_rl_objective_weight
     )
+    assert (
+        algorithm_c.scale_actor_rl_objective_weight
+        == algorithm_l.scale_actor_rl_objective_weight
+    )
+    assert (
+        algorithm_c.actor_bc_objective_weight == algorithm_l.actor_bc_objective_weight
+    )
     assert algorithm_c.action_noise == algorithm_l.action_noise
     assert algorithm_c.ent_coef == algorithm_l.ent_coef
     assert algorithm_c.target_update_interval == algorithm_l.target_update_interval

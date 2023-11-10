@@ -9,6 +9,8 @@ algorithm:
   tau: 0.005
   gamma: 0.99
   actor_rl_objective_weight: 2.5
+  scale_actor_rl_objective_weight: true
+  actor_bc_objective_weight: 1.0
   action_noise: null
   ent_coef: "auto"
   target_update_interval: 1
