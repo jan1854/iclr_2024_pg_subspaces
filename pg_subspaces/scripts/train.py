@@ -4,9 +4,8 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-import gym
 import hydra
 import numpy as np
 import omegaconf
@@ -30,6 +29,8 @@ from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
 )
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
 from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraAgentSpec
+from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
+
 
 logger = logging.getLogger(__name__)
 
@@ -63,44 +64,6 @@ def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
         else:
             new_conf[key] = obj_config_to_type_and_kwargs(conf_dict[key])
     return new_conf
-
-
-def make_single_env(
-    env_cfg: omegaconf.DictConfig,
-    action_transformation_cfg: Optional[omegaconf.DictConfig],
-    **kwargs,
-):
-    env = gym.make(env_cfg, **kwargs)
-    if action_transformation_cfg is not None:
-        env = hydra.utils.instantiate(action_transformation_cfg, env=env)
-    return env
-
-
-def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
-    if cfg.algorithm.training.n_envs == 1:
-        env = stable_baselines3.common.vec_env.DummyVecEnv(
-            [
-                lambda: stable_baselines3.common.monitor.Monitor(
-                    make_single_env(
-                        cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                    )
-                )
-            ]
-        )
-    else:
-        env = stable_baselines3.common.vec_env.SubprocVecEnv(
-            [
-                lambda: make_single_env(
-                    cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                )
-                for _ in range(cfg.algorithm.training.n_envs)
-            ]
-        )
-        env = stable_baselines3.common.vec_env.VecMonitor(env)
-    if "env_wrappers" in cfg.algorithm:
-        for wrapper in cfg.algorithm.env_wrappers.values():
-            env = hydra.utils.instantiate(wrapper, venv=env)
-    return env
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")

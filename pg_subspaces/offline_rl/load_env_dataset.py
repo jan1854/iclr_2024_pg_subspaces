@@ -9,6 +9,7 @@ import stable_baselines3.common.monitor
 import stable_baselines3.common.vec_env
 import torch
 
+from pg_subspaces.sb3_utils.common.env.make_env import make_single_env
 from pg_subspaces.sb3_utils.common.replay_buffer_diff_checkpointer import (
     get_replay_buffer_checkpoints,
     load_replay_buffer,
