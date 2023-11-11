@@ -35,8 +35,11 @@ def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> flo
         logger.warning(
             f"Logs at {working_directory / 'tensorboard'} contain only a single value."
         )
+    ignored_steps = cfg.ignore_initial_steps_ratio * cfg.algorithm.training.steps
     return -sum(
-        v.value for s, v in scalar.items() if 0 < s < cfg.algorithm.training.steps
+        v.value
+        for s, v in scalar.items()
+        if ignored_steps < s < cfg.algorithm.training.steps
     )
 
 
