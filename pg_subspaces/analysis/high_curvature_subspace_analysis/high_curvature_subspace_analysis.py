@@ -6,6 +6,7 @@ import gym
 import numpy as np
 import stable_baselines3
 import stable_baselines3.common.buffers
+import stable_baselines3.common.base_class
 import stable_baselines3.common.off_policy_algorithm
 import stable_baselines3.common.on_policy_algorithm
 import torch
@@ -55,6 +56,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         hessian_eigen: HessianEigen,
         overwrite_cached_eigen: bool,
         skip_cacheing_eigen: bool,
+        on_policy_data_collection_processes: int,
     ):
         super().__init__(
             "high_curvature_subspace_analysis",
@@ -69,6 +71,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         self.hessian_eigen = hessian_eigen
         self.overwrite_cached_eigen = overwrite_cached_eigen
         self.skip_cacheing_eigen = skip_cacheing_eigen
+        self.on_policy_data_collection_processes = on_policy_data_collection_processes
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.eigenspectrum_dir = self.results_dir / "eigenspectrum"
@@ -441,10 +444,12 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             agent.gae_lambda,
             agent.gamma,
         )
+        agent_spec_cpu = self.agent_spec.copy_with_new_parameters(device="cpu")
         fill_rollout_buffer(
             self.env_factory_or_dataset,
-            self.agent_spec,
+            agent_spec_cpu,
             rollout_buffer_true_loss,
+            num_spawned_processes=self.on_policy_data_collection_processes,
         )
 
         rollout_buffer_gradient_estimates = (

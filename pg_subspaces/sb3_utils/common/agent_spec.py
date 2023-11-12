@@ -69,6 +69,7 @@ class AgentSpec(abc.ABC):
         self,
         weights: Optional[Sequence[torch.Tensor]] = None,
         agent_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[Union[torch.device, str]] = None,
     ) -> "AgentSpec":
         pass
 
@@ -138,16 +139,19 @@ class CheckpointAgentSpec(AgentSpec):
         self,
         weights: Optional[Sequence[torch.Tensor]] = None,
         agent_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[Union[torch.device, str]] = None,
     ) -> "CheckpointAgentSpec":
         if weights is None:
             weights = self.override_weights
         if agent_kwargs is None:
             agent_kwargs = self.agent_kwargs
+        if device is None:
+            device = self.device
         return CheckpointAgentSpec(
             self.agent_class,
             self.checkpoints_dir,
             self.timestep,
-            self.device,
+            device,
             weights,
             agent_kwargs,
         )
@@ -212,6 +216,7 @@ class HydraAgentSpec(AgentSpec):
         self,
         weights: Optional[Sequence[torch.Tensor]] = None,
         agent_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[Union[torch.device, str]] = None,
     ) -> "HydraAgentSpec":
         if weights is None:
             weights = self.override_weights
