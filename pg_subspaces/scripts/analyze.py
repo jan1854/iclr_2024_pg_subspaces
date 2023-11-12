@@ -29,7 +29,7 @@ def create_jobs(
     run_dirs: Sequence[Path],
     checkpoints_to_analyze: Optional[Sequence[int]],
     min_interval: Optional[int],
-    first_checkpoint: Optional[int],
+    first_checkpoint: int,
     last_checkpoint: Optional[int],
 ) -> List[Tuple[Path, int]]:
     jobs = []
