@@ -25,7 +25,7 @@ dependencies = [
     "scipy",
     "stable-baselines3[extra]==1.8.0",
     "tensorboard",
-    "torch==2.0.1",
+    "torch==2.1.0",
     "tqdm"
 ]
 
