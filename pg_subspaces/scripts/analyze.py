@@ -6,7 +6,7 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence, List, Tuple
 
 import gym
 import hydra
@@ -23,6 +23,45 @@ from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec
 from pg_subspaces.sb3_utils.common.env.make_env import make_single_env
 
 logger = logging.getLogger(__name__)
+
+
+def create_jobs(
+    run_dirs: Sequence[Path],
+    checkpoints_to_analyze: Optional[Sequence[int]],
+    min_interval: Optional[int],
+    first_checkpoint: Optional[int],
+    last_checkpoint: Optional[int],
+) -> List[Tuple[Path, int]]:
+    jobs = []
+    for log_dir in run_dirs:
+        checkpoints_dir = log_dir / "checkpoints"
+        checkpoint_steps = [
+            get_step_from_checkpoint(checkpoint.name)
+            for checkpoint in checkpoints_dir.iterdir()
+        ]
+        checkpoint_steps.sort()
+        curr_jobs = []
+        if checkpoints_to_analyze is not None:
+            for checkpoint in checkpoints_to_analyze:
+                checkpoint_no_action_repeat = int(checkpoint)
+                if checkpoint_no_action_repeat in checkpoint_steps:
+                    curr_jobs.append((log_dir, checkpoint_no_action_repeat))
+                else:
+                    logger.warning(
+                        f"Did not find checkpoint {checkpoint} in {checkpoints_dir}, skipping."
+                    )
+        else:
+            for step in checkpoint_steps:
+
+                if (
+                    step >= first_checkpoint
+                    and (last_checkpoint is None or step <= last_checkpoint)
+                    and step - first_checkpoint >= len(curr_jobs) * min_interval
+                ):
+                    curr_jobs.append((log_dir, step))
+        jobs.extend(curr_jobs)
+    jobs.sort(key=lambda j: (j[1], j[0]))
+    return jobs
 
 
 def analysis_worker(
@@ -112,40 +151,16 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
 
-    jobs = []
+    jobs = create_jobs(
+        run_logs,
+        cfg.get("checkpoints_to_analyze"),
+        cfg.get("min_interval"),
+        cfg.get("first_checkpoint"),
+        cfg.get("last_checkpoint"),
+    )
     summary_writers = {}
     for log_dir in run_logs:
         summary_writers[log_dir] = SummaryWriter(str(log_dir / "tensorboard"))
-        checkpoints_dir = log_dir / "checkpoints"
-        checkpoint_steps = [
-            get_step_from_checkpoint(checkpoint.name)
-            for checkpoint in checkpoints_dir.iterdir()
-        ]
-        checkpoint_steps.sort()
-        checkpoints_to_analyze = []
-        if cfg.checkpoints_to_analyze is not None:
-            for checkpoint in cfg.checkpoints_to_analyze:
-                checkpoint_no_action_repeat = int(checkpoint)
-                if checkpoint_no_action_repeat in checkpoint_steps:
-                    checkpoints_to_analyze.append(
-                        (log_dir, checkpoint_no_action_repeat)
-                    )
-                else:
-                    logger.warning(
-                        f"Did not find checkpoint {checkpoint} in {checkpoints_dir}, skipping."
-                    )
-        else:
-            for step in checkpoint_steps:
-
-                if (
-                    step >= cfg.first_checkpoint
-                    and (cfg.last_checkpoint is None or step <= cfg.last_checkpoint)
-                    and step - cfg.first_checkpoint
-                    >= len(checkpoints_to_analyze) * cfg.min_interval
-                ):
-                    checkpoints_to_analyze.append((log_dir, step))
-        jobs.extend(checkpoints_to_analyze)
-    jobs.sort(key=lambda j: (j[1], j[0]))
 
     if cfg.num_workers == 1:
         for log_dir, step in tqdm(jobs, desc="Analyzing logs"):
