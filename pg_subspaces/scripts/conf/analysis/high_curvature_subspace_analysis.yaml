@@ -10,3 +10,4 @@ overwrite_cached_eigen: false
 skip_cacheing_eigen: false
 hessian_eigen: ???
 on_policy_data_collection_processes: 5
+lock_analysis_log_file: True

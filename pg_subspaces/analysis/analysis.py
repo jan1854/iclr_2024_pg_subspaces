@@ -32,12 +32,14 @@ class Analysis(abc.ABC):
         env_factory_or_dataset: Callable[[], gym.Env],
         agent_spec: AgentSpec,
         run_dir: Path,
+        lock_analysis_log_file: bool = True,
     ):
         self.analysis_name = analysis_name
         self.analysis_run_id = analysis_run_id
         self.env_factory_or_dataset = env_factory_or_dataset
         self.agent_spec = agent_spec
         self.run_dir = run_dir
+        self.lock_analysis_log_file = lock_analysis_log_file
         self._analyses_log_file = run_dir / ".analyses.yaml"
         if not self._analyses_log_file.exists():
             self._analyses_log_file.touch()
@@ -63,7 +65,7 @@ class Analysis(abc.ABC):
                         self._analyses_log_file.suffix + ".lock"
                     )
                 )
-                with lock.acquire(timeout=60):
+                with lock.acquire(timeout=60, blocking=self.lock_analysis_log_file):
                     # Re-read the analyses.yaml file in case it was changed by another process in the meantime
                     analyses_logs = self._load_analysis_logs()
                     # Save that the analysis was done for this step

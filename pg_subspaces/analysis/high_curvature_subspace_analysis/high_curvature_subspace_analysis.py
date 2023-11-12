@@ -57,6 +57,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         overwrite_cached_eigen: bool,
         skip_cacheing_eigen: bool,
         on_policy_data_collection_processes: int,
+        lock_analysis_log_file: bool = True,
     ):
         super().__init__(
             "high_curvature_subspace_analysis",
@@ -64,6 +65,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             env_factory_or_dataset,
             agent_spec,
             run_dir,
+            lock_analysis_log_file,
         )
         self.num_samples_true_loss = num_samples_true_loss
         self.top_eigenvec_levels = top_eigenvec_levels
