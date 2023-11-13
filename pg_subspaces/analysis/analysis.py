@@ -59,24 +59,28 @@ class Analysis(abc.ABC):
         if env_step not in curr_analysis_logs or overwrite_results:
             logs = self._do_analysis(env_step, logs, overwrite_results, show_progress)
             if env_step not in curr_analysis_logs:
-                # Lock the analysis.yaml file to ensure sequential access
-                lock = filelock.FileLock(
-                    self._analyses_log_file.with_suffix(
-                        self._analyses_log_file.suffix + ".lock"
+                if self.lock_analysis_log_file:
+                    # Lock the analysis.yaml file to ensure sequential access
+                    lock = filelock.FileLock(
+                        self._analyses_log_file.with_suffix(
+                            self._analyses_log_file.suffix + ".lock"
+                        )
                     )
-                )
-                with lock.acquire(timeout=60, blocking=self.lock_analysis_log_file):
-                    # Re-read the analyses.yaml file in case it was changed by another process in the meantime
-                    analyses_logs = self._load_analysis_logs()
-                    # Save that the analysis was done for this step
-                    analyses_logs[self.analysis_name][self.analysis_run_id] += [
-                        env_step
-                    ]
-                    analyses_logs[self.analysis_name][self.analysis_run_id].sort()
-                    with self._analyses_log_file.open("w") as analyses_log_file:
-                        yaml.dump(analyses_logs, analyses_log_file)
+                    with lock.acquire(timeout=60):
+                        self._update_analyses_logs(env_step)
+                else:
+                    self._update_analyses_logs(env_step)
             add_new_data_indicator(self.run_dir)
         return logs
+
+    def _update_analyses_logs(self, env_step: int) -> None:
+        # Re-read the analyses.yaml file in case it was changed by another process in the meantime
+        analyses_logs = self._load_analysis_logs()
+        # Save that the analysis was done for this step
+        analyses_logs[self.analysis_name][self.analysis_run_id] += [env_step]
+        analyses_logs[self.analysis_name][self.analysis_run_id].sort()
+        with self._analyses_log_file.open("w") as analyses_log_file:
+            yaml.dump(analyses_logs, analyses_log_file)
 
     def _load_analysis_logs(self) -> Dict[str, Dict[str, List[int]]]:
         with self._analyses_log_file.open("r") as analyses_log_file:
