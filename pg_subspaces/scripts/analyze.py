@@ -72,6 +72,7 @@ def analysis_worker(
     overwrite_results: bool,
     show_progress: bool,
 ) -> TensorboardLogs:
+    logger.debug("Created analysis_worker.")
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
     if device is None:
         device = train_cfg.algorithm.algorithm.device
@@ -102,6 +103,7 @@ def analysis_worker(
         agent_spec=agent_spec,
         run_dir=run_dir,
     )
+    logger.debug("Starting analysis.")
     return analysis.do_analysis(agent_step, overwrite_results, show_progress)
 
 
