@@ -127,7 +127,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             device=agent.device,
             skip_cacheing=self.skip_cacheing_eigen,
         )
-        logger.debug(f"Computing eigenvectors for step {env_step}.")
+        print(f"Computing eigenvectors for step {env_step}.")
         (
             eigenvals_combined,
             eigenvecs_combined,
