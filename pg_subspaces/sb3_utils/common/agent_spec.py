@@ -174,7 +174,9 @@ class HydraAgentSpec(AgentSpec):
         self.env_factory = env_factory
         self.weights_checkpoint_path = weights_checkpoint_path
 
-        if isinstance(self.agent_cfg.algorithm.policy_kwargs.net_arch, int):
+        if "net_arch" in self.agent_cfg.get("algorithm", {}).get(
+            "policy_kwargs", {}
+        ) and isinstance(self.agent_cfg.algorithm.policy_kwargs.net_arch, int):
             # Hack: The sweeper cannot handle list-type parameters, so if the net_arch is a scalar, convert it to a list
             self.agent_cfg.algorithm.policy_kwargs.net_arch = omegaconf.ListConfig(
                 [
