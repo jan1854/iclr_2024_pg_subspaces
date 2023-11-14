@@ -40,17 +40,22 @@ class SubspaceOverlaps:
         summary_writer = torch.utils.tensorboard.SummaryWriter(
             str(self.run_dir / "tensorboard")
         )
-        logs = TensorboardLogs("subspace_overlap")
+        logs = TensorboardLogs("subspace_overlaps_analysis/default")
         agent = self.agent_spec.create_agent()
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         prefixes = ["", "low_sample/"]
         for loss_name in loss_names:
             for prefix in prefixes:
                 if self.verbose:
-                    print(f"Calculating overlaps for loss {loss_name}.")
+                    print(
+                        f"Calculating overlaps for loss {loss_name}{f' ({prefix[:-1]})' if len(prefix) > 0 else ''}."
+                    )
                 overlaps = self._calculate_overlaps(loss_name, agent)
                 if self.verbose:
-                    print(f"Finished calculating overlaps for loss {loss_name}.")
+                    print(
+                        f"Finished calculating overlaps for loss {loss_name}"
+                        f"{f' ({prefix[:-1]})' if len(prefix) > 0 else ''}."
+                    )
                 for k, overlaps_top_k in overlaps.items():
                     keys = []
                     for t1, overlaps_t1 in overlaps_top_k.items():
