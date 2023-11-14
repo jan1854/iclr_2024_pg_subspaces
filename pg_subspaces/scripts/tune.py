@@ -16,11 +16,6 @@ logger = logging.getLogger(__name__)
 def worker(cfg: omegaconf.DictConfig, seed: int, working_directory: Path) -> float:
     cfg = copy.deepcopy(cfg)
     cfg.seed = seed
-    if isinstance(cfg.algorithm.algorithm.policy_kwargs.net_arch, int):
-        # Hack: The sweeper cannot handle list-type parameters, so pass a single number and convert it to a list
-        cfg.algorithm.algorithm.policy_kwargs.net_arch = omegaconf.ListConfig(
-            [cfg.algorithm.algorithm.policy_kwargs.net_arch]
-        )
     working_directory.mkdir()
     try:
         train(cfg, root_path=str(working_directory))
