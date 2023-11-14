@@ -182,7 +182,6 @@ class HydraAgentSpec(AgentSpec):
                     self.agent_cfg.algorithm.policy_kwargs.net_arch,
                 ]
             )
-        pass
 
     def _create_agent(
         self,
