@@ -1,51 +1,44 @@
 from pathlib import Path
-from typing import Callable, Dict, Literal, Sequence
+from typing import Dict, Literal, Sequence
 
-import gym
 import stable_baselines3.common.base_class
 import torch
+import torch.utils.tensorboard
 
-from pg_subspaces.analysis.analysis import Analysis
 from pg_subspaces.analysis.hessian.hessian_eigen_cached_calculator import (
     HessianEigenCachedCalculator,
 )
-from pg_subspaces.metrics.tensorboard_logs import TensorboardLogs
+from pg_subspaces.metrics.tensorboard_logs import (
+    TensorboardLogs,
+    add_new_data_indicator,
+)
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
 from pg_subspaces.sb3_utils.common.parameters import project_orthonormal
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 
 
-class SubspaceOverlapAnalysis(Analysis):
+class SubspaceOverlaps:
     def __init__(
         self,
-        analysis_run_id: str,
-        env_factory_or_dataset: Callable[[], gym.Env],
         agent_spec: AgentSpec,
         run_dir: Path,
         top_eigenvec_levels: Sequence[int],
         hessian_eigen: HessianEigen,
         eigenvec_overlap_checkpoints: Sequence[int],
-        lock_analysis_log_file: bool = True,
     ):
-        super().__init__(
-            "subspace_overlaps_analysis",
-            analysis_run_id,
-            env_factory_or_dataset,
-            agent_spec,
-            run_dir,
-            lock_analysis_log_file,
-        )
+        self.run_dir = run_dir
+        self.agent_spec = agent_spec
         self.top_eigenvec_levels = top_eigenvec_levels
         self.hessian_eigen = hessian_eigen
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
 
-    def _do_analysis(
+    def analyze_subspace_overlaps(
         self,
-        env_step: int,
-        logs: TensorboardLogs,
-        overwrite_results: bool,
-        verbose: bool,
     ) -> TensorboardLogs:
+        summary_writer = torch.utils.tensorboard.SummaryWriter(
+            str(self.run_dir / "tensorboard")
+        )
+        logs = TensorboardLogs("subspace_overlap")
         agent = self.agent_spec.create_agent()
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         prefixes = ["", "low_sample/"]
@@ -63,6 +56,8 @@ class SubspaceOverlapAnalysis(Analysis):
                     logs.add_multiline_scalar(
                         f"{prefix}overlaps_top{k:03d}/{loss_name}", keys
                     )
+        logs.log(summary_writer)
+        add_new_data_indicator(self.run_dir)
         return logs
 
     def _calculate_overlaps(

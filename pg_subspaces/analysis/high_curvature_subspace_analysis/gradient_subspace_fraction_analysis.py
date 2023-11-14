@@ -59,7 +59,7 @@ class GradientSubspaceFractionAnalysis(Analysis):
         lock_analysis_log_file: bool = True,
     ):
         super().__init__(
-            "gradient_subspace_fraction_analysis",
+            "high_curvature_subspace_analysis",
             analysis_run_id,
             env_factory_or_dataset,
             agent_spec,

@@ -21,7 +21,7 @@ def make_single_env(
 
 
 def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
-    if cfg.algorithm.training.n_envs == 1:
+    if "n_envs" not in cfg.algorithm.training or cfg.algorithm.training.n_envs == 1:
         env = stable_baselines3.common.vec_env.DummyVecEnv(
             [
                 lambda: stable_baselines3.common.monitor.Monitor(
