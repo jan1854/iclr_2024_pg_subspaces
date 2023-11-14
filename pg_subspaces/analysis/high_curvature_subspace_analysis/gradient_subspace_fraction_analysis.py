@@ -41,7 +41,7 @@ from pg_subspaces.sb3_utils.common.loss import actor_critic_gradient
 logger = logging.Logger(__name__)
 
 
-class HighCurvatureSubspaceAnalysis(Analysis):
+class GradientSubspaceFractionAnalysis(Analysis):
     def __init__(
         self,
         analysis_run_id: str,
@@ -52,7 +52,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         run_dir: Path,
         num_samples_true_loss: int,
         top_eigenvec_levels: Sequence[int],
-        eigenvec_overlap_checkpoints: Sequence[int],
         hessian_eigen: HessianEigen,
         overwrite_cached_eigen: bool,
         skip_cacheing_eigen: bool,
@@ -60,7 +59,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         lock_analysis_log_file: bool = True,
     ):
         super().__init__(
-            "high_curvature_subspace_analysis",
+            "gradient_subspace_fraction_analysis",
             analysis_run_id,
             env_factory_or_dataset,
             agent_spec,
@@ -69,7 +68,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         )
         self.num_samples_true_loss = num_samples_true_loss
         self.top_eigenvec_levels = top_eigenvec_levels
-        self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
         self.hessian_eigen = hessian_eigen
         self.overwrite_cached_eigen = overwrite_cached_eigen
         self.skip_cacheing_eigen = skip_cacheing_eigen
@@ -252,28 +250,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             f"{prefix}gradient_subspace_fraction/true_gradient/{loss_name}", keys
         )
 
-        overlaps = self._calculate_overlaps(loss_name, agent)
-        for k, overlaps_top_k in overlaps.items():
-            keys = []
-            for t1, overlaps_t1 in overlaps_top_k.items():
-                if len(overlaps_t1) > 0:
-                    curr_key = (
-                        f"{prefix}overlaps_top{k:03d}_checkpoint{t1:07d}/{loss_name}"
-                    )
-                    keys.append(curr_key)
-                    for t2, overlap in overlaps_t1.items():
-                        logs.add_scalar(curr_key, overlap, t2)
-            logs.add_multiline_scalar(f"{prefix}overlaps_top{k:03d}/{loss_name}", keys)
-
-    @classmethod
-    def _calculate_eigenvectors_overlap(
-        cls, eigenvectors1: torch.Tensor, eigenvectors2: torch.Tensor
-    ) -> float:
-        projected_evs = project_orthonormal(
-            eigenvectors2, eigenvectors1, result_in_orig_space=True
-        )
-        return torch.mean(torch.norm(projected_evs, dim=0) ** 2).item()
-
     def _plot_eigenspectrum(
         self,
         eigenvalues_policy: torch.Tensor,
@@ -360,41 +336,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             num_evs: np.mean(sub_frac_list)
             for num_evs, sub_frac_list in subspace_fractions.items()
         }
-
-    def _calculate_overlaps(
-        self,
-        loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"],
-        agent: stable_baselines3.common.base_class.BaseAlgorithm,
-    ) -> Dict[int, Dict[int, Dict[int, float]]]:
-        hess_eigen_calculator = HessianEigenCachedCalculator(
-            self.run_dir, self.hessian_eigen, skip_cacheing=self.skip_cacheing_eigen
-        )
-        start_checkpoints_eigenvecs = {
-            num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels
-        }
-        overlaps = {num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels}
-        for env_step, _, eigenvecs in hess_eigen_calculator.iter_cached_eigen(
-            agent, loss_name=loss_name
-        ):
-            for num_eigenvecs in self.top_eigenvec_levels:
-                curr_start_checkpoints_eigenvecs = start_checkpoints_eigenvecs[
-                    num_eigenvecs
-                ]
-                curr_overlaps = overlaps[num_eigenvecs]
-                for (
-                    checkpoint_env_step,
-                    checkpoint_evs,
-                ) in curr_start_checkpoints_eigenvecs.items():
-                    curr_overlaps[checkpoint_env_step][
-                        env_step
-                    ] = self._calculate_eigenvectors_overlap(
-                        checkpoint_evs[:, :num_eigenvecs],
-                        eigenvecs[:, :num_eigenvecs],
-                    )
-                if env_step in self.eigenvec_overlap_checkpoints:
-                    curr_start_checkpoints_eigenvecs[env_step] = eigenvecs
-                    curr_overlaps[env_step] = {env_step: 1.0}
-        return overlaps
 
     # TODO: This is redundant with HessianEigenCachedCalculator
     def calculate_eigen(

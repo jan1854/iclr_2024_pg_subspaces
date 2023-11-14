@@ -1,0 +1,9 @@
+defaults:
+  - hessian_eigen: lanczos
+
+_target_: pg_subspaces.analysis.high_curvature_subspace_analysis.subspace_overlap_analysis.SubspaceOverlapAnalysis
+analysis_run_id: default
+top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
+eigenvec_overlap_checkpoints: [0, 10_000, 50_000, 100_000, 200_000, 500_000, 1_000_000]
+hessian_eigen: ???
+lock_analysis_log_file: True

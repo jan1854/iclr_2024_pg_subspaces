@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - analysis: high_curvature_subspace_analysis
+  - analysis: gradient_subspace_fraction_analysis
 
 
 train_logs: ??
