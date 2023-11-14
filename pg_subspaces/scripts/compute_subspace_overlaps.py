@@ -11,6 +11,7 @@ import hydra
 import omegaconf
 import torch
 from omegaconf import OmegaConf
+from tqdm import tqdm
 
 from pg_subspaces.analysis.high_curvature_subspace_analysis.subspace_overlaps import (
     SubspaceOverlaps,
@@ -29,7 +30,7 @@ def analysis_worker(
     analysis_cfg: omegaconf.DictConfig,
     run_dir: Path,
 ) -> TensorboardLogs:
-    logger.debug("Created analysis_worker.")
+    print("Created analysis_worker.")
     train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
 
     agent_spec = HydraAgentSpec(
@@ -109,7 +110,11 @@ def compute_subspace_overlaps(cfg: omegaconf.DictConfig) -> None:
             cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
         )
         try:
-            pool.map(functools.partial(analysis_worker, cfg), run_dirs)
+            for _ in tqdm(
+                pool.map(functools.partial(analysis_worker, cfg), run_dirs),
+                total=len(run_dirs),
+            ):
+                pass
         except Exception as e:
             # TODO: Need to terminate the children's children as well
             for process in multiprocessing.active_children():
