@@ -73,7 +73,11 @@ def analysis_worker(
     show_progress: bool,
 ) -> TensorboardLogs:
     logger.debug("Created analysis_worker.")
-    train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
+    train_cfg_path = run_dir / ".hydra" / "config.yaml"
+    # If we're analyzing the output of a tuning run, the .hydra directory is one directory up
+    if not train_cfg_path.exists() and run_dir.parent.name.isnumeric():
+        train_cfg_path = run_dir.parent / ".hydra" / "config.yaml"
+    train_cfg = OmegaConf.load(train_cfg_path)
     if device is None:
         device = train_cfg.algorithm.algorithm.device
 
@@ -147,21 +151,28 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         train_logs_local = train_logs
 
     if (train_logs_local / "checkpoints").exists():
-        run_logs = [train_logs_local]
+        run_dirs = [train_logs_local]
     else:
-        run_logs = [
+        run_dirs = [
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
+        for run_dir in run_dirs.copy():
+            sub_run_dirs = [
+                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
+            ]
+            if len(sub_run_dirs) > 0:
+                run_dirs.remove(run_dir)
+            run_dirs.extend(sub_run_dirs)
 
     jobs = create_jobs(
-        run_logs,
+        run_dirs,
         cfg.get("checkpoints_to_analyze"),
         cfg.get("min_interval"),
         cfg.get("first_checkpoint"),
         cfg.get("last_checkpoint"),
     )
     summary_writers = {}
-    for log_dir in run_logs:
+    for log_dir in run_dirs:
         summary_writers[log_dir] = SummaryWriter(str(log_dir / "tensorboard"))
 
     if cfg.num_workers == 1:
