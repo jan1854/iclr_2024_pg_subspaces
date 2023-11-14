@@ -98,11 +98,12 @@ def compute_subspace_overlaps(cfg: omegaconf.DictConfig) -> None:
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
 
-    for run_dir in run_dirs:
-        analysis_worker(
-            cfg,
-            run_dir,
-        )
+    if cfg.num_workers == 1:
+        for run_dir in run_dirs:
+            analysis_worker(
+                cfg,
+                run_dir,
+            )
     else:
         pool = concurrent.futures.ProcessPoolExecutor(
             cfg.num_workers, mp_context=torch.multiprocessing.get_context("spawn")
