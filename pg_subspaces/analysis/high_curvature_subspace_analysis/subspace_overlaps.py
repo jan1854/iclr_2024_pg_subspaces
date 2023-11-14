@@ -25,12 +25,14 @@ class SubspaceOverlaps:
         top_eigenvec_levels: Sequence[int],
         hessian_eigen: HessianEigen,
         eigenvec_overlap_checkpoints: Sequence[int],
+        verbose,
     ):
         self.run_dir = run_dir
         self.agent_spec = agent_spec
         self.top_eigenvec_levels = top_eigenvec_levels
         self.hessian_eigen = hessian_eigen
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
+        self.verbose = verbose
 
     def analyze_subspace_overlaps(
         self,
@@ -44,7 +46,11 @@ class SubspaceOverlaps:
         prefixes = ["", "low_sample/"]
         for loss_name in loss_names:
             for prefix in prefixes:
+                if self.verbose:
+                    print(f"Calculating overlaps for loss {loss_name}.")
                 overlaps = self._calculate_overlaps(loss_name, agent)
+                if self.verbose:
+                    print(f"Finished calculating overlaps for loss {loss_name}.")
                 for k, overlaps_top_k in overlaps.items():
                     keys = []
                     for t1, overlaps_t1 in overlaps_top_k.items():
@@ -56,6 +62,8 @@ class SubspaceOverlaps:
                     logs.add_multiline_scalar(
                         f"{prefix}overlaps_top{k:03d}/{loss_name}", keys
                     )
+        if self.verbose:
+            print(f"Writing results to logs.")
         logs.log(summary_writer)
         add_new_data_indicator(self.run_dir)
         return logs

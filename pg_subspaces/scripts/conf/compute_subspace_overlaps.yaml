@@ -8,6 +8,7 @@ sync_train_logs: true
 num_workers: 1
 top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
 eigenvec_overlap_checkpoints: [0, 10_000, 50_000, 100_000, 200_000, 500_000, 1_000_000]
+verbose: false
 
 log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
 

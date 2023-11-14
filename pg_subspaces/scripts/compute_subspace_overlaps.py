@@ -46,6 +46,7 @@ def analysis_worker(
         analysis_cfg.top_eigenvec_levels,
         HessianEigenLanczos(1e-3, 100, None),
         analysis_cfg.eigenvec_overlap_checkpoints,
+        analysis_cfg.verbose,
     )
     logger.debug("Starting analysis.")
     return subspace_overlaps.analyze_subspace_overlaps()
