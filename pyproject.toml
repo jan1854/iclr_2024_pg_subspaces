@@ -32,6 +32,9 @@ dependencies = [
 [project.optional-dependencies]
 extra = [
     "hydra-joblib-launcher>=1.2.0",
-    "hydra-ax-sweeper>=1.2.0"
+    "hydra-ax-sweeper>=1.2.0",
+    # These are required to get the hydra-ax-sweeper plugin to work
+    "gpytorch<=1.8.0",
+    "pandas<=1.4.0"
 ]
 dev = ["pytest"]
