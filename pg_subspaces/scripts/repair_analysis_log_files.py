@@ -3,6 +3,7 @@ import logging
 import re
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 import hydra
 import yaml
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 def repair(
     run_dir: Path,
     expected_interval: int,
-    last_checkpoint: int,
+    last_checkpoint: Optional[int],
     analysis_run_id: str,
 ) -> None:
     hc_key = f"high_curvature_subspace_analysis/{analysis_run_id}/gradient_subspace_fraction_100evs/true_gradient/value_function_loss"
@@ -28,6 +29,11 @@ def repair(
     hc_analysis_steps = analyses_dict.get("high_curvature_subspace_analysis", {}).get(
         analysis_run_id, []
     )
+    if last_checkpoint is None:
+        if len(hc_analysis_steps) > 0:
+            last_checkpoint = max(hc_analysis_steps)
+        else:
+            last_checkpoint = 3000000
     missing_steps = [
         step
         for step in range(0, last_checkpoint + 1, expected_interval)
@@ -68,7 +74,7 @@ def repair_analysis_log_files(
     train_logs: Path,
     log_dir: Path,
     expected_interval: int,
-    last_checkpoint: int,
+    last_checkpoint: Optional[int],
     analysis_run_id: str,
     sync_train_logs: bool,
 ) -> None:
@@ -126,8 +132,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("train_logs", type=str)
     parser.add_argument("log_dir", type=str)
-    parser.add_argument("expected_interval", type=int)
-    parser.add_argument("last_checkpoint", type=int)
+    parser.add_argument("--expected-interval", type=int, default=50000)
+    parser.add_argument("--last-checkpoint", type=int)
     parser.add_argument("--analysis-run-id", type=str, default="default")
     parser.add_argument("--sync-logs", action="store_true")
     args = parser.parse_args()
