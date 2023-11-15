@@ -69,6 +69,8 @@ def worker(
             fontsize,
             linewidth,
             {},
+            {},
+            {},
             out,
         )
     except Exception as e:
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         experiment_configs = yaml.safe_load(experiment_configs_file)
 
     results = []
-    with multiprocessing.Pool(20) as pool:
+    with multiprocessing.Pool(10) as pool:
         for env_name, run_config in run_configs.items():
             if env_name not in args.envs and "*" not in args.envs:
                 continue

@@ -14,56 +14,56 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 PLOT_CONFIGS_SINGLE_RUN = {
-    "gradient_subspace_fraction_precise_vs_low_sample_hessian": {
-        # "title": "Subspace frac., precise vs. low-sample Hessian",
-        "out_dir": "gradient_subspace_fraction",
-        "keys": [
-            "gradient_subspace_fraction_001evs/estimated_gradient",
-            "low_sample/gradient_subspace_fraction_001evs/estimated_gradient",
-            "gradient_subspace_fraction_010evs/estimated_gradient",
-            "low_sample/gradient_subspace_fraction_010evs/estimated_gradient",
-            "gradient_subspace_fraction_100evs/estimated_gradient",
-            "low_sample/gradient_subspace_fraction_100evs/estimated_gradient",
-        ],
-        "legend": [
-            "True Hessian; 1 EV",
-            "Estimated Hessian; 1 EV",
-            "True Hessian; 10 EVs",
-            "Estimated Hessian; 10 EVs",
-            "True Hessian; 100 EVs",
-            "Estimated Hessian; 100 EVs",
-        ],
-        "ylabel": "Gradient subspace fraction",
-        "num_same_color_plots": 2,
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-    },
-    "gradient_subspace_fraction_estimated_vs_true": {
-        # "title": "Subspace frac., estimated vs. true grad.",
-        "out_dir": "gradient_subspace_fraction",
-        "keys": [
-            "gradient_subspace_fraction_001evs/true_gradient",
-            "gradient_subspace_fraction_001evs/estimated_gradient",
-            "gradient_subspace_fraction_010evs/true_gradient",
-            "gradient_subspace_fraction_010evs/estimated_gradient",
-            "gradient_subspace_fraction_100evs/true_gradient",
-            "gradient_subspace_fraction_100evs/estimated_gradient",
-        ],
-        "legend": [
-            "True grad.; 1 EV",
-            "Estimated grad.; 1 EV",
-            "True grad.; 10 EVs",
-            "Estimated grad.; 10 EVs",
-            "True grad.; 100 EVs",
-            "Estimated grad.; 100 EVs",
-        ],
-        "ylabel": "Gradient subspace fraction",
-        "num_same_color_plots": 2,
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-    },
+    # "gradient_subspace_fraction_precise_vs_low_sample_hessian": {
+    #     # "title": "Subspace frac., precise vs. low-sample Hessian",
+    #     "out_dir": "gradient_subspace_fraction",
+    #     "keys": [
+    #         "gradient_subspace_fraction_001evs/estimated_gradient",
+    #         "low_sample/gradient_subspace_fraction_001evs/estimated_gradient",
+    #         "gradient_subspace_fraction_010evs/estimated_gradient",
+    #         "low_sample/gradient_subspace_fraction_010evs/estimated_gradient",
+    #         "gradient_subspace_fraction_100evs/estimated_gradient",
+    #         "low_sample/gradient_subspace_fraction_100evs/estimated_gradient",
+    #     ],
+    #     "legend": [
+    #         "True Hessian; 1 EV",
+    #         "Estimated Hessian; 1 EV",
+    #         "True Hessian; 10 EVs",
+    #         "Estimated Hessian; 10 EVs",
+    #         "True Hessian; 100 EVs",
+    #         "Estimated Hessian; 100 EVs",
+    #     ],
+    #     "ylabel": "Gradient subspace fraction",
+    #     "num_same_color_plots": 2,
+    #     "ymin": 0.0,
+    #     "ymax": 1.0,
+    #     "smoothing_weight": 0.0,
+    # },
+    # "gradient_subspace_fraction_estimated_vs_true": {
+    #     # "title": "Subspace frac., estimated vs. true grad.",
+    #     "out_dir": "gradient_subspace_fraction",
+    #     "keys": [
+    #         "gradient_subspace_fraction_001evs/true_gradient",
+    #         "gradient_subspace_fraction_001evs/estimated_gradient",
+    #         "gradient_subspace_fraction_010evs/true_gradient",
+    #         "gradient_subspace_fraction_010evs/estimated_gradient",
+    #         "gradient_subspace_fraction_100evs/true_gradient",
+    #         "gradient_subspace_fraction_100evs/estimated_gradient",
+    #     ],
+    #     "legend": [
+    #         "True grad.; 1 EV",
+    #         "Estimated grad.; 1 EV",
+    #         "True grad.; 10 EVs",
+    #         "Estimated grad.; 10 EVs",
+    #         "True grad.; 100 EVs",
+    #         "Estimated grad.; 100 EVs",
+    #     ],
+    #     "ylabel": "Gradient subspace fraction",
+    #     "num_same_color_plots": 2,
+    #     "ymin": 0.0,
+    #     "ymax": 1.0,
+    #     "smoothing_weight": 0.0,
+    # },
     # "true_gradient_subspace_fraction": {
     #     # "title": "True gradient subspace fraction",
     #     "out_dir": "gradient_subspace_fraction",
@@ -100,84 +100,84 @@ PLOT_CONFIGS_SINGLE_RUN = {
     #     "ymax": 1.0,
     #     "smoothing_weight": 0.0,
     # },
-    "subspace_overlap_0100000_precise_vs_low_sample_hessian": {
-        # "title": "Subspace overlap, precise vs. low-sample Hessian, $t_1 = 10^{5}$",
-        "out_dir": "subspace_overlap",
-        "keys": [
-            "overlaps_top001_checkpoint0100000",
-            "low_sample/overlaps_top001_checkpoint0100000",
-            "overlaps_top010_checkpoint0100000",
-            "low_sample/overlaps_top010_checkpoint0100000",
-            "overlaps_top100_checkpoint0100000",
-            "low_sample/overlaps_top100_checkpoint0100000",
-        ],
-        "legend": [
-            "True Hessian; 1 EV",
-            "Estimated Hessian; 1 EV",
-            "True Hessian; 10 EVs",
-            "Estimated Hessian; 10 EVs",
-            "True Hessian; 100 EVs",
-            "Estimated Hessian; 100 EVs",
-        ],
-        "ylabel": "Subspace overlap",
-        "num_same_color_plots": 2,
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-        "fill_in_data": {100000: 1.0},
-        "annotations": {100000: "$t_1$"},
-    },
-    "subspace_overlap_0010000": {
-        # "title": "Subspace overlap, $t_1 = 10^{4}$",
-        "out_dir": "subspace_overlap",
-        "keys": [
-            "overlaps_top001_checkpoint0010000",
-            "overlaps_top010_checkpoint0010000",
-            "overlaps_top100_checkpoint0010000",
-        ],
-        "legend": ["1 EV", "10 EVs", "100 EVs"],
-        "xlabel": "$t_2$",
-        "ylabel": "Subspace overlap",
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-        "fill_in_data": {10000: 1.0},
-        "annotations": {10000: "$t_1$"},
-    },
-    "subspace_overlap_0100000": {
-        # "title": "Subspace overlap, $t_1 = 10^{5}$",
-        "out_dir": "subspace_overlap",
-        "keys": [
-            "overlaps_top001_checkpoint0100000",
-            "overlaps_top010_checkpoint0100000",
-            "overlaps_top100_checkpoint0100000",
-        ],
-        "legend": ["1 EV", "10 EVs", "100 EVs"],
-        "xlabel": "$t_2$",
-        "ylabel": "Subspace overlap",
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-        "fill_in_data": {100000: 1.0},
-        "annotations": {100000: "$t_1$"},
-    },
-    "subspace_overlap_0500000": {
-        # "title": "Subspace overlap, $t_1 = 5 \cdot 10^{5}$",
-        "out_dir": "subspace_overlap",
-        "keys": [
-            "overlaps_top001_checkpoint0500000",
-            "overlaps_top010_checkpoint0500000",
-            "overlaps_top100_checkpoint0500000",
-        ],
-        "legend": ["1 EV", "10 EVs", "100 EVs"],
-        "xlabel": "$t_2$",
-        "ylabel": "Subspace overlap",
-        "ymin": 0.0,
-        "ymax": 1.0,
-        "smoothing_weight": 0.0,
-        "fill_in_data": {500000: 1.0},
-        "annotations": {500000: "$t_1$"},
-    },
+    # "subspace_overlap_0100000_precise_vs_low_sample_hessian": {
+    #     # "title": "Subspace overlap, precise vs. low-sample Hessian, $t_1 = 10^{5}$",
+    #     "out_dir": "subspace_overlap",
+    #     "keys": [
+    #         "overlaps_top001_checkpoint0100000",
+    #         "low_sample/overlaps_top001_checkpoint0100000",
+    #         "overlaps_top010_checkpoint0100000",
+    #         "low_sample/overlaps_top010_checkpoint0100000",
+    #         "overlaps_top100_checkpoint0100000",
+    #         "low_sample/overlaps_top100_checkpoint0100000",
+    #     ],
+    #     "legend": [
+    #         "True Hessian; 1 EV",
+    #         "Estimated Hessian; 1 EV",
+    #         "True Hessian; 10 EVs",
+    #         "Estimated Hessian; 10 EVs",
+    #         "True Hessian; 100 EVs",
+    #         "Estimated Hessian; 100 EVs",
+    #     ],
+    #     "ylabel": "Subspace overlap",
+    #     "num_same_color_plots": 2,
+    #     "ymin": 0.0,
+    #     "ymax": 1.0,
+    #     "smoothing_weight": 0.0,
+    #     "fill_in_data": {100000: 1.0},
+    #     "x_annotations": [(100000, "$t_1$", False)],
+    # },
+    # "subspace_overlap_0010000": {
+    #     # "title": "Subspace overlap, $t_1 = 10^{4}$",
+    #     "out_dir": "subspace_overlap",
+    #     "keys": [
+    #         "overlaps_top001_checkpoint0010000",
+    #         "overlaps_top010_checkpoint0010000",
+    #         "overlaps_top100_checkpoint0010000",
+    #     ],
+    #     "legend": ["1 EV", "10 EVs", "100 EVs"],
+    #     "xlabel": "$t_2$",
+    #     "ylabel": "Subspace overlap",
+    #     "ymin": 0.0,
+    #     "ymax": 1.0,
+    #     "smoothing_weight": 0.0,
+    #     "fill_in_data": {10000: 1.0},
+    #     "x_annotations": [(10000, "$t_1$", False)],
+    # },
+    # "subspace_overlap_0100000": {
+    #     # "title": "Subspace overlap, $t_1 = 10^{5}$",
+    #     "out_dir": "subspace_overlap",
+    #     "keys": [
+    #         "overlaps_top001_checkpoint0100000",
+    #         "overlaps_top010_checkpoint0100000",
+    #         "overlaps_top100_checkpoint0100000",
+    #     ],
+    #     "legend": ["1 EV", "10 EVs", "100 EVs"],
+    #     "xlabel": "$t_2$",
+    #     "ylabel": "Subspace overlap",
+    #     "ymin": 0.0,
+    #     "ymax": 1.0,
+    #     "smoothing_weight": 0.0,
+    #     "fill_in_data": {100000: 1.0},
+    #     "x_annotations": [(100000, "$t_1$", False)],
+    # },
+    # "subspace_overlap_0500000": {
+    #     # "title": "Subspace overlap, $t_1 = 5 \cdot 10^{5}$",
+    #     "out_dir": "subspace_overlap",
+    #     "keys": [
+    #         "overlaps_top001_checkpoint0500000",
+    #         "overlaps_top010_checkpoint0500000",
+    #         "overlaps_top100_checkpoint0500000",
+    #     ],
+    #     "legend": ["1 EV", "10 EVs", "100 EVs"],
+    #     "xlabel": "$t_2$",
+    #     "ylabel": "Subspace overlap",
+    #     "ymin": 0.0,
+    #     "ymax": 1.0,
+    #     "smoothing_weight": 0.0,
+    #     "fill_in_data": {500000: 1.0},
+    #     "x_annotations": [(500000, "$t_1$", False)],
+    # },
 }
 
 PLOT_CONFIGS_MULTIPLE_RUNS = {
@@ -205,7 +205,7 @@ PLOT_CONFIGS_MULTIPLE_RUNS = {
         "ymax": 1.0,
         "smoothing_weight": 0.0,
         "fill_in_data": {100000: 1.0},
-        "annotations": {100000: "$t_1$"},
+        "x_annotations": [(100000, "$t_1$", False)],
     },
     "subspace_overlap_100evs_checkpoint_0100000": {
         "out_dir": "subspace_overlap",
@@ -215,7 +215,7 @@ PLOT_CONFIGS_MULTIPLE_RUNS = {
         "ymax": 1.0,
         "smoothing_weight": 0.0,
         "fill_in_data": {100000: 1.0},
-        "annotations": {100000: "$t_1$"},
+        "x_annotations": [(100000, "$t_1$", False)],
     },
 }
 
@@ -286,8 +286,9 @@ def worker_multiple_runs(
     fontsize: int,
     linewidth: float,
     fill_in_data: Dict[int, float],
+    x_annotations: Tuple[int, str, bool],
+    y_annotations: Tuple[int, str, bool],
     out: Path,
-    annotations: Dict[int, str],
 ):
     from pg_subspaces.scripts.create_plots import create_plots
 
@@ -309,8 +310,9 @@ def worker_multiple_runs(
             fontsize,
             linewidth,
             fill_in_data,
+            x_annotations,
+            y_annotations,
             out,
-            annotations,
         )
     except Exception as e:
         logger.warning(
@@ -339,7 +341,7 @@ if __name__ == "__main__":
         experiment_configs = yaml.safe_load(experiment_configs_file)
 
     results = []
-    with multiprocessing.Pool(20) as pool:
+    with multiprocessing.Pool(10) as pool:
         for env_name, run_config in run_configs.items():
             if env_name not in args.envs and "*" not in args.envs:
                 continue
@@ -382,6 +384,9 @@ if __name__ == "__main__":
                             )
                         keys = [
                             f"high_curvature_subspace_analysis/{analysis_run_id}/{key}/{loss_type}"
+                            for key in plot_config["keys"]
+                        ] + [
+                            f"subspace_overlaps_analysis/{analysis_run_id}/{key}/{loss_type}"
                             for key in plot_config["keys"]
                         ]
                         title_env_name = (
@@ -475,8 +480,9 @@ if __name__ == "__main__":
                                     plot_config.get("fontsize", 22),
                                     plot_config.get("linewidth", 2.5),
                                     plot_config.get("fill_in_data", {}),
+                                    plot_config.get("x_annotations", ()),
+                                    plot_config.get("y_annotations", ()),
                                     out_path,
-                                    plot_config.get("annotations", {}),
                                 ),
                             )
                         )
