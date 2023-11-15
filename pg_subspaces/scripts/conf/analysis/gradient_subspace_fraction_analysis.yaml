@@ -8,5 +8,5 @@ top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
 overwrite_cached_eigen: false
 skip_cacheing_eigen: false
 hessian_eigen: ???
-on_policy_data_collection_processes: 5
+on_policy_data_collection_processes: 1
 lock_analysis_log_file: True
