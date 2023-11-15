@@ -16,6 +16,14 @@ from pg_subspaces.metrics.tensorboard_logs import (
 logger = logging.Logger(__name__)
 
 
+def calculate_axis_limits(
+    curr_min: float, curr_max: float, val: float
+) -> Tuple[float, float]:
+    val_min = val + (curr_max - val) * 0.1
+    val_max = val - (val - curr_min) * 0.1
+    return min(val_min, curr_min), max(val_max, curr_max)
+
+
 def smooth(
     scalars: Sequence[float], weight: float
 ) -> np.ndarray:  # Weight between 0 and 1
@@ -117,6 +125,7 @@ def create_plots(
                         value_mean,
                         color=color,
                         linestyle=linestyles[i % num_same_color_plots],
+                        zorder=i + 2,
                     )
                     ax.fill_between(
                         steps,
@@ -125,6 +134,7 @@ def create_plots(
                         alpha=0.2,
                         label="_nolegend_",
                         color=color,
+                        zorder=i + 52,
                     )
                 else:
                     if (log_path / "tensorboard").exists():
@@ -206,6 +216,9 @@ def create_plots(
                     color="gray",
                     zorder=100,
                 )
+            x_low, x_high = ax.get_xlim()
+            x_low, x_high = calculate_axis_limits(x_low, x_high, pos)
+            ax.set_xlim(x_low, x_high)
 
         for pos, annotation, ann_legend in y_annotations:
             x_low, x_high = ax.get_xlim()
@@ -243,6 +256,9 @@ def create_plots(
                     color="gray",
                     zorder=100,
                 )
+            y_low, y_high = ax.get_ylim()
+            y_low, y_high = calculate_axis_limits(y_low, y_high, pos)
+            ax.set_ylim(y_low, y_high)
 
         if legend is not None and not separate_legend:
             ax.legend(legend, loc="lower right")
