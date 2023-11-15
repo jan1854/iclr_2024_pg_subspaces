@@ -349,7 +349,10 @@ if __name__ == "__main__":
                 curr_log_dir = log_dir / "training" / env_name / algo_log_dir
                 env_file_name = env_name[:-3].lower().replace("-", "_")
                 if not env_name.startswith("dmc"):
-                    env_file_name = "gym_" + env_file_name
+                    if env_name.startswith("Fetch"):
+                        env_file_name = "gym-robotics_" + env_file_name
+                    else:
+                        env_file_name = "gym_" + env_file_name
                 for out_filename, plot_config in PLOT_CONFIGS_SINGLE_RUN.items():
                     for loss_type, loss_type_short in [
                         ("combined_loss", "combined"),
@@ -389,11 +392,12 @@ if __name__ == "__main__":
                             f"subspace_overlaps_analysis/{analysis_run_id}/{key}/{loss_type}"
                             for key in plot_config["keys"]
                         ]
-                        title_env_name = (
-                            env_name[4:-3]
-                            if env_name.startswith("dmc_")
-                            else env_name[:-3]
-                        )
+                        if env_name.startswith("dmc_"):
+                            title_env_name = env_name[len("dmc_") : -3]
+                        elif env_name.startswith("gym-robotics_"):
+                            title_env_name = env_name[len("gym-robotics_") : -3]
+                        else:
+                            title_env_name = env_name[:-3]
                         title = (
                             f"{algo_name.upper()} - {title_env_name} - {plot_config.get('title')}"
                             if plot_config.get("title") is not None
