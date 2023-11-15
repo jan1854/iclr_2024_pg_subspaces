@@ -40,7 +40,7 @@ class SubspaceOverlaps:
         summary_writer = torch.utils.tensorboard.SummaryWriter(
             str(self.run_dir / "tensorboard")
         )
-        logs = TensorboardLogs("subspace_overlaps_analysis/default")
+        logs = TensorboardLogs("high_curvature_subspace_analysis/default")
         agent = self.agent_spec.create_agent()
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         prefixes = ["", "low_sample/"]
