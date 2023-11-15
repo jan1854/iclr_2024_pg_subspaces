@@ -463,6 +463,9 @@ if __name__ == "__main__":
                         keys = [
                             f"high_curvature_subspace_analysis/{a_id}/{plot_config['key']}/{loss_type}"
                             for a_id in analysis_run_ids
+                        ] + [
+                            f"subspace_overlaps_analysis/{a_id}/{plot_config['key']}/{loss_type}"
+                            for a_id in analysis_run_ids
                         ]
                         results.append(
                             pool.apply_async(
