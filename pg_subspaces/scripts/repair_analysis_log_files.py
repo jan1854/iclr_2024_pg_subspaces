@@ -7,6 +7,7 @@ from typing import Optional
 
 import hydra
 import yaml
+from tqdm import tqdm
 
 from pg_subspaces.metrics.tensorboard_logs import (
     create_event_accumulators,
@@ -113,7 +114,7 @@ def repair_analysis_log_files(
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
 
-    for run_dir in run_dirs:
+    for run_dir in tqdm(run_dirs, total=len(run_dirs)):
         repair(run_dir, expected_interval, last_checkpoint, analysis_run_id)
 
     if sync_train_logs:
