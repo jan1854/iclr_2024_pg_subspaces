@@ -56,6 +56,7 @@ class GradientSubspaceFractionAnalysis(Analysis):
         overwrite_cached_eigen: bool,
         skip_cacheing_eigen: bool,
         on_policy_data_collection_processes: int,
+        on_policy_data_collection_device: Union[torch.device, str],
         lock_analysis_log_file: bool = True,
     ):
         super().__init__(
@@ -72,6 +73,7 @@ class GradientSubspaceFractionAnalysis(Analysis):
         self.overwrite_cached_eigen = overwrite_cached_eigen
         self.skip_cacheing_eigen = skip_cacheing_eigen
         self.on_policy_data_collection_processes = on_policy_data_collection_processes
+        self.on_policy_data_collection_device = on_policy_data_collection_device
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.eigenspectrum_dir = self.results_dir / "eigenspectrum"
@@ -388,7 +390,9 @@ class GradientSubspaceFractionAnalysis(Analysis):
             agent.gae_lambda,
             agent.gamma,
         )
-        agent_spec_cpu = self.agent_spec.copy_with_new_parameters(device="cpu")
+        agent_spec_cpu = self.agent_spec.copy_with_new_parameters(
+            device=self.on_policy_data_collection_device
+        )
         fill_rollout_buffer(
             self.env_factory_or_dataset,
             agent_spec_cpu,

@@ -9,4 +9,5 @@ overwrite_cached_eigen: false
 skip_cacheing_eigen: false
 hessian_eigen: ???
 on_policy_data_collection_processes: 1
+on_policy_data_collection_device: "cpu"
 lock_analysis_log_file: True
