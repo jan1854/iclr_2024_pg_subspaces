@@ -1,19 +1,22 @@
 Ant-v3:
   log_dirs:
-    ppo: 2023-09-22/18-15-58
+    ppo: 2023-11-16/19-47-24
     sac: 2023-09-26/16-54-05
     ppo_large: 2023-10-11/07-08-45
     sac_small: 2023-10-11/04-32-14
     sac_on_policy: 2023-10-18/03-32-06
   xmax: 3_000_000
+BipedalWalker-v3:
+  log_dirs:
+    ppo: 2023-11-16/12-56-29
+    sac: 2023-11-16/12-59-10
 HalfCheetah-v3:
   log_dirs:
-    ppo: 2023-07-14/21-58-53
+    ppo: 2023-11-16/19-45-06
     sac: 2023-09-19/11-08-06
     sac_on_policy: 2023-10-18/09-17-06
   xmax: 3_000_000
   analysis_run_ids:
-    ppo: repeat_low_sample
     sac: repeat_after_bugfix
 Pendulum-v1:
   log_dirs:
@@ -28,20 +31,20 @@ Reacher-v2:
     ppo: 2023-11-11/22-59-05
     sac: 2023-11-12/22-30-34
   xmax: 500000
+  analysis_run_ids:
+    ppo: repeat_after_vecnormalize_fix
 Swimmer-v3:
   log_dirs:
     ppo: 2023-11-11/21-52-08
     sac: 2023-11-12/00-07-00
 Walker2d-v3:
   log_dirs:
-    ppo: 2023-07-14/23-14-41
+    ppo: 2023-11-16/19-26-41
     sac: 2023-09-23/23-20-09
     ppo_large: 2023-10-11/16-34-45
     sac_small: 2023-10-11/16-31-25
     sac_on_policy: 2023-10-30/18-55-03    # tuned
   xmax: 3_000_000
-  analysis_run_ids:
-    ppo: repeat_low_sample
 dmc_Ball_in_cup-catch-v1:
   log_dirs:
     ppo: 2023-09-22/10-49-35
@@ -62,7 +65,8 @@ dmc_Finger-spin-v1:
     ppo: repeat_low_sample
 FetchReach-v1:
   log_dirs:
-    ppo: 2023-11-14/12-25-33
+    ppo: 2023-11-15/20-07-13
+  xmax: 500_000
 FetchPush-v1:
   log_dirs:
     ppo: 2023-11-14/12-29-33
