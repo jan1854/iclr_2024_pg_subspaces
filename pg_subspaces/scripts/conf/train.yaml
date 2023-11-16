@@ -9,7 +9,7 @@ device: auto
 show_progress: true
 num_eval_episodes: 10
 eval_interval: 10000
-checkpoint_interval: 100_000
+checkpoint_interval: 50_000
 additional_checkpoints: [10_000]
 save_replay_buffer: false
 
