@@ -187,7 +187,8 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
                 cfg.overwrite_results,
                 show_progress=True,
             )
-            logs.log(summary_writers[log_dir])
+            if logs is not None:
+                logs.log(summary_writers[log_dir])
     else:
         # In contrast to multiprocessing.Pool, concurrent.futures.ProcessPoolExecutor allows nesting processes
         pool = concurrent.futures.ProcessPoolExecutor(
@@ -213,7 +214,8 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
                 desc="Analyzing logs",
             ):
                 logs = result.result()
-                logs.log(summary_writers[log_dir])
+                if logs is not None:
+                    logs.log(summary_writers[log_dir])
         except Exception as e:
             # TODO: Need to terminate the children's children as well
             for process in multiprocessing.active_children():

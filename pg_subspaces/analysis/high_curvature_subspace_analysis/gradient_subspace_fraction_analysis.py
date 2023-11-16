@@ -58,6 +58,7 @@ class GradientSubspaceFractionAnalysis(Analysis):
         on_policy_data_collection_processes: int,
         on_policy_data_collection_device: Union[torch.device, str],
         lock_analysis_log_file: bool = True,
+        ignore_exceptions: bool = False,
     ):
         super().__init__(
             "high_curvature_subspace_analysis",

@@ -4,7 +4,7 @@ import logging
 import filelock as filelock
 import torch.multiprocessing
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 import gym
 import yaml
@@ -33,6 +33,7 @@ class Analysis(abc.ABC):
         agent_spec: AgentSpec,
         run_dir: Path,
         lock_analysis_log_file: bool = True,
+        ignore_exceptions: bool = False,
     ):
         self.analysis_name = analysis_name
         self.analysis_run_id = analysis_run_id
@@ -40,6 +41,7 @@ class Analysis(abc.ABC):
         self.agent_spec = agent_spec
         self.run_dir = run_dir
         self.lock_analysis_log_file = lock_analysis_log_file
+        self.ignore_exceptions = ignore_exceptions
         self._analyses_log_file = run_dir / ".analyses.yaml"
         if not self._analyses_log_file.exists():
             self._analyses_log_file.touch()
@@ -49,7 +51,7 @@ class Analysis(abc.ABC):
         env_step: int,
         overwrite_results: bool = False,
         show_progress: bool = False,
-    ) -> TensorboardLogs:
+    ) -> Optional[TensorboardLogs]:
         prefix = f"{self.analysis_name}/{self.analysis_run_id}"
         prefix_step_plots = f"{self.analysis_name}_step_plots/{self.analysis_run_id}"
         logs = TensorboardLogs(prefix, prefix_step_plots)
@@ -57,7 +59,16 @@ class Analysis(abc.ABC):
         analyses_logs = self._load_analysis_logs()
         curr_analysis_logs = analyses_logs[self.analysis_name][self.analysis_run_id]
         if env_step not in curr_analysis_logs or overwrite_results:
-            logs = self._do_analysis(env_step, logs, overwrite_results, show_progress)
+            try:
+                logs = self._do_analysis(
+                    env_step, logs, overwrite_results, show_progress
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Analysis failed for directory {self.run_dir}, step {env_step} "
+                    f"with exception {type(e).__name__}: {e}."
+                )
+                return None
             if env_step not in curr_analysis_logs:
                 if self.lock_analysis_log_file:
                     # Lock the analysis.yaml file to ensure sequential access
