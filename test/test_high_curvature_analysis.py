@@ -5,6 +5,7 @@ from pathlib import Path
 import gym
 import pytest
 import stable_baselines3.common.buffers
+import stable_baselines3.common.vec_env
 import torch
 
 from pg_subspaces.analysis.hessian.hessian_eigen_cached_calculator import (
@@ -37,7 +38,9 @@ def test_high_curvature_overlap():
 
 
 def test_hessian_eigen_cached_calculator():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     agent = stable_baselines3.ppo.PPO(
         "MlpPolicy",
         env,

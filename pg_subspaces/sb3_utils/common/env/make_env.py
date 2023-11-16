@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 import gym
@@ -20,7 +21,11 @@ def make_single_env(
     return env
 
 
-def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
+def make_vec_env(
+    cfg: omegaconf.DictConfig,
+    vec_normalize_load_path: Optional[Path] = None,
+    freeze_loaded_vec_normalize: bool = False,
+) -> stable_baselines3.common.vec_env.VecEnv:
     if "n_envs" not in cfg.algorithm.training or cfg.algorithm.training.n_envs == 1:
         env = stable_baselines3.common.vec_env.DummyVecEnv(
             [
@@ -44,4 +49,11 @@ def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.
     if "env_wrappers" in cfg.algorithm:
         for wrapper in cfg.algorithm.env_wrappers.values():
             env = hydra.utils.instantiate(wrapper, venv=env)
+    if vec_normalize_load_path is not None:
+        # TODO: This cannot deal with the case that VecNormalize is not the outer-most wrapper
+        assert isinstance(env, stable_baselines3.common.vec_env.VecNormalize)
+        env = stable_baselines3.common.vec_env.VecNormalize.load(
+            str(vec_normalize_load_path), env.venv
+        )
+        env.training = not freeze_loaded_vec_normalize
     return env

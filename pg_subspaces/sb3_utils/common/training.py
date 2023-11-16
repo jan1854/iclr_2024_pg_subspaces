@@ -13,6 +13,8 @@ from typing import (
 
 import gym
 import stable_baselines3
+import stable_baselines3.common.buffers
+import stable_baselines3.common.vec_env
 import torch
 
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
@@ -32,9 +34,12 @@ def maybe_create_agent(
 
 
 def maybe_create_env(
-    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
-) -> gym.Env:
-    if isinstance(env_or_factory, gym.Env):
+    env_or_factory: Union[
+        stable_baselines3.common.vec_env.VecEnv,
+        Callable[[], stable_baselines3.common.vec_env.VecEnv],
+    ],
+) -> stable_baselines3.common.vec_env.VecEnv:
+    if isinstance(env_or_factory, stable_baselines3.common.vec_env.VecEnv):
         return env_or_factory
     else:
         return env_or_factory()

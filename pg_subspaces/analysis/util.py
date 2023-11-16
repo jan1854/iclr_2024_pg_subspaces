@@ -1,17 +1,17 @@
 import dataclasses
-from typing import Callable, Iterable, List, Optional, Sequence, Union, Dict, Any
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Union
 
-import gym
 import numpy as np
+import stable_baselines3.common.buffers
+import stable_baselines3.common.base_class
+import stable_baselines3.common.vec_env
+import torch
 
 from pg_subspaces.sb3_utils.a2c.a2c_loss import a2c_loss
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
 from pg_subspaces.sb3_utils.common.buffer import get_episode_length, fill_rollout_buffer
 from pg_subspaces.sb3_utils.common.training import maybe_create_agent
 from pg_subspaces.sb3_utils.ppo.ppo_loss import ppo_loss
-import stable_baselines3.common.buffers
-import stable_baselines3.common.base_class
-import torch
 
 
 @dataclasses.dataclass
@@ -69,7 +69,10 @@ def evaluate_agent_returns(
         stable_baselines3.ppo.PPO,
         Sequence[stable_baselines3.ppo.PPO],
     ],
-    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
+    env_or_factory: Union[
+        stable_baselines3.common.vec_env.VecEnv,
+        Callable[[], stable_baselines3.common.vec_env.VecEnv],
+    ],
     num_steps: Optional[int] = None,
     num_episodes: Optional[int] = None,
     num_spawned_processes: Optional[int] = 0,

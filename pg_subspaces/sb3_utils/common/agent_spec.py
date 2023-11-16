@@ -1,7 +1,17 @@
 import abc
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Sequence, Union, Type, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    Sequence,
+    Union,
+    Type,
+    TypeVar,
+    Literal,
+)
 
 import gym
 import hydra
@@ -22,6 +32,28 @@ SB3Agent = TypeVar(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def get_agent_name(checkpoints_dir: Path):
+    agent_checkpoint_path = next(checkpoints_dir.glob(f"*_steps.zip"))
+    return agent_checkpoint_path.name[: agent_checkpoint_path.name.find("_")]
+
+
+def get_checkpoint_path(
+    checkpoints_dir: Path,
+    timestep: int,
+    checkpoint_type: Optional[Literal["replay_buffer", "vecnormalize"]] = None,
+):
+    agent_name = get_agent_name(checkpoints_dir)
+    checkpoint_type_str = f"{checkpoint_type}_" if checkpoint_type is not None else ""
+    checkpoint_path = (
+        checkpoints_dir / f"{agent_name}_{checkpoint_type_str}{timestep}_steps"
+    )
+    if checkpoint_type is None:
+        checkpoint_path = checkpoint_path.with_suffix(".zip")
+    else:
+        checkpoint_path = checkpoint_path.with_suffix(".pkl")
+    return checkpoint_path
 
 
 class AgentSpec(abc.ABC):
@@ -83,22 +115,20 @@ class CheckpointAgentSpec(AgentSpec):
         device: Union[str, torch.device],
         override_weights: Optional[Sequence[torch.Tensor]] = None,
         agent_kwargs: Dict[str, Any] = None,
+        freeze_vec_normalize: bool = False,
     ):
         super().__init__(device, override_weights, agent_kwargs)
         self.agent_class = agent_class
         self.checkpoints_dir = checkpoints_dir
         self.timestep = timestep
+        self.freeze_vec_normalize = freeze_vec_normalize
 
     def _create_agent(
         self,
-        env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+        env: Optional[stable_baselines3.common.vec_env.VecEnv],
         replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> SB3Agent:
-        agent_checkpoint_path = list(
-            self.checkpoints_dir.glob(f"*_{self.timestep}_steps.zip")
-        )
-        assert len(agent_checkpoint_path) == 1
-        agent_checkpoint_path = agent_checkpoint_path[0]
+        agent_checkpoint_path = get_checkpoint_path(self.checkpoints_dir, self.timestep)
         if issubclass(self.agent_class, OfflineAlgorithm):
             agent = self.agent_class.load(
                 agent_checkpoint_path, replay_buffer, self.device, **self.agent_kwargs
@@ -112,9 +142,7 @@ class CheckpointAgentSpec(AgentSpec):
         if replay_buffer is None and isinstance(
             agent, stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm
         ):
-            agent_name = agent_checkpoint_path.name[
-                : agent_checkpoint_path.name.find("_")
-            ]
+            agent_name = get_agent_name(self.checkpoints_dir)
             rb_checkpointer = ReplayBufferDiffCheckpointer(
                 agent, agent_name, self.checkpoints_dir
             )
@@ -187,7 +215,7 @@ class HydraAgentSpec(AgentSpec):
 
     def _create_agent(
         self,
-        env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+        env: Optional[stable_baselines3.common.vec_env.VecEnv],
         replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> SB3Agent:
         agent_class = hydra.utils.get_class(self.agent_cfg["algorithm"]["_target_"])

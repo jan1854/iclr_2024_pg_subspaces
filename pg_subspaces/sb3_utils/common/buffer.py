@@ -32,7 +32,10 @@ EnvSteps = collections.namedtuple(
 
 
 def fill_rollout_buffer(
-    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
+    env_or_factory: Union[
+        stable_baselines3.common.vec_env.VecEnv,
+        Callable[[], stable_baselines3.common.vec_env.VecEnv],
+    ],
     agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
     rollout_buffer: Optional[stable_baselines3.common.buffers.RolloutBuffer],
     rollout_buffer_no_value_bootstrap: Optional[
@@ -202,7 +205,10 @@ def get_episode_length(
 def collect_complete_episodes(
     min_num_env_steps: int,
     max_num_episodes: Optional[int],
-    env_or_factory: Union[gym.Env, Callable[[], gym.Env]],
+    env_or_factory: Union[
+        stable_baselines3.common.vec_env.VecEnv,
+        Callable[[], stable_baselines3.common.vec_env.VecEnv],
+    ],
     agent_or_spec: Union[AgentSpec, stable_baselines3.ppo.PPO],
 ) -> EnvSteps:
     if isinstance(env_or_factory, Callable):
@@ -251,7 +257,7 @@ def collect_complete_episodes(
             # Convert to pytorch tensor or to TensorDict
             obs_tensor = obs_as_tensor(observations[n_steps], agent.device)
             action, value, log_prob = agent.policy(obs_tensor.unsqueeze(0))
-        action = action.squeeze(0).cpu().numpy()
+        action = action.cpu().numpy()
 
         # Rescale and perform action
         clipped_action = action
@@ -261,7 +267,7 @@ def collect_complete_episodes(
                 action, agent.action_space.low, agent.action_space.high
             )
 
-        obs, reward, done, info = env.step(clipped_action)
+        obs, reward, done, infos = env.step(clipped_action)
 
         if isinstance(agent.action_space, gym.spaces.Discrete):
             # Reshape in case of discrete action
@@ -270,23 +276,25 @@ def collect_complete_episodes(
         # Handle timeout by bootstrapping with value function
         # see GitHub issue #633
         reward_no_bootstrap = reward
-        if done and info.get("TimeLimit.truncated", False):
-            terminal_obs = agent.policy.obs_to_tensor(obs)[0]
+        # TODO: This should be able to handle more than one env in the VecEnv
+        if done.item() and infos[0].get("TimeLimit.truncated", False):
+            terminal_obs = agent.policy.obs_to_tensor(infos[0]["terminal_observation"])[
+                0
+            ]
             with torch.no_grad():
                 terminal_value = agent.policy.predict_values(terminal_obs)[0]
             reward += agent.gamma * terminal_value.item()
 
-        if done:
-            obs = env.reset()
+        if done.item():
             n_episodes += 1
 
         # This is for the next step (we add the first observation before the loop); the last observation of each episode
         # is not added to observations since it is not needed for filling a RolloutBuffer.
-        observations[n_steps + 1] = obs
-        actions[n_steps] = action
-        rewards[n_steps] = reward
-        rewards_no_bootstrap[n_steps] = reward_no_bootstrap
-        dones[n_steps] = done
+        observations[n_steps + 1] = obs[0]
+        actions[n_steps] = action[0]
+        rewards[n_steps] = reward.item()
+        rewards_no_bootstrap[n_steps] = reward_no_bootstrap.item()
+        dones[n_steps] = done.item()
         values[n_steps] = value.item()
         log_probs[n_steps] = log_prob.item()
 

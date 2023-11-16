@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 from typing import Optional, Sequence, List, Tuple
 
-import gym
 import hydra
 import omegaconf
 import torch
@@ -19,8 +18,11 @@ from tqdm import tqdm
 from pg_subspaces.metrics.tensorboard_logs import TensorboardLogs
 from pg_subspaces.offline_rl.load_env_dataset import load_env_dataset
 from pg_subspaces.offline_rl.offline_algorithm import OfflineAlgorithm
-from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec
-from pg_subspaces.sb3_utils.common.env.make_env import make_single_env
+from pg_subspaces.sb3_utils.common.agent_spec import (
+    CheckpointAgentSpec,
+    get_checkpoint_path,
+)
+from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
 
 logger = logging.getLogger(__name__)
 
@@ -88,18 +90,18 @@ def analysis_worker(
         agent_step,
         device,
         agent_kwargs={"tensorboard_logs": None},
+        freeze_vec_normalize=True,
     )
     if issubclass(agent_class, OfflineAlgorithm):
         _, env_factory_or_dataset = load_env_dataset(train_cfg.logs_dataset, device)
     else:
-        env_factory_or_dataset = functools.partial(
-            gym.make, train_cfg.env, **train_cfg.env_args
+        vec_normalize_path = get_checkpoint_path(
+            run_dir / "checkpoints", agent_step, "vecnormalize"
         )
-        functools.partial(
-            make_single_env,
-            train_cfg.env,
-            train_cfg.get("action_transformation"),
-            **train_cfg.env_args,
+        if not vec_normalize_path.exists():
+            vec_normalize_path = None
+        env_factory_or_dataset = functools.partial(
+            make_vec_env, train_cfg, vec_normalize_path, True
         )
     analysis = hydra.utils.instantiate(
         analysis_cfg,

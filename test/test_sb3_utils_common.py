@@ -74,7 +74,9 @@ class DummyEnv(gym.Env):
 
 
 def env_factory():
-    return TimeLimit(DummyEnv(), 5)
+    return stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: TimeLimit(DummyEnv(), 5)]
+    )
 
 
 class DummyAgentSpec(AgentSpec):
@@ -84,14 +86,16 @@ class DummyAgentSpec(AgentSpec):
 
     def _create_agent(
         self,
-        env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]] = None,
+        env: Optional[Union[gym.Env, stable_baselines3.common.vec_env.VecEnv]],
+        replay_buffer: Optional[stable_baselines3.common.buffers.ReplayBuffer],
     ) -> stable_baselines3.ppo.PPO:
-        return PPO("MlpPolicy", DummyVecEnv([lambda: self.env]), device="cpu", seed=42)
+        return PPO("MlpPolicy", self.env, device="cpu", seed=42)
 
     def copy_with_new_parameters(
         self,
         weights: Optional[Sequence[torch.Tensor]] = None,
         agent_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[Union[torch.device, str]] = None,
     ) -> "DummyAgentSpec":
         return DummyAgentSpec(self.env)
 
@@ -115,7 +119,10 @@ def test_fill_rollout_buffer():
     for num_steps in [300, 303]:
         env = env_factory()
         rollout_buffer = RolloutBuffer(
-            num_steps, env.observation_space, env.action_space, device="cpu"
+            num_steps,
+            env.observation_space,
+            env.action_space,
+            device="cpu",
         )
         agent_spec = DummyAgentSpec(env)
         fill_rollout_buffer(
@@ -123,12 +130,15 @@ def test_fill_rollout_buffer():
         )
 
         rollout_buffer_ppo = RolloutBuffer(
-            num_steps, env.observation_space, env.action_space, device="cpu"
+            num_steps,
+            env.observation_space,
+            env.action_space,
+            device="cpu",
         )
         ppo = agent_spec.create_agent(env_factory())
         ppo._last_obs = ppo.env.reset()
         ppo._last_episode_starts = True
-        callback = EvalCallback(DummyVecEnv([env_factory]))
+        callback = EvalCallback(env_factory())
         callback.init_callback(ppo)
         ppo.collect_rollouts(ppo.env, callback, rollout_buffer_ppo, num_steps)
         assert rollout_buffer.observations == pytest.approx(
@@ -196,10 +206,10 @@ def test_flatten_unflatten():
 
 
 def test_ppo_gradient():
-    env = gym.make("Pendulum-v1")
-    agent = stable_baselines3.ppo.PPO(
-        "MlpPolicy", DummyVecEnv([lambda: env]), device="cpu"
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
     )
+    agent = stable_baselines3.ppo.PPO("MlpPolicy", env, device="cpu")
     rollout_buffer = RolloutBuffer(
         5000, env.observation_space, env.action_space, device="cpu"
     )
@@ -215,7 +225,9 @@ def test_ppo_gradient():
 
 
 def test_combine_actor_critic_parameter_vectors():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     for agent in [
         stable_baselines3.PPO("MlpPolicy", env, device="cpu"),
         stable_baselines3.SAC("MlpPolicy", env, device="cpu"),
@@ -230,7 +242,9 @@ def test_combine_actor_critic_parameter_vectors():
 
 
 def test_replay_buffer_checkpointing():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     algo = stable_baselines3.SAC(
         "MlpPolicy",
         env,
