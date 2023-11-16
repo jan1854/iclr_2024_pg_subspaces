@@ -204,14 +204,12 @@ class HydraAgentSpec(AgentSpec):
 
         if "net_arch" in self.agent_cfg.get("algorithm", {}).get(
             "policy_kwargs", {}
-        ) and isinstance(self.agent_cfg.algorithm.policy_kwargs.net_arch, int):
+        ) and isinstance(self.agent_cfg["algorithm"]["policy_kwargs"]["net_arch"], int):
             # Hack: The sweeper cannot handle list-type parameters, so if the net_arch is a scalar, convert it to a list
-            self.agent_cfg.algorithm.policy_kwargs.net_arch = omegaconf.ListConfig(
-                [
-                    self.agent_cfg.algorithm.policy_kwargs.net_arch,
-                    self.agent_cfg.algorithm.policy_kwargs.net_arch,
-                ]
-            )
+            self.agent_cfg["algorithm"]["policy_kwargs"]["net_arch"] = [
+                self.agent_cfg["algorithm"]["policy_kwargs"]["net_arch"],
+                self.agent_cfg["algorithm"]["policy_kwargs"]["net_arch"],
+            ]
 
     def _create_agent(
         self,
