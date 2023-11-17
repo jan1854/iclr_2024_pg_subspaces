@@ -1,0 +1,37 @@
+# TODO: Most parameters should be in a default PPO config
+name: "ppo"
+
+defaults:
+  - env_wrappers:
+      - vec_normalize
+  - activation_fn@algorithm.policy_kwargs.activation_fn: relu
+
+algorithm:
+  _target_: stable_baselines3.PPO
+  policy: "MlpPolicy"
+  learning_rate: 9.80828e-5
+  n_steps: 512
+  batch_size: 32
+  n_epochs: 5
+  gamma: 0.999
+  gae_lambda: 0.99
+  clip_range: 0.2
+  clip_range_vf: null
+  normalize_advantage: true
+  ent_coef: 0.00229519
+  vf_coef: 0.835671
+  max_grad_norm: 0.7
+  use_sde: false
+  sde_sample_freq: -1
+  target_kl: null
+  policy_kwargs:
+    log_std_init: -2
+    ortho_init: false
+    net_arch: [256, 256]
+  device: ${device}
+  tensorboard_log: tensorboard
+
+
+training:
+  steps: 3000000
+  n_envs: 1
