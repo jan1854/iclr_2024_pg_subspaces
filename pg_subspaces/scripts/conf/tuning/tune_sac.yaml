@@ -11,10 +11,6 @@ algorithm.algorithm.train_freq:
   type: choice
   values: [1, 4, 16, 32, 64]
   value_type: int
-algorithm.grad_steps_per_env_step:
-  type: range
-  bounds: [1, 4]
-  value_type: int
 algorithm.algorithm.gamma:
   type: range
   bounds: [0.9, 1]
