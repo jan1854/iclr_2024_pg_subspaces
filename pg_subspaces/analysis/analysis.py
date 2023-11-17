@@ -52,6 +52,7 @@ class Analysis(abc.ABC):
         overwrite_results: bool = False,
         show_progress: bool = False,
     ) -> Optional[TensorboardLogs]:
+        print(f"Starting analysis for step {env_step}")
         prefix = f"{self.analysis_name}/{self.analysis_run_id}"
         prefix_step_plots = f"{self.analysis_name}_step_plots/{self.analysis_run_id}"
         logs = TensorboardLogs(prefix, prefix_step_plots)
