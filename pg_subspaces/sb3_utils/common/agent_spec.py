@@ -198,7 +198,11 @@ class HydraAgentSpec(AgentSpec):
         if device is None:
             device = agent_cfg["algorithm"]["device"]
         super().__init__(device, override_weights, agent_kwargs)
-        self.agent_cfg = agent_cfg
+        self.agent_cfg = {
+            "algorithm": self._obj_config_to_type_and_kwargs(
+                omegaconf.OmegaConf.to_container(agent_cfg["algorithm"])
+            )
+        } | {k: v for k, v in agent_cfg.items() if k != "algorithm"}
         self.env_factory = env_factory
         self.weights_checkpoint_path = weights_checkpoint_path
 
@@ -248,6 +252,34 @@ class HydraAgentSpec(AgentSpec):
             self._set_weights(agent, agent_checkpoint.policy.parameters())
 
         return agent
+
+    @classmethod
+    def _obj_config_to_type_and_kwargs(cls, cfg_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise, we need to checkpoint
+        the entire object to allow save / load. Therefore, replace each object in the config by a <obj>_type and
+        <obj>_kwargs to allow creating them in the algorithm's constructor.
+
+        :param cfg_dict:
+        :return:
+        """
+        new_cfg = {}
+        for key in cfg_dict.keys():
+            if not isinstance(cfg_dict[key], dict):
+                new_cfg[key] = cfg_dict[key]
+            elif "_target_" in cfg_dict[key] and not key == "activation_fn":
+                new_cfg[f"{key}_class"] = hydra.utils.get_class(
+                    cfg_dict[key]["_target_"]
+                )
+                cfg_dict[key].pop("_target_")
+                new_cfg[f"{key}_kwargs"] = cls._obj_config_to_type_and_kwargs(
+                    cfg_dict[key]
+                )
+            elif "_target_" in cfg_dict[key] and key == "activation_fn":
+                new_cfg[key] = hydra.utils.get_class(cfg_dict[key]["_target_"])
+            else:
+                new_cfg[key] = cls._obj_config_to_type_and_kwargs(cfg_dict[key])
+        return new_cfg
 
     def copy_with_new_parameters(
         self,

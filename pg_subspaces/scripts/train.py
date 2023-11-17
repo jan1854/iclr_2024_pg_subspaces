@@ -4,7 +4,6 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import Any, Dict
 
 import hydra
 import numpy as np
@@ -42,30 +41,6 @@ def env_with_prefix(key: str, prefix: str, default: str) -> str:
     return default
 
 
-def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise, we need to checkpoint
-    the entire object to allow save / load. Therefore, replace each object in the config by a <obj>_type and
-    <obj>_kwargs to allow creating them in the algorithm's constructor.
-
-    :param conf_dict:
-    :return:
-    """
-    new_conf = {}
-    for key in conf_dict.keys():
-        if not isinstance(conf_dict[key], dict):
-            new_conf[key] = conf_dict[key]
-        elif "_target_" in conf_dict[key] and not key == "activation_fn":
-            new_conf[f"{key}_class"] = hydra.utils.get_class(conf_dict[key]["_target_"])
-            conf_dict[key].pop("_target_")
-            new_conf[f"{key}_kwargs"] = obj_config_to_type_and_kwargs(conf_dict[key])
-        elif "_target_" in conf_dict[key] and key == "activation_fn":
-            new_conf[key] = hydra.utils.get_class(conf_dict[key]["_target_"])
-        else:
-            new_conf[key] = obj_config_to_type_and_kwargs(conf_dict[key])
-    return new_conf
-
-
 @hydra.main(version_base=None, config_path="conf", config_name="train")
 def main(cfg: omegaconf.DictConfig) -> None:
     train(cfg)
@@ -93,11 +68,6 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         env.seed(cfg.seed)
 
     omegaconf.OmegaConf.resolve(cfg)
-    algorithm_cfg = {
-        "algorithm": obj_config_to_type_and_kwargs(
-            omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
-        )
-    } | {k: v for k, v in cfg.algorithm.items() if k != "algorithm"}
     checkpoints_path = root_path / "checkpoints"
     # If checkpoints exist, load the checkpoint else train an agent from scratch
     if checkpoints_path.exists():
@@ -115,7 +85,7 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
         ).create_agent(env)
         algorithm.num_timesteps = checkpoint_to_load
     else:
-        algorithm = HydraAgentSpec(algorithm_cfg, None, None, None).create_agent(env)
+        algorithm = HydraAgentSpec(cfg.algorithm, None, None, None).create_agent(env)
         if cfg.checkpoint_interval is not None:
             checkpoints_path.mkdir()
             # Save the initial agent
