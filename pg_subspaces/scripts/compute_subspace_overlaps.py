@@ -43,6 +43,7 @@ def analysis_worker(
     subspace_overlaps = SubspaceOverlaps(
         agent_spec,
         run_dir,
+        cfg.analysis_run_id,
         analysis_cfg.top_eigenvec_levels,
         HessianEigenLanczos(1e-3, 100, None),
         analysis_cfg.eigenvec_overlap_checkpoints,

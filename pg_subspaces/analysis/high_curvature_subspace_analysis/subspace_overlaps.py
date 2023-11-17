@@ -22,12 +22,14 @@ class SubspaceOverlaps:
         self,
         agent_spec: AgentSpec,
         run_dir: Path,
+        analysis_run_id: str,
         top_eigenvec_levels: Sequence[int],
         hessian_eigen: HessianEigen,
         eigenvec_overlap_checkpoints: Sequence[int],
         verbose,
     ):
         self.run_dir = run_dir
+        self.analysis_run_id = analysis_run_id
         self.agent_spec = agent_spec
         self.top_eigenvec_levels = top_eigenvec_levels
         self.hessian_eigen = hessian_eigen
@@ -40,7 +42,9 @@ class SubspaceOverlaps:
         summary_writer = torch.utils.tensorboard.SummaryWriter(
             str(self.run_dir / "tensorboard")
         )
-        logs = TensorboardLogs("high_curvature_subspace_analysis/default")
+        logs = TensorboardLogs(
+            f"high_curvature_subspace_analysis/{self.analysis_run_id}"
+        )
         agent = self.agent_spec.create_agent()
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
         prefixes = ["", "low_sample/"]
