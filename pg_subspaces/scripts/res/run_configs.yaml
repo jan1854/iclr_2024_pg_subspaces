@@ -10,6 +10,7 @@ BipedalWalker-v3:
   log_dirs:
     ppo: 2023-11-16/12-56-29
     sac: 2023-11-16/12-59-10
+  xmax: 3_000_000
 HalfCheetah-v3:
   log_dirs:
     ppo: 2023-11-16/19-45-06
@@ -18,6 +19,16 @@ HalfCheetah-v3:
   xmax: 3_000_000
   analysis_run_ids:
     sac: repeat_after_bugfix
+Hopper-v3:
+  log_dirs:
+    ppo: 2023-11-17/13-22-43
+    sac: 2023-11-17/13-34-02
+  xmax: 2_000_000
+LunarLanderContinuous-v2:
+  log_dirs:
+    ppo: 2023-11-17/13-20-55
+    sac: 2023-11-17/13-30-35
+  xmax: 1_000_000
 Pendulum-v1:
   log_dirs:
     ppo: 2023-09-22/10-51-27
@@ -66,6 +77,7 @@ dmc_Finger-spin-v1:
 FetchReach-v1:
   log_dirs:
     ppo: 2023-11-15/20-07-13
+    sac: 2023-11-17/11-44-52
   xmax: 500_000
 FetchPush-v1:
   log_dirs:
