@@ -295,7 +295,8 @@ if __name__ == "__main__":
     parser.add_argument("--marker", default="d")
     parser.add_argument("--fontsize", type=int, default=18)
     parser.add_argument("--linewidth", type=float, default=1.5)
-    parser.add_argument("--annotations", type=str, default={}, nargs="+")
+    parser.add_argument("--x-annotations", type=str, default={}, nargs="+")
+    parser.add_argument("--y-annotations", type=str, default={}, nargs="+")
     parser.add_argument("--outname", type=str, default="graphs.pdf")
     args = parser.parse_args()
 
