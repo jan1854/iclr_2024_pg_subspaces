@@ -382,5 +382,5 @@ if __name__ == "__main__":
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
     create_plots_iclr_gradient_subspace_fraction(
-        Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir)
+        Path(args.log_dir), Path(args.cache_file), Path(args.out_dir)
     )
