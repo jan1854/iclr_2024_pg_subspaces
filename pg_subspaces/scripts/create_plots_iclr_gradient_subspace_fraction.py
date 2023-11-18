@@ -278,6 +278,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
         left = 0.15  # Leave space for y-axis labels
         bottom = 0.5 - (height / 2)  # Center the axes in the figure
         ax.set_position([left, bottom, width, height])
+        print(results)
         for env_name in ["dmc_Finger-spin-v1", "Walker2d-v3"]:
             env_results = results[env_name]
             x_pos_start_env = bar_xpos
