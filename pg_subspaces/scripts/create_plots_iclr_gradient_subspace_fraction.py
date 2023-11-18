@@ -203,7 +203,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
         ) as run_configs_file:
             run_configs = yaml.safe_load(run_configs_file)
         for env_name, run_config in run_configs.items():
-            if env_name in "dmc_Finger-spin_TC-v1" or env_name in "Walker2d_TC-v3":
+            if env_name in "dmc_Finger-spin-v1" or env_name in "Walker2d-v3":
                 results[env_name] = {}
                 curr_results_env = results[env_name]
                 for algorithm_name, algorthm_log_path in run_config["log_dirs"].items():
