@@ -23,7 +23,7 @@ Hopper-v3:
   log_dirs:
     ppo: 2023-11-17/13-22-43
     sac: 2023-11-17/13-34-02
-  xmax: 2_000_000
+  xmax: 1_500_000
 LunarLanderContinuous-v2:
   log_dirs:
     ppo: 2023-11-17/13-20-55
