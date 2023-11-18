@@ -49,9 +49,9 @@ GOLDEN_RATIO = 1.618
 
 
 def env_name_to_diplay(name):
-    if name == "dmc_Finger-spin_TC-v1":
+    if name == "dmc_Finger-spin-v1":
         return "Finger-spin"
-    elif name == "Walker2d_TC-v3":
+    elif name == "Walker2d-v3":
         return "Walker2D"
 
 
