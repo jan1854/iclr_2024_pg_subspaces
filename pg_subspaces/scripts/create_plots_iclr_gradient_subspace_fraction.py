@@ -49,9 +49,9 @@ GOLDEN_RATIO = 1.618
 
 
 def env_name_to_diplay(name):
-    if name == "dmc_Finger-spin_TC-v1":
+    if name == "dmc_Finger-spin-v1":
         return "Finger-spin"
-    elif name == "Walker2d_TC-v3":
+    elif name == "Walker2d-v3":
         return "Walker2D"
 
 
@@ -278,7 +278,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
         left = 0.15  # Leave space for y-axis labels
         bottom = 0.5 - (height / 2)  # Center the axes in the figure
         ax.set_position([left, bottom, width, height])
-        for env_name in ["dmc_Finger-spin_TC-v1", "Walker2d_TC-v3"]:
+        for env_name in ["dmc_Finger-spin-v1", "Walker2d-v3"]:
             env_results = results[env_name]
             x_pos_start_env = bar_xpos
             for algorithm_name in ["ppo", "sac"]:
