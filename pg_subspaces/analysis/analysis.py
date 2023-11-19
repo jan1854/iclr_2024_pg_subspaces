@@ -69,6 +69,8 @@ class Analysis(abc.ABC):
                     f"Analysis failed for directory {self.run_dir}, step {env_step} "
                     f"with exception {type(e).__name__}: {e}."
                 )
+                if not self.ignore_exceptions:
+                    raise e
                 return None
             if env_step not in curr_analysis_logs:
                 if self.lock_analysis_log_file:
