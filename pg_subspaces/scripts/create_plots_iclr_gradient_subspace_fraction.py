@@ -1,6 +1,5 @@
 import argparse
 import logging
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -8,8 +7,8 @@ import yaml
 from matplotlib import pyplot as plt
 from matplotlib import patches
 
+from pg_subspaces.metrics.read_metrics_cached import read_metrics_cached
 from pg_subspaces.scripts.convergence_criterion import ConvergenceCriterion
-from pg_subspaces.metrics.tensorboard_logs import create_event_accumulators, read_scalar
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
@@ -84,65 +83,44 @@ def split_training_phases(
 
 
 def load_logs(log_path, key, max_step, only_complete_steps=True):
-    run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
-    if len(run_dirs) > 0:
-        tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-        event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
-    scalars_value = []
-    scalars_reward = []
-    for ea in event_accumulators:
-        try:
-            scalars_curr_ea_value = read_scalar(ea, key)
-            scalars_value.append(scalars_curr_ea_value)
-        except:
-            logger.warning(f"Did not find key {key} in all logs.")
-        scalars_curr_ea_reward = read_scalar(ea, "rollout/ep_rew_mean")
-        scalars_reward.append(scalars_curr_ea_reward)
-    scalars_value = sorted(
-        [list(s.values()) for s in scalars_value], key=lambda s: len(s)
-    )
-    scalars_reward = sorted(
-        [list(s.values()) for s in scalars_reward], key=lambda s: len(s)
-    )
-    steps_value = set([s.step for s in scalars_value[-1]])
-    for scalar in scalars_value:
-        scalar.sort(key=lambda s: s.step)
-        assert np.all(s.step in steps_value for s in scalar), "Steps do not match."
-    if len(scalars_value[0]) < len(scalars_value[-1]):
+    metrics = read_metrics_cached(log_path, [key])
+    rewards = read_metrics_cached(log_path, ["rollout/ep_rew_mean"])
+
+    metrics = sorted(metrics, key=lambda m: len(m[0]))
+    rewards = sorted(rewards, key=lambda r: len(r[0]))
+    if len(metrics[0][0]) < len(metrics[-1][0]):
         logger.warning(
             f"Found a different number of scalars for the event accumulators (key: {key}, "
-            f"min: {len(scalars_value[0])}, max: {len(scalars_value[-1])}), using the "
+            f"min: {len(metrics[0][0])}, max: {len(metrics[-1][0])}), using the "
             f"{'minimum' if only_complete_steps else 'maximum'} value"
         )
     if only_complete_steps:
-        steps_value = [scalar.step for scalar in scalars_value[0]]
+        steps_metrics = metrics[0][0]
+        steps_reward = rewards[0][0]
     else:
-        steps_value = [scalar.step for scalar in scalars_value[-1]]
-    if only_complete_steps:
-        steps_reward = [scalar.step for scalar in scalars_reward[0]]
-    else:
-        steps_reward = [scalar.step for scalar in scalars_reward[-1]]
+        steps_metrics = metrics[-1][0]
+        steps_reward = rewards[-1][0]
 
-    steps_value = [step for step in steps_value if step <= max_step]
+    steps_metrics = [step for step in steps_metrics if step <= max_step]
     steps_reward = [step for step in steps_reward if step <= max_step]
 
-    values = [
+    values_metrics = [
         [
-            scalars_curr_run[i].value
-            for scalars_curr_run in scalars_value
-            if i < len(scalars_curr_run)
+            scalars_curr_run[1][i]
+            for scalars_curr_run in metrics
+            if i < len(scalars_curr_run[1])
         ]
-        for i in range(len(steps_value))
+        for i in range(len(steps_metrics))
     ]
-    rewards = [
+    values_rewards = [
         [
-            scalars_curr_run[i].value
-            for scalars_curr_run in scalars_reward
-            if i < len(scalars_curr_run)
+            scalars_curr_run[1][i]
+            for scalars_curr_run in rewards
+            if i < len(scalars_curr_run[1])
         ]
         for i in range(len(steps_reward))
     ]
-    return (steps_value, values), (steps_reward, rewards)
+    return (steps_metrics, values_metrics), (steps_reward, values_rewards)
 
 
 def plot_bars(data, ax):
@@ -194,22 +172,22 @@ def plot_bars(data, ax):
             bar.set_hatch("XXX")
 
 
-def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
+def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
     global bar_xpos
-    if not cache_file.exists():
-        results = {}
-        with (Path(__file__).parent / "res" / "run_configs.yaml").open(
-            "r"
-        ) as run_configs_file:
-            run_configs = yaml.safe_load(run_configs_file)
-        for env_name, run_config in run_configs.items():
-            if env_name in "dmc_Finger-spin-v1" or env_name in "Walker2d-v3":
-                results[env_name] = {}
-                curr_results_env = results[env_name]
-                for algorithm_name, algorthm_log_path in run_config["log_dirs"].items():
+    results = {}
+    with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+        "r"
+    ) as run_configs_file:
+        run_configs = yaml.safe_load(run_configs_file)
+    for env_name, run_config in run_configs.items():
+        if env_name in ["dmc_Finger-spin-v1", "Walker2d-v3"]:
+            results[env_name] = {}
+            curr_results_env = results[env_name]
+            for algorithm_name, algorithm_log_path in run_config["log_dirs"].items():
+                if algorithm_name in ["ppo", "sac"]:
                     curr_results_env[algorithm_name] = {}
                     curr_results_algo = curr_results_env[algorithm_name]
-                    algorthm_log_path = log_dir / env_name / algorthm_log_path
+                    algorithm_log_path = log_dir / env_name / algorithm_log_path
                     for loss_type, loss_type_short in [
                         ("policy_loss", "policy"),
                         ("value_function_loss", "vf"),
@@ -234,7 +212,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                             (steps_values, values), (
                                 steps_rewards,
                                 rewards,
-                            ) = load_logs(algorthm_log_path, key, run_config["xmax"])
+                            ) = load_logs(algorithm_log_path, key, run_config["xmax"])
                             values_split = [[] for _ in range(3)]
                             for curr_values, curr_rewards, curr_steps in zip(
                                 np.transpose(values),
@@ -256,12 +234,6 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                                 {"mean": np.mean(v), "std": np.std(v)}
                                 for v in values_split
                             ]
-
-        with cache_file.open("wb") as f:
-            pickle.dump(results, f)
-    else:
-        with cache_file.open("rb") as f:
-            results = pickle.load(f)
 
     for loss_type in ["policy", "vf"]:
         bar_xpos = 0
@@ -379,9 +351,6 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
-    parser.add_argument("cache_file", type=str)
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(
-        Path(args.log_dir), Path(args.cache_file), Path(args.out_dir)
-    )
+    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.out_dir))

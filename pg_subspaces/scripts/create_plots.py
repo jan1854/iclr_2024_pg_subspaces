@@ -6,11 +6,7 @@ from typing import Dict, Optional, Sequence, Tuple
 import numpy as np
 from matplotlib import pyplot as plt
 
-from pg_subspaces.metrics.tensorboard_logs import (
-    create_event_accumulators,
-    calculate_mean_std_sequence,
-    read_scalar,
-)
+from pg_subspaces.metrics.read_metrics_cached import read_metrics_cached
 
 
 logger = logging.Logger(__name__)
@@ -77,92 +73,64 @@ def create_plots(
             if i % num_same_color_plots == 0:
                 color = next(ax._get_lines.prop_cycler)["color"]
             if log_path is not None:
-                run_dirs = [
-                    d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()
-                ]
-                if len(run_dirs) > 0:
-                    tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-                    event_accumulators = [
-                        ea for _, ea in create_event_accumulators(tb_dirs)
-                    ]
-                    key_indices = np.argwhere(
-                        [
-                            np.all(
-                                [
-                                    key in ea.Tags()["scalars"]
-                                    for ea in event_accumulators
-                                ]
+                metrics = read_metrics_cached(log_path, keys)
+                min_last_step = min([m[0][-1] for m in metrics])
+                max_last_step = max([m[0][-1] for m in metrics])
+                if min_last_step != max_last_step:
+                    logger.warning(
+                        f"Found different last step ({min_last_step} vs. {max_last_step}), "
+                        f"using {'minimum' if only_complete_steps else 'maximum'} value."
+                    )
+                    if only_complete_steps:
+                        for metric in metrics:
+                            metrics[0] = np.array(
+                                [m for m in metric[0] if m <= min_last_step]
                             )
-                            for key in keys
-                        ]
-                    )
-                    if key_indices.shape[0] == 0:
-                        logger.warning(
-                            f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
-                        )
-                        # Empty plot to advance the color cycle (so that future plots have the correct color)
-                        ax.plot([], [], color=color)
-                        continue
-                    key = keys[key_indices[0].item()]
-                    (steps, _, value_mean, value_std,) = calculate_mean_std_sequence(
-                        event_accumulators, key, only_complete_steps
-                    )
-                    for s, v in fill_in_data.items():
-                        if s not in steps:
-                            idx = np.argmax(steps > s)
-                            steps = np.insert(steps, idx, s)
-                            value_mean = np.insert(value_mean, idx, v)
-                            value_std = np.insert(value_std, idx, 0.0)
+                            metrics[1] = metrics[1][: len(metrics[0])]
 
-                    value_mean = smooth(value_mean, smoothing_weight)
-                    value_std = smooth(value_std, smoothing_weight)
+                steps = metrics[0][0]
+                value_mean = np.array(
+                    [
+                        np.mean([m[1][i] for m in metrics if i < len(m[1])])
+                        for i in range(len(steps))
+                    ]
+                )
+                value_std = np.array(
+                    [
+                        np.std([m[1][i] for m in metrics if i < len(m[1])])
+                        for i in range(len(steps))
+                    ]
+                )
 
-                    if xaxis_log:
-                        steps = 10**steps
-                        ax.xscale("log")
-                    ax.plot(
-                        steps,
-                        value_mean,
-                        color=color,
-                        linestyle=linestyles[i % num_same_color_plots],
-                        zorder=i + 2,
-                    )
-                    ax.fill_between(
-                        steps,
-                        value_mean - value_std,
-                        value_mean + value_std,
-                        alpha=0.2,
-                        label="_nolegend_",
-                        color=color,
-                        zorder=i + 52,
-                    )
-                else:
-                    if (log_path / "tensorboard").exists():
-                        tb_dir = log_path / "tensorboard"
-                    else:
-                        tb_dir = log_path
-                    _, event_accumulator = create_event_accumulators([tb_dir])[0]
-                    key_indices = np.argwhere(
-                        [key in event_accumulator.Tags()["scalars"] for key in keys]
-                    )
-                    assert (
-                        key_indices.shape[0] > 0
-                    ), f"None of the keys {', '.join(keys)} is present in all tensorboard logs of {log_path}."
-                    key = keys[key_indices[0].item()]
-                    scalar = read_scalar(event_accumulator, key)
-                    scalar = list(scalar.items())
-                    scalar.sort(key=lambda x: x[0])
+                for s, v in fill_in_data.items():
+                    if s not in steps:
+                        idx = np.argmax(steps > s)
+                        steps = np.insert(steps, idx, s)
+                        value_mean = np.insert(value_mean, idx, v)
+                        value_std = np.insert(value_std, idx, 0.0)
 
-                    steps = np.array([s[0] for s in scalar])
-                    if xaxis_log:
-                        steps = 10**steps
-                        ax.xscale("log")
-                    ax.plot(
-                        steps,
-                        smooth([s[1].value for s in scalar], smoothing_weight),
-                        color=color,
-                        linestyle=linestyles[i % num_same_color_plots],
-                    )
+                value_mean = smooth(value_mean, smoothing_weight)
+                value_std = smooth(value_std, smoothing_weight)
+
+                if xaxis_log:
+                    steps = 10**steps
+                    ax.xscale("log")
+                ax.plot(
+                    steps,
+                    value_mean,
+                    color=color,
+                    linestyle=linestyles[i % num_same_color_plots],
+                    zorder=i + 2,
+                )
+                ax.fill_between(
+                    steps,
+                    value_mean - value_std,
+                    value_mean + value_std,
+                    alpha=0.2,
+                    label="_nolegend_",
+                    color=color,
+                    zorder=i + 52,
+                )
 
         if not xaxis_log:
             ax.ticklabel_format(

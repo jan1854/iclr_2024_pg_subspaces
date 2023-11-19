@@ -67,8 +67,9 @@ def worker(
             fontsize,
             linewidth,
             fill_in_data,
-            out,
             {100000: "$t_1"},
+            {},
+            out,
         )
     except Exception as e:
         logger.warning(
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
     args = parser.parse_args()
-    log_dir = Path(args.log_dir)
+    log_dir = Path(args.log_dir) / "training"
     results = []
     with (Path(__file__).parent / "res" / "run_configs.yaml").open(
         "r"
