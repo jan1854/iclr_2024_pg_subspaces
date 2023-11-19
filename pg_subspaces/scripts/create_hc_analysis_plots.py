@@ -254,6 +254,7 @@ def worker_single_run(
             xaxis_log,
             keys,
             smoothing_weight,
+            True,
             separate_legend,
             num_same_color_plots,
             marker,
