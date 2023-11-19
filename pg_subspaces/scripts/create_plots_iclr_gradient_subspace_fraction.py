@@ -246,7 +246,7 @@ def create_plots_iclr_gradient_subspace_fraction(
     for loss_type in ["policy", "vf"]:
         bar_xpos = 0
         # fig, ax = plt.subplots(figsize=(factor * GOLDEN_RATIO * 4, factor))
-        plt.rc("font", size=8)
+        plt.rc("font", size=7.5)
         fig, ax = plt.subplots()
         ax.set_zorder(10)
         ax.grid(axis="y", alpha=0.5)
