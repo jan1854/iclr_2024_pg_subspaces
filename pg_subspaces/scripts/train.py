@@ -1,10 +1,10 @@
 import logging
 import random
 import subprocess
+import time
+import os
 from pathlib import Path
-from typing import Any, Dict, Optional
 
-import gym
 import hydra
 import numpy as np
 import omegaconf
@@ -20,84 +20,34 @@ import torch
 from pg_subspaces.callbacks.additional_training_metrics_callback import (
     AdditionalTrainingMetricsCallback,
 )
-from pg_subspaces.callbacks.additional_checkpoints_callback import (
-    AdditionalCheckpointsCallback,
+from pg_subspaces.callbacks.custom_checkpoint_callback import (
+    CustomCheckpointCallback,
 )
 from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
     FixEpInfoBufferCallback,
 )
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
+from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraAgentSpec
+from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
+
 
 logger = logging.getLogger(__name__)
 
 
-def obj_config_to_type_and_kwargs(conf_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    stable-baselines3' algorithms should not get objects passed to the constructors. Otherwise we need to checkpoint
-    the entire object to allow save / load. Therefore, replace each object in the config by a <obj>_type and
-    <obj>_kwargs to allow creating them in the algorithm's constructor.
-
-    :param conf_dict:
-    :return:
-    """
-    new_conf = {}
-    for key in conf_dict.keys():
-        if not isinstance(conf_dict[key], dict):
-            new_conf[key] = conf_dict[key]
-        elif "_target_" in conf_dict[key] and not key == "activation_fn":
-            new_conf[f"{key}_class"] = hydra.utils.get_class(conf_dict[key]["_target_"])
-            conf_dict[key].pop("_target_")
-            new_conf[f"{key}_kwargs"] = obj_config_to_type_and_kwargs(conf_dict[key])
-        elif "_target_" in conf_dict[key] and key == "activation_fn":
-            new_conf[key] = hydra.utils.get_class(conf_dict[key]["_target_"])
-        else:
-            new_conf[key] = obj_config_to_type_and_kwargs(conf_dict[key])
-    return new_conf
-
-
-def make_single_env(
-    env_cfg: omegaconf.DictConfig,
-    action_transformation_cfg: Optional[omegaconf.DictConfig],
-    **kwargs,
-):
-    env = gym.make(env_cfg, **kwargs)
-    if action_transformation_cfg is not None:
-        env = hydra.utils.instantiate(action_transformation_cfg, env=env)
-    # To get the training code working for environments not wrapped with a ControllerBaseWrapper.
-    if not hasattr(env, "base_env_timestep_factor"):
-        env.base_env_timestep_factor = 1
-    return env
-
-
-def make_vec_env(cfg: omegaconf.DictConfig) -> stable_baselines3.common.vec_env.VecEnv:
-    if cfg.algorithm.training.n_envs == 1:
-        env = stable_baselines3.common.vec_env.DummyVecEnv(
-            [
-                lambda: stable_baselines3.common.monitor.Monitor(
-                    make_single_env(
-                        cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                    )
-                )
-            ]
-        )
-    else:
-        env = stable_baselines3.common.vec_env.SubprocVecEnv(
-            [
-                lambda: make_single_env(
-                    cfg.env, cfg.get("action_transformation"), **cfg.env_args
-                )
-                for _ in range(cfg.algorithm.training.n_envs)
-            ]
-        )
-        env = stable_baselines3.common.vec_env.VecMonitor(env)
-    if "env_wrappers" in cfg.algorithm:
-        for wrapper in cfg.algorithm.env_wrappers.values():
-            env = hydra.utils.instantiate(wrapper, venv=env)
-    return env
+def env_with_prefix(key: str, prefix: str, default: str) -> str:
+    value = os.getenv(key)
+    if value:
+        return prefix + value
+    return default
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
-def train(cfg: omegaconf.DictConfig) -> None:
+def main(cfg: omegaconf.DictConfig) -> None:
+    train(cfg)
+
+
+def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
+    root_path = Path(root_path)
     result_commit = subprocess.run(
         ["git", "-C", f"{Path(__file__).parent}", "rev-parse", "HEAD"],
         stdout=subprocess.PIPE,
@@ -106,7 +56,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
         f"Commit {Path(__file__).parents[2].name}: {result_commit.stdout.decode().strip()}"
     )
 
-    logger.info(f"Log directory: {Path.cwd()}")
+    logger.info(f"Log directory: {root_path.absolute()}")
 
     env = make_vec_env(cfg)
 
@@ -117,23 +67,9 @@ def train(cfg: omegaconf.DictConfig) -> None:
         torch.cuda.manual_seed(cfg.seed)
         env.seed(cfg.seed)
 
-    algorithm_cfg = obj_config_to_type_and_kwargs(
-        omegaconf.OmegaConf.to_container(cfg.algorithm.algorithm)
-    )
-
-    algorithm = hydra.utils.instantiate(algorithm_cfg, env=env, _convert_="partial")
-    tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
-        "tensorboard"
-    )
-    base_env_timestep_factor = env.get_attr("base_env_timestep_factor")[0]
-    algorithm.set_logger(
-        SB3CustomLogger(
-            "tensorboard",
-            [tb_output_format],
-            base_env_timestep_factor,
-        )
-    )
-    checkpoints_path = Path("checkpoints")
+    omegaconf.OmegaConf.resolve(cfg)
+    checkpoints_path = root_path / "checkpoints"
+    # If checkpoints exist, load the checkpoint else train an agent from scratch
     if checkpoints_path.exists():
         checkpoints = [
             int(p.name[len(f"{cfg.algorithm.name}_") : -len("_steps.zip")])
@@ -141,24 +77,32 @@ def train(cfg: omegaconf.DictConfig) -> None:
             if p.suffix == ".zip"
         ]
         checkpoint_to_load = max(checkpoints)
-        algorithm.load(
-            checkpoints_path / f"{cfg.algorithm.name}_{checkpoint_to_load}_steps.zip",
-            device=cfg.algorithm.algorithm.device,
-        )
+        algorithm = CheckpointAgentSpec(
+            hydra.utils.get_class(cfg.algorithm.algorithm._target_),
+            checkpoints_path,
+            checkpoint_to_load,
+            cfg.algorithm.algorithm.device,
+        ).create_agent(env)
         algorithm.num_timesteps = checkpoint_to_load
-        if isinstance(
-            algorithm, stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm
-        ):
-            algorithm.load_replay_buffer(
-                checkpoints_path
-                / f"{cfg.algorithm.name}_replay_buffer_{checkpoint_to_load}_steps.pkl",
-            )
     else:
-        checkpoints_path.mkdir()
-        # Save the initial agent
-        path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
-        algorithm.save(path)
+        algorithm = HydraAgentSpec(cfg.algorithm, None, None, None).create_agent(env)
+        if cfg.checkpoint_interval is not None:
+            checkpoints_path.mkdir()
+            # Save the initial agent
+            path = checkpoints_path / f"{cfg.algorithm.name}_0_steps"
+            algorithm.save(path)
+    tb_output_format = stable_baselines3.common.logger.TensorBoardOutputFormat(
+        str(root_path / "tensorboard")
+    )
+    algorithm.set_logger(
+        SB3CustomLogger(
+            str(root_path / "tensorboard"),
+            [tb_output_format],
+        )
+    )
     eval_env = make_vec_env(cfg)
+    if cfg.seed is not None:
+        eval_env.seed(cfg.seed + 1)  # Use a different seed for the eval environment
     eval_callback = stable_baselines3.common.callbacks.EvalCallback(
         eval_env,
         n_eval_episodes=cfg.num_eval_episodes,
@@ -171,7 +115,7 @@ def train(cfg: omegaconf.DictConfig) -> None:
     ]
     if cfg.checkpoint_interval is not None:
         callbacks.append(
-            AdditionalCheckpointsCallback(
+            CustomCheckpointCallback(
                 cfg.checkpoint_interval,
                 cfg.additional_checkpoints,
                 str(checkpoints_path),
@@ -184,20 +128,27 @@ def train(cfg: omegaconf.DictConfig) -> None:
         algorithm, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
     ):
         callbacks.append(AdditionalTrainingMetricsCallback())
-    training_steps = cfg.algorithm.training.steps // base_env_timestep_factor
     try:
         # Hack to get the evaluation of the initial policy in addition
         eval_callback.init_callback(algorithm)
         eval_callback._on_step()
         algorithm.learn(
-            total_timesteps=training_steps - algorithm.num_timesteps,
+            total_timesteps=cfg.algorithm.training.steps - algorithm.num_timesteps,
             callback=callbacks,
             progress_bar=cfg.show_progress,
             reset_num_timesteps=False,
         )
+        time.sleep(1)  # To give the tensorboard loggers time to finish writing
     finally:
-        (Path.cwd() / "done").touch()
+        (root_path / "done").touch()
 
 
 if __name__ == "__main__":
-    train()
+    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
+    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
+    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
+    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
+    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+    omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
+
+    main()

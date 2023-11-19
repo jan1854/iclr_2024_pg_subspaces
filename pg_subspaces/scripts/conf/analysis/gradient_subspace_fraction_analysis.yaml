@@ -1,0 +1,14 @@
+defaults:
+  - hessian_eigen: lanczos
+
+_target_: pg_subspaces.analysis.high_curvature_subspace_analysis.gradient_subspace_fraction_analysis.GradientSubspaceFractionAnalysis
+analysis_run_id: default
+num_samples_true_loss: 1_000_000
+top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
+overwrite_cached_eigen: false
+skip_cacheing_eigen: false
+hessian_eigen: ???
+on_policy_data_collection_processes: 1
+on_policy_data_collection_device: "cpu"
+lock_analysis_log_file: true
+ignore_exceptions: false

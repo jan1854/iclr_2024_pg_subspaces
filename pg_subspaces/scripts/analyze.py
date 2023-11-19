@@ -6,9 +6,8 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence, List, Tuple
 
-import gym
 import hydra
 import omegaconf
 import torch
@@ -17,9 +16,54 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from pg_subspaces.metrics.tensorboard_logs import TensorboardLogs
-from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec
+from pg_subspaces.offline_rl.load_env_dataset import load_env_dataset
+from pg_subspaces.offline_rl.offline_algorithm import OfflineAlgorithm
+from pg_subspaces.sb3_utils.common.agent_spec import (
+    CheckpointAgentSpec,
+    get_checkpoint_path,
+)
+from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
 
 logger = logging.getLogger(__name__)
+
+
+def create_jobs(
+    run_dirs: Sequence[Path],
+    checkpoints_to_analyze: Optional[Sequence[int]],
+    min_interval: Optional[int],
+    first_checkpoint: int,
+    last_checkpoint: Optional[int],
+) -> List[Tuple[Path, int]]:
+    jobs = []
+    for log_dir in run_dirs:
+        checkpoints_dir = log_dir / "checkpoints"
+        checkpoint_steps = [
+            get_step_from_checkpoint(checkpoint.name)
+            for checkpoint in checkpoints_dir.iterdir()
+        ]
+        checkpoint_steps.sort()
+        curr_jobs = []
+        if checkpoints_to_analyze is not None:
+            for checkpoint in checkpoints_to_analyze:
+                checkpoint_no_action_repeat = int(checkpoint)
+                if checkpoint_no_action_repeat in checkpoint_steps:
+                    curr_jobs.append((log_dir, checkpoint_no_action_repeat))
+                else:
+                    logger.warning(
+                        f"Did not find checkpoint {checkpoint} in {checkpoints_dir}, skipping."
+                    )
+        else:
+            for step in checkpoint_steps:
+
+                if (
+                    step >= first_checkpoint
+                    and (last_checkpoint is None or step <= last_checkpoint)
+                    and step - first_checkpoint >= len(curr_jobs) * min_interval
+                ):
+                    curr_jobs.append((log_dir, step))
+        jobs.extend(curr_jobs)
+    jobs.sort(key=lambda j: (j[1], j[0]))
+    return jobs
 
 
 def analysis_worker(
@@ -30,34 +74,43 @@ def analysis_worker(
     overwrite_results: bool,
     show_progress: bool,
 ) -> TensorboardLogs:
-    train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
+    logger.debug("Created analysis_worker.")
+    train_cfg_path = run_dir / ".hydra" / "config.yaml"
+    # If we're analyzing the output of a tuning run, the .hydra directory is one directory up
+    if not train_cfg_path.exists() and run_dir.parent.name.isnumeric():
+        train_cfg_path = run_dir.parent / ".hydra" / "config.yaml"
+    train_cfg = OmegaConf.load(train_cfg_path)
     if device is None:
         device = train_cfg.algorithm.algorithm.device
 
-    env = gym.make(train_cfg.env, **train_cfg.env_args)
-
-    agent_checkpoint = (
-        run_dir / "checkpoints" / f"{train_cfg.algorithm.name}_{agent_step}_steps"
-    )
+    agent_class = hydra.utils.get_class(train_cfg.algorithm.algorithm._target_)
     agent_spec = CheckpointAgentSpec(
-        hydra.utils.get_class(train_cfg.algorithm.algorithm._target_),
-        agent_checkpoint,
+        agent_class,
+        run_dir / "checkpoints",
+        agent_step,
         device,
         agent_kwargs={"tensorboard_logs": None},
+        freeze_vec_normalize=True,
     )
+    if issubclass(agent_class, OfflineAlgorithm):
+        _, env_factory_or_dataset = load_env_dataset(train_cfg.logs_dataset, device)
+    else:
+        vec_normalize_path = get_checkpoint_path(
+            run_dir / "checkpoints", agent_step, "vecnormalize"
+        )
+        if not vec_normalize_path.exists():
+            vec_normalize_path = None
+        env_factory_or_dataset = functools.partial(
+            make_vec_env, train_cfg, vec_normalize_path, True
+        )
     analysis = hydra.utils.instantiate(
         analysis_cfg,
-        env_factory=functools.partial(gym.make, train_cfg.env, **train_cfg.env_args),
+        env_factory_or_dataset=env_factory_or_dataset,
         agent_spec=agent_spec,
         run_dir=run_dir,
     )
-    if hasattr(env, "base_env_timestep_factor"):
-        base_env_timestep_factor = env.base_env_timestep_factor
-    else:
-        base_env_timestep_factor = 1
-    return analysis.do_analysis(
-        agent_step * base_env_timestep_factor, overwrite_results, show_progress
-    )
+    logger.debug("Starting analysis.")
+    return analysis.do_analysis(agent_step, overwrite_results, show_progress)
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
@@ -100,69 +153,42 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         train_logs_local = train_logs
 
     if (train_logs_local / "checkpoints").exists():
-        run_logs = [train_logs_local]
+        run_dirs = [train_logs_local]
     else:
-        run_logs = [
+        run_dirs = [
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
+        for run_dir in run_dirs.copy():
+            sub_run_dirs = [
+                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
+            ]
+            if len(sub_run_dirs) > 0:
+                run_dirs.remove(run_dir)
+            run_dirs.extend(sub_run_dirs)
 
-    # Determine the base_env_timestep_factor to load the correct checkpoints
-    train_cfg = OmegaConf.load(run_logs[0] / ".hydra" / "config.yaml")
-    env = gym.make(train_cfg.env, **train_cfg.env_args)
-    if hasattr(env, "base_env_timestep_factor"):
-        base_env_timestep_factor = env.base_env_timestep_factor
-    else:
-        base_env_timestep_factor = 1
-
-    jobs = []
+    jobs = create_jobs(
+        run_dirs,
+        cfg.get("checkpoints_to_analyze"),
+        cfg.get("min_interval"),
+        cfg.get("first_checkpoint"),
+        cfg.get("last_checkpoint"),
+    )
     summary_writers = {}
-    for log_dir in run_logs:
+    for log_dir in run_dirs:
         summary_writers[log_dir] = SummaryWriter(str(log_dir / "tensorboard"))
-        checkpoints_dir = log_dir / "checkpoints"
-        checkpoint_steps = [
-            get_step_from_checkpoint(checkpoint.name)
-            for checkpoint in checkpoints_dir.iterdir()
-        ]
-        checkpoint_steps.sort()
-        checkpoints_to_analyze = []
-        if cfg.checkpoints_to_analyze is not None:
-            for checkpoint in cfg.checkpoints_to_analyze:
-                checkpoint_no_action_repeat = (
-                    int(checkpoint) // base_env_timestep_factor
-                )
-                if checkpoint_no_action_repeat in checkpoint_steps:
-                    checkpoints_to_analyze.append(
-                        (log_dir, checkpoint_no_action_repeat)
-                    )
-                else:
-                    logger.warning(
-                        f"Did not find checkpoint {checkpoint} in {checkpoints_dir}, skipping."
-                    )
-        else:
-            for agent_step in checkpoint_steps:
-                env_step = agent_step * base_env_timestep_factor
-
-                if (
-                    env_step >= cfg.first_checkpoint
-                    and (cfg.last_checkpoint is None or env_step <= cfg.last_checkpoint)
-                    and env_step - cfg.first_checkpoint
-                    >= len(checkpoints_to_analyze) * cfg.min_interval
-                ):
-                    checkpoints_to_analyze.append((log_dir, agent_step))
-        jobs.extend(checkpoints_to_analyze)
-    jobs.sort(key=lambda j: (j[1], j[0]))
 
     if cfg.num_workers == 1:
-        for log_dir, agent_step in tqdm(jobs, desc="Analyzing logs"):
+        for log_dir, step in tqdm(jobs, desc="Analyzing logs"):
             logs = analysis_worker(
                 cfg.analysis,
                 log_dir,
-                agent_step,
+                step,
                 cfg.device,
                 cfg.overwrite_results,
                 show_progress=True,
             )
-            logs.log(summary_writers[log_dir])
+            if logs is not None:
+                logs.log(summary_writers[log_dir])
     else:
         # In contrast to multiprocessing.Pool, concurrent.futures.ProcessPoolExecutor allows nesting processes
         pool = concurrent.futures.ProcessPoolExecutor(
@@ -170,25 +196,26 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
         )
         try:
             results = []
-            for log_dir, agent_step in jobs:
+            for log_dir, step in jobs:
                 results.append(
                     pool.submit(
                         analysis_worker,
                         cfg.analysis,
                         log_dir,
-                        agent_step,
+                        step,
                         cfg.device,
                         cfg.overwrite_results,
                         show_progress=False,
                     )
                 )
-            for result, (log_dir, agent_step) in tqdm(
+            for result, (log_dir, step) in tqdm(
                 zip(results, jobs),
                 total=len(jobs),
                 desc="Analyzing logs",
             ):
                 logs = result.result()
-                logs.log(summary_writers[log_dir])
+                if logs is not None:
+                    logs.log(summary_writers[log_dir])
         except Exception as e:
             # TODO: Need to terminate the children's children as well
             for process in multiprocessing.active_children():

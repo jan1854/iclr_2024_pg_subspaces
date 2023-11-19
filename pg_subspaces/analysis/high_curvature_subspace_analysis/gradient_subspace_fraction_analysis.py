@@ -1,11 +1,12 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import gym
 import numpy as np
 import stable_baselines3
 import stable_baselines3.common.buffers
+import stable_baselines3.common.base_class
 import stable_baselines3.common.off_policy_algorithm
 import stable_baselines3.common.on_policy_algorithm
 import torch
@@ -25,41 +26,55 @@ from pg_subspaces.analysis.hessian.hessian_eigen_cached_calculator import (
 )
 from pg_subspaces.metrics.tensorboard_logs import TensorboardLogs
 from pg_subspaces.sb3_utils.common.agent_spec import AgentSpec
-from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer, concatenate_buffer_samples
-from pg_subspaces.sb3_utils.common.parameters import flatten_parameters, project_orthonormal, combine_actor_critic_parameter_vectors
+from pg_subspaces.sb3_utils.common.buffer import (
+    fill_rollout_buffer,
+    concatenate_buffer_samples,
+)
+from pg_subspaces.sb3_utils.common.parameters import (
+    flatten_parameters,
+    project_orthonormal,
+    combine_actor_critic_parameter_vectors,
+)
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
 from pg_subspaces.sb3_utils.common.loss import actor_critic_gradient
 
 logger = logging.Logger(__name__)
 
 
-class HighCurvatureSubspaceAnalysis(Analysis):
+class GradientSubspaceFractionAnalysis(Analysis):
     def __init__(
         self,
         analysis_run_id: str,
-        env_factory: Callable[[], gym.Env],
+        env_factory_or_dataset: Union[
+            Callable[[], gym.Env], stable_baselines3.common.buffers.ReplayBuffer
+        ],
         agent_spec: AgentSpec,
         run_dir: Path,
         num_samples_true_loss: int,
         top_eigenvec_levels: Sequence[int],
-        eigenvec_overlap_checkpoints: Sequence[int],
         hessian_eigen: HessianEigen,
         overwrite_cached_eigen: bool,
         skip_cacheing_eigen: bool,
+        on_policy_data_collection_processes: int,
+        on_policy_data_collection_device: Union[torch.device, str],
+        lock_analysis_log_file: bool = True,
+        ignore_exceptions: bool = False,
     ):
         super().__init__(
             "high_curvature_subspace_analysis",
             analysis_run_id,
-            env_factory,
+            env_factory_or_dataset,
             agent_spec,
             run_dir,
+            lock_analysis_log_file,
         )
         self.num_samples_true_loss = num_samples_true_loss
         self.top_eigenvec_levels = top_eigenvec_levels
-        self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
         self.hessian_eigen = hessian_eigen
         self.overwrite_cached_eigen = overwrite_cached_eigen
         self.skip_cacheing_eigen = skip_cacheing_eigen
+        self.on_policy_data_collection_processes = on_policy_data_collection_processes
+        self.on_policy_data_collection_device = on_policy_data_collection_device
         self.results_dir = run_dir / "analyses" / self.analysis_name / analysis_run_id
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.eigenspectrum_dir = self.results_dir / "eigenspectrum"
@@ -75,20 +90,36 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         overwrite_results: bool,
         verbose: bool,
     ) -> TensorboardLogs:
-
-        agent = self.agent_spec.create_agent(self.env_factory())
         if isinstance(
-            agent, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+            self.env_factory_or_dataset, stable_baselines3.common.buffers.ReplayBuffer
         ):
-            (
-                data_true_loss,
-                data_estimated_loss,
-            ) = self._collect_data_on_policy_algorithm(agent)
+            agent = self.agent_spec.create_agent(
+                replay_buffer=self.env_factory_or_dataset
+            )
+            max_idx = (
+                agent.replay_buffer.buffer_size
+                if agent.replay_buffer.full
+                else agent.replay_buffer.pos
+            )
+            data_true_loss = agent.replay_buffer._get_samples(np.arange(max_idx))
+            data_estimated_loss = [
+                agent.replay_buffer.sample(agent.batch_size)
+                for _ in range(2048 // agent.batch_size)
+            ]
         else:
-            (
-                data_true_loss,
-                data_estimated_loss,
-            ) = self._collect_data_off_policy_algorithm(agent)
+            agent = self.agent_spec.create_agent(env=self.env_factory_or_dataset())
+            if isinstance(
+                agent, stable_baselines3.common.on_policy_algorithm.OnPolicyAlgorithm
+            ):
+                (
+                    data_true_loss,
+                    data_estimated_loss,
+                ) = self._collect_data_on_policy_algorithm(agent)
+            else:
+                (
+                    data_true_loss,
+                    data_estimated_loss,
+                ) = self._collect_data_off_policy_algorithm(agent)
 
         hess_eigen_calculator = HessianEigenCachedCalculator(
             self.run_dir,
@@ -97,6 +128,7 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             device=agent.device,
             skip_cacheing=self.skip_cacheing_eigen,
         )
+        print(f"Computing eigenvectors for step {env_step}.")
         (
             eigenvals_combined,
             eigenvecs_combined,
@@ -221,28 +253,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             f"{prefix}gradient_subspace_fraction/true_gradient/{loss_name}", keys
         )
 
-        overlaps = self._calculate_overlaps(loss_name, agent)
-        for k, overlaps_top_k in overlaps.items():
-            keys = []
-            for t1, overlaps_t1 in overlaps_top_k.items():
-                if len(overlaps_t1) > 0:
-                    curr_key = (
-                        f"{prefix}overlaps_top{k:03d}_checkpoint{t1:07d}/{loss_name}"
-                    )
-                    keys.append(curr_key)
-                    for t2, overlap in overlaps_t1.items():
-                        logs.add_scalar(curr_key, overlap, t2)
-            logs.add_multiline_scalar(f"{prefix}overlaps_top{k:03d}/{loss_name}", keys)
-
-    @classmethod
-    def _calculate_eigenvectors_overlap(
-        cls, eigenvectors1: torch.Tensor, eigenvectors2: torch.Tensor
-    ) -> float:
-        projected_evs = project_orthonormal(
-            eigenvectors2, eigenvectors1, result_in_orig_space=True
-        )
-        return torch.mean(torch.norm(projected_evs, dim=0) ** 2).item()
-
     def _plot_eigenspectrum(
         self,
         eigenvalues_policy: torch.Tensor,
@@ -330,41 +340,6 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             for num_evs, sub_frac_list in subspace_fractions.items()
         }
 
-    def _calculate_overlaps(
-        self,
-        loss_name: Literal["combined_loss", "policy_loss", "value_function_loss"],
-        agent: stable_baselines3.common.base_class.BaseAlgorithm,
-    ) -> Dict[int, Dict[int, Dict[int, float]]]:
-        hess_eigen_calculator = HessianEigenCachedCalculator(
-            self.run_dir, self.hessian_eigen, skip_cacheing=self.skip_cacheing_eigen
-        )
-        start_checkpoints_eigenvecs = {
-            num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels
-        }
-        overlaps = {num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels}
-        for env_step, _, eigenvecs in hess_eigen_calculator.iter_cached_eigen(
-            agent, loss_name=loss_name
-        ):
-            for num_eigenvecs in self.top_eigenvec_levels:
-                curr_start_checkpoints_eigenvecs = start_checkpoints_eigenvecs[
-                    num_eigenvecs
-                ]
-                curr_overlaps = overlaps[num_eigenvecs]
-                for (
-                    checkpoint_env_step,
-                    checkpoint_evs,
-                ) in curr_start_checkpoints_eigenvecs.items():
-                    curr_overlaps[checkpoint_env_step][
-                        env_step
-                    ] = self._calculate_eigenvectors_overlap(
-                        checkpoint_evs[:, :num_eigenvecs],
-                        eigenvecs[:, :num_eigenvecs],
-                    )
-                if env_step in self.eigenvec_overlap_checkpoints:
-                    curr_start_checkpoints_eigenvecs[env_step] = eigenvecs
-                    curr_overlaps[env_step] = {env_step: 1.0}
-        return overlaps
-
     # TODO: This is redundant with HessianEigenCachedCalculator
     def calculate_eigen(
         self,
@@ -416,10 +391,14 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             agent.gae_lambda,
             agent.gamma,
         )
+        agent_spec_cpu = self.agent_spec.copy_with_new_parameters(
+            device=self.on_policy_data_collection_device
+        )
         fill_rollout_buffer(
-            self.env_factory,
-            self.agent_spec,
+            self.env_factory_or_dataset,
+            agent_spec_cpu,
             rollout_buffer_true_loss,
+            num_spawned_processes=self.on_policy_data_collection_processes,
         )
 
         rollout_buffer_gradient_estimates = (
@@ -430,7 +409,9 @@ class HighCurvatureSubspaceAnalysis(Analysis):
                 agent.device,
             )
         )
-        fill_rollout_buffer(self.env_factory, agent, rollout_buffer_gradient_estimates)
+        fill_rollout_buffer(
+            self.env_factory_or_dataset, agent, rollout_buffer_gradient_estimates
+        )
 
         return next(rollout_buffer_true_loss.get()), list(
             rollout_buffer_gradient_estimates.get(agent.batch_size)
@@ -440,22 +421,21 @@ class HighCurvatureSubspaceAnalysis(Analysis):
         self,
         agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
     ) -> Tuple[ReplayBufferSamples, List[ReplayBufferSamples]]:
-        # If the replay buffer is empty (step 0), collect some random data
-        if not agent.replay_buffer.full and agent.replay_buffer.pos == 0:
-            env = DummyVecEnv([lambda: self.env_factory()])
-            agent._last_obs = env.reset()
-            # collect_rollouts requires a callback for some reason
-            callback = CallbackList([])
-            callback.init_callback(agent)
-            agent._total_timesteps = 50_000
-            agent.collect_rollouts(
-                env,
-                callback,
-                TrainFreq(50_000, TrainFrequencyUnit.STEP),
-                agent.replay_buffer,
-                agent.action_noise,
-                50_000,
+        # If the replay buffer is too small, assume that the agent is an "on-policy" variant of the off-policy algorithm
+        # and replace the replay buffer by one of size num_samples_true_loss samples and fill it with on-policy data.
+        if agent.replay_buffer.buffer_size < 50000:
+            agent.replay_buffer = stable_baselines3.common.buffers.ReplayBuffer(
+                self.num_samples_true_loss,
+                agent.observation_space,
+                agent.action_space,
+                agent.device,
             )
+            self._collect_on_policy_data_off_policy_algorithm(
+                agent, self.num_samples_true_loss
+            )
+        # If the replay buffer is empty (step 0), collect some random data
+        elif not agent.replay_buffer.full and agent.replay_buffer.pos == 0:
+            self._collect_on_policy_data_off_policy_algorithm(agent, 50_000)
         max_idx = (
             agent.replay_buffer.buffer_size
             if agent.replay_buffer.full
@@ -467,3 +447,30 @@ class HighCurvatureSubspaceAnalysis(Analysis):
             agent.replay_buffer.sample(agent.batch_size)
             for _ in range(2048 // agent.batch_size)
         ]
+
+    def _collect_on_policy_data_off_policy_algorithm(
+        self,
+        agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
+        num_samples: int,
+    ) -> None:
+        env = self.env_factory_or_dataset()
+        agent._last_obs = env.reset()
+        # collect_rollouts requires a callback for some reason
+        callback = CallbackList([])
+        callback.init_callback(agent)
+        agent._total_timesteps = num_samples
+        agent._setup_learn(
+            50000,
+            callback,
+            False,
+            "run",
+            False,
+        )
+        agent.collect_rollouts(
+            env,
+            callback,
+            TrainFreq(num_samples, TrainFrequencyUnit.STEP),
+            agent.replay_buffer,
+            agent.action_noise,
+            num_samples,
+        )

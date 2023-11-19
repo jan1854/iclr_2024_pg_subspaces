@@ -53,14 +53,14 @@ def test_evaluate_agent_returns():
 
     num_episodes = 4
     num_steps = sum(env.max_steps[:num_episodes]) + 3
-    env = gym.wrappers.TimeLimit(DummyEnv(), 50)
+    env = DummyVecEnv([lambda: gym.wrappers.TimeLimit(DummyEnv(), 50)])
     eval_result_steps = evaluate_agent_returns(agent, env, num_steps=num_steps)
-    env = gym.wrappers.TimeLimit(DummyEnv(), 50)
+    env = DummyVecEnv([lambda: gym.wrappers.TimeLimit(DummyEnv(), 50)])
     eval_result_episodes = evaluate_agent_returns(agent, env, num_episodes=num_episodes)
     gt_values_undiscounted = []
     gt_values_discounted = []
     for episode in range(num_episodes):
-        curr_max_step = env.max_steps[episode]
+        curr_max_step = env.envs[0].max_steps[episode]
         gt_values_undiscounted.append(np.sum(np.arange(1, curr_max_step + 1)))
         gt_values_discounted.append(
             np.sum(

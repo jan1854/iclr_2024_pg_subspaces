@@ -4,7 +4,11 @@ import numpy as np
 import stable_baselines3.common.base_class
 import torch
 
-from pg_subspaces.sb3_utils.ppo.ppo_parameters import get_actor_parameter_names, get_critic_parameter_names
+from pg_subspaces.offline_rl.minimalistic_offline_sac import MinimalisticOfflineSAC
+from pg_subspaces.sb3_utils.ppo.ppo_parameters import (
+    get_actor_parameter_names,
+    get_critic_parameter_names,
+)
 
 
 def flatten_parameters(param_seq: Iterable[torch.nn.Parameter]) -> torch.Tensor:
@@ -51,10 +55,8 @@ def get_actor_critic_parameters(
         actor_parameter_names = get_actor_parameter_names(
             agent.policy.named_parameters()
         )
-        critic_parameter_names = (
-            get_critic_parameter_names(
-                agent.policy.named_parameters()
-            )
+        critic_parameter_names = get_critic_parameter_names(
+            agent.policy.named_parameters()
         )
         actor_parameters = [
             p for n, p in agent.policy.named_parameters() if n in actor_parameter_names
@@ -63,8 +65,10 @@ def get_actor_critic_parameters(
             p for n, p in agent.policy.named_parameters() if n in critic_parameter_names
         ]
         return actor_parameters, critic_parameters
-    elif isinstance(agent, stable_baselines3.TD3) or isinstance(
-        agent, stable_baselines3.SAC
+    elif (
+        isinstance(agent, stable_baselines3.TD3)
+        or isinstance(agent, stable_baselines3.SAC)
+        or isinstance(agent, MinimalisticOfflineSAC)
     ):
         return list(agent.policy.actor.parameters()), list(
             agent.policy.critic.parameters()

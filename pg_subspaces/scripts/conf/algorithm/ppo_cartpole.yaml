@@ -21,7 +21,7 @@ algorithm:
     _target_: pg_subspaces.training.schedules.LinearSchedule
     start: 0.2
     end: 0.0
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
 
 training:

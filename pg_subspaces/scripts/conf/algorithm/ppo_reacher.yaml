@@ -18,7 +18,7 @@ algorithm:
   gae_lambda: 1.0
   max_grad_norm: 0.9
   vf_coef: 0.950368
-  device: "auto"
+  device: ${device}
   tensorboard_log: tensorboard
 
 training:

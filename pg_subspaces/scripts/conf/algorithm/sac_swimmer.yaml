@@ -1,0 +1,18 @@
+# TODO: Most parameters should be in a default SAC config
+name: "sac"
+
+defaults:
+  - env_wrappers: []
+
+algorithm:
+  _target_: stable_baselines3.SAC
+  policy: "MlpPolicy"
+  learning_rate: 3e-4
+  gamma: 0.9999
+  device: ${device}
+  tensorboard_log: tensorboard
+  learning_starts: 10000
+
+training:
+  steps: 1000000
+  n_envs: 1

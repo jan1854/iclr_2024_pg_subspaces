@@ -5,37 +5,42 @@ from pathlib import Path
 import gym
 import pytest
 import stable_baselines3.common.buffers
+import stable_baselines3.common.vec_env
 import torch
 
 from pg_subspaces.analysis.hessian.hessian_eigen_cached_calculator import (
     HessianEigenCachedCalculator,
 )
-from pg_subspaces.analysis.high_curvature_subspace_analysis.high_curvature_subspace_analysis import (
-    HighCurvatureSubspaceAnalysis,
+from pg_subspaces.analysis.high_curvature_subspace_analysis.subspace_overlaps import (
+    SubspaceOverlaps,
 )
 from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import (
+    HessianEigenExplicit,
+)
 
 
 def test_high_curvature_overlap():
     v1 = torch.tensor([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]]).T
-    overlap = HighCurvatureSubspaceAnalysis._calculate_eigenvectors_overlap(v1, v1)
+    overlap = SubspaceOverlaps._calculate_eigenvectors_overlap(v1, v1)
     assert overlap == pytest.approx(1.0)
     v2 = torch.tensor([[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]]).T
-    overlap = HighCurvatureSubspaceAnalysis._calculate_eigenvectors_overlap(v1, v2)
+    overlap = SubspaceOverlaps._calculate_eigenvectors_overlap(v1, v2)
     assert overlap == pytest.approx(0.5)
     v2 = torch.tensor([[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]).T
-    overlap = HighCurvatureSubspaceAnalysis._calculate_eigenvectors_overlap(v1, v2)
+    overlap = SubspaceOverlaps._calculate_eigenvectors_overlap(v1, v2)
     assert overlap == pytest.approx(0.0)
     v2 = torch.tensor(
         [[sqrt(0.5), sqrt(0.5), 0.0, 0.0], [0.0, sqrt(0.5), sqrt(0.5), 0.0]]
     ).T
-    overlap = HighCurvatureSubspaceAnalysis._calculate_eigenvectors_overlap(v1, v2)
+    overlap = SubspaceOverlaps._calculate_eigenvectors_overlap(v1, v2)
     assert overlap == pytest.approx(0.5 * (1.0 + 0.5))
 
 
 def test_hessian_eigen_cached_calculator():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     agent = stable_baselines3.ppo.PPO(
         "MlpPolicy",
         env,
@@ -48,7 +53,9 @@ def test_hessian_eigen_cached_calculator():
     fill_rollout_buffer(env, agent, rollout_buffer)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        hess_eigen_comp = HessianEigenCachedCalculator(Path(tmpdir), HessianEigenExplicit())
+        hess_eigen_comp = HessianEigenCachedCalculator(
+            Path(tmpdir), HessianEigenExplicit()
+        )
         eigenvals_calc, eigenvecs_calc = hess_eigen_comp.get_eigen_combined_loss(
             agent,
             next(rollout_buffer.get()),

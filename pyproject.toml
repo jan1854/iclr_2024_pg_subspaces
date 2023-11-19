@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"" = "pg_subspaces"}
+packages = ["pg_subspaces"]
 
 [project]
 name = "pg_subspaces"
@@ -17,16 +17,24 @@ dependencies = [
     "dmc2gym @ git+https://github.com/jan1854/dmc2gym",
     "filelock",
     "gym[mujoco]==0.21.0",
-    "hydra-core",
-    "numpy",
+    "joblib",
+    "hydra-core>=1.3.0",
+    "numpy==1.24.1",
     "omegaconf",
     "Pillow",
     "scipy",
     "stable-baselines3[extra]==1.8.0",
     "tensorboard",
-    "torch==2.0.1",
+    "torch==2.1.0",
     "tqdm"
 ]
 
 [project.optional-dependencies]
+extra = [
+    "hydra-joblib-launcher>=1.2.0",
+    "hydra-ax-sweeper>=1.2.0",
+    # These are required to get the hydra-ax-sweeper plugin to work
+    "gpytorch<=1.8.0",
+    "pandas<=1.4.0"
+]
 dev = ["pytest"]

@@ -1,0 +1,38 @@
+# TODO: Most parameters should be in a default SAC config
+name: "sac"
+epochs: 10  # This belongs to the algorithm, but we cannot put it there; otherwise it would be passed to the constructor
+
+defaults:
+  - env_wrappers: []
+
+algorithm:
+  _target_: stable_baselines3.SAC
+  policy: "MlpPolicy"
+  learning_rate: 3e-4
+  learning_starts: 10000
+  tau: 0.005
+  gamma: 0.99
+  device: ${device}
+  train_freq: 2048
+  buffer_size: ${.train_freq}
+  batch_size: 256
+  gradient_steps: ${INTDIV:${MUL:${..epochs},${.train_freq}},${.batch_size}} # (epochs * train_freq // batch_size)
+  action_noise: null
+  replay_buffer_class: null
+  replay_buffer_kwargs: null
+  optimize_memory_usage: false
+  ent_coef: "auto"
+  target_update_interval: 1
+  target_entropy: "auto"
+  use_sde: false
+  sde_sample_freq: -1
+  use_sde_at_warmup: false
+  stats_window_size: 100
+  policy_kwargs:
+    net_arch: [256, 256]
+  verbose: 0
+  tensorboard_log: tensorboard
+
+training:
+  steps: 1000000
+  n_envs: 1

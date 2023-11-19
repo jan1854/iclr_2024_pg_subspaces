@@ -1,0 +1,23 @@
+defaults:
+  - _self_
+  - analysis: gradient_subspace_fraction_analysis
+
+
+train_logs: ??
+sync_train_logs: true
+num_workers: 1
+analysis_run_id: default
+top_eigenvec_levels: [1, 2, 5, 10, 20, 50, 100]
+eigenvec_overlap_checkpoints: [0, 10_000, 50_000, 100_000, 200_000, 500_000, 1_000_000]
+verbose: false
+
+log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
+
+# Disable the creation of the log directory
+hydra:
+  run:
+    dir: ${train_logs}/analysis_output/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: true
+  verbose:
+    - __main__

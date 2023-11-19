@@ -2,14 +2,18 @@ import gym
 import pytest
 import stable_baselines3
 import stable_baselines3.common.buffers
+import stable_baselines3.common.vec_env
 import torch
 
 from pg_subspaces.sb3_utils.common.buffer import fill_rollout_buffer
 from pg_subspaces.sb3_utils.hessian.calculate_hessian import calculate_hessian
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen import HessianEigen
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import HessianEigenExplicit
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import HessianEigenLanczos
-from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_power_method import HessianEigenPowerMethod
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_explicit import (
+    HessianEigenExplicit,
+)
+from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import (
+    HessianEigenLanczos,
+)
 from pg_subspaces.sb3_utils.ppo.ppo_loss import ppo_loss
 
 
@@ -49,7 +53,9 @@ def analytic_hessian(x):
 def compare_approx_eigen_to_explicit(
     hess_eigen_approx: HessianEigen, bound_abs: float, bound_rel: float
 ) -> None:
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     agent = stable_baselines3.ppo.PPO(
         "MlpPolicy",
         env,
@@ -115,7 +121,9 @@ def test_calculate_hessian_analytic():
 
 
 def test_calculate_hessian_dimension():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     agent = stable_baselines3.ppo.PPO(
         "MlpPolicy", env, device="cpu", policy_kwargs={"net_arch": [32, 16]}
     )
@@ -131,7 +139,9 @@ def test_calculate_hessian_dimension():
 
 
 def test_hessian_ev_calculation():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     agent = stable_baselines3.ppo.PPO(
         "MlpPolicy",
         env,
@@ -171,13 +181,16 @@ def test_hessian_ev_calculation():
                 :, j
             ] == pytest.approx(0.0)
 
+
 def test_compare_lanczos_to_explicit():
     hess_eigen_lanczos = HessianEigenLanczos(1e-5, 10000, None)
     compare_approx_eigen_to_explicit(hess_eigen_lanczos, 1e-4, 1e-5)
 
 
 def test_hessian_eigen_orthonormal():
-    env = gym.make("Pendulum-v1")
+    env = stable_baselines3.common.vec_env.DummyVecEnv(
+        [lambda: gym.make("Pendulum-v1")]
+    )
     agent = stable_baselines3.ppo.PPO(
         "MlpPolicy",
         env,

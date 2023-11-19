@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - analysis: high_curvature_subspace_analysis
+  - analysis: gradient_subspace_fraction_analysis
 
 
 train_logs: ??
@@ -22,6 +22,5 @@ hydra:
     dir: ${train_logs}/analysis_output/${now:%Y-%m-%d}/${now:%H-%M-%S}
   job:
     chdir: true
-  verbose: [
-    __main__
-  ]
+  verbose:
+    - __main__

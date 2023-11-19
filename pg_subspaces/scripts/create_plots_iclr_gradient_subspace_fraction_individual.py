@@ -1,24 +1,19 @@
 import argparse
 import logging
-import multiprocessing
 import pickle
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
+import yaml
 from matplotlib import pyplot as plt
 from matplotlib import patches
 
-from scripts.convergence_criterion import ConvergenceCriterion
-from scripts.create_plots import create_plots
-from util.tensorboard_logs import create_event_accumulators, read_scalar
+from pg_subspaces.scripts.convergence_criterion import ConvergenceCriterion
+from pg_subspaces.metrics.tensorboard_logs import create_event_accumulators, read_scalar
+from pg_subspaces.scripts.create_plots_iclr_gradient_subspace_fraction import load_logs
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
-
-from tqdm import tqdm
-
-from run_configs import RUN_CONFIGS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -55,9 +50,9 @@ GOLDEN_RATIO = 1.618
 
 
 def env_name_to_diplay(name):
-    if name == "dmc_Finger-spin_TC-v1":
+    if name == "dmc_Finger-spin-v1":
         return "Finger-spin"
-    elif name == "Walker2d_TC-v3":
+    elif name == "Walker2d-v3":
         return "Walker2D"
 
 
@@ -89,66 +84,66 @@ def split_training_phases(
     )
 
 
-def load_logs(log_path, key, max_step, only_complete_steps=True):
-    run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
-    if len(run_dirs) > 0:
-        tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
-        event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
-    scalars_value = []
-    scalars_reward = []
-    for ea in event_accumulators:
-        try:
-            scalars_curr_ea_value = read_scalar(ea, key)
-            scalars_value.append(scalars_curr_ea_value)
-        except:
-            logger.warning(f"Did not find key {key} in all logs.")
-        scalars_curr_ea_reward = read_scalar(ea, "rollout/ep_rew_mean")
-        scalars_reward.append(scalars_curr_ea_reward)
-    scalars_value = sorted(
-        [list(s.values()) for s in scalars_value], key=lambda s: len(s)
-    )
-    scalars_reward = sorted(
-        [list(s.values()) for s in scalars_reward], key=lambda s: len(s)
-    )
-    steps_value = set([s.step for s in scalars_value[-1]])
-    for scalar in scalars_value:
-        scalar.sort(key=lambda s: s.step)
-        assert np.all(s.step in steps_value for s in scalar), "Steps do not match."
-    if len(scalars_value[0]) < len(scalars_value[-1]):
-        logger.warning(
-            f"Found a different number of scalars for the event accumulators (key: {key}, "
-            f"min: {len(scalars_value[0])}, max: {len(scalars_value[-1])}), using the "
-            f"{'minimum' if only_complete_steps else 'maximum'} value"
-        )
-    if only_complete_steps:
-        steps_value = [scalar.step for scalar in scalars_value[0]]
-    else:
-        steps_value = [scalar.step for scalar in scalars_value[-1]]
-    if only_complete_steps:
-        steps_reward = [scalar.step for scalar in scalars_reward[0]]
-    else:
-        steps_reward = [scalar.step for scalar in scalars_reward[-1]]
-
-    steps_value = [step for step in steps_value if step <= max_step]
-    steps_reward = [step for step in steps_reward if step <= max_step]
-
-    values = [
-        [
-            scalars_curr_run[i].value
-            for scalars_curr_run in scalars_value
-            if i < len(scalars_curr_run)
-        ]
-        for i in range(len(steps_value))
-    ]
-    rewards = [
-        [
-            scalars_curr_run[i].value
-            for scalars_curr_run in scalars_reward
-            if i < len(scalars_curr_run)
-        ]
-        for i in range(len(steps_reward))
-    ]
-    return (steps_value, values), (steps_reward, rewards)
+# def load_logs(log_path, key, max_step, only_complete_steps=True):
+#     run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isnumeric()]
+#     if len(run_dirs) > 0:
+#         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
+#         event_accumulators = [ea for _, ea in create_event_accumulators(tb_dirs)]
+#     scalars_value = []
+#     scalars_reward = []
+#     for ea in event_accumulators:
+#         try:
+#             scalars_curr_ea_value = read_scalar(ea, key)
+#             scalars_value.append(scalars_curr_ea_value)
+#         except:
+#             logger.warning(f"Did not find key {key} in all logs.")
+#         scalars_curr_ea_reward = read_scalar(ea, "rollout/ep_rew_mean")
+#         scalars_reward.append(scalars_curr_ea_reward)
+#     scalars_value = sorted(
+#         [list(s.values()) for s in scalars_value], key=lambda s: len(s)
+#     )
+#     scalars_reward = sorted(
+#         [list(s.values()) for s in scalars_reward], key=lambda s: len(s)
+#     )
+#     steps_value = set([s.step for s in scalars_value[-1]])
+#     for scalar in scalars_value:
+#         scalar.sort(key=lambda s: s.step)
+#         assert np.all(s.step in steps_value for s in scalar), "Steps do not match."
+#     if len(scalars_value[0]) < len(scalars_value[-1]):
+#         logger.warning(
+#             f"Found a different number of scalars for the event accumulators (key: {key}, "
+#             f"min: {len(scalars_value[0])}, max: {len(scalars_value[-1])}), using the "
+#             f"{'minimum' if only_complete_steps else 'maximum'} value"
+#         )
+#     if only_complete_steps:
+#         steps_value = [scalar.step for scalar in scalars_value[0]]
+#     else:
+#         steps_value = [scalar.step for scalar in scalars_value[-1]]
+#     if only_complete_steps:
+#         steps_reward = [scalar.step for scalar in scalars_reward[0]]
+#     else:
+#         steps_reward = [scalar.step for scalar in scalars_reward[-1]]
+#
+#     steps_value = [step for step in steps_value if step <= max_step]
+#     steps_reward = [step for step in steps_reward if step <= max_step]
+#
+#     values = [
+#         [
+#             scalars_curr_run[i].value
+#             for scalars_curr_run in scalars_value
+#             if i < len(scalars_curr_run)
+#         ]
+#         for i in range(len(steps_value))
+#     ]
+#     rewards = [
+#         [
+#             scalars_curr_run[i].value
+#             for scalars_curr_run in scalars_reward
+#             if i < len(scalars_curr_run)
+#         ]
+#         for i in range(len(steps_reward))
+#     ]
+#     return (steps_value, values), (steps_reward, rewards)
 
 
 def plot_bars(data, ax):
@@ -200,73 +195,67 @@ def plot_bars(data, ax):
             bar.set_hatch("XXX")
 
 
-def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
+def create_plots_iclr_gradient_subspace_fraction_individual(log_dir, out_dir):
     global bar_xpos
-    if not cache_file.exists():
-        results = {}
-        for env_name, run_config in RUN_CONFIGS.items():
-            results[env_name] = {}
-            curr_results_env = results[env_name]
-            for algorithm_name, algorthm_log_path in run_config["log_dirs"].items():
-                curr_results_env[algorithm_name] = {}
-                curr_results_algo = curr_results_env[algorithm_name]
-                algorthm_log_path = log_dir / env_name / algorthm_log_path
-                for loss_type, loss_type_short in [
-                    ("policy_loss", "policy"),
-                    ("value_function_loss", "vf"),
+    results = {}
+    with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+        "r"
+    ) as run_configs_file:
+        run_configs = yaml.safe_load(run_configs_file)
+    for env_name, run_config in run_configs.items():
+        results[env_name] = {}
+        curr_results_env = results[env_name]
+        for algorithm_name, algorthm_log_path in run_config["log_dirs"].items():
+            curr_results_env[algorithm_name] = {}
+            curr_results_algo = curr_results_env[algorithm_name]
+            algorthm_log_path = log_dir / env_name / algorthm_log_path
+            for loss_type, loss_type_short in [
+                ("policy_loss", "policy"),
+                ("value_function_loss", "vf"),
+            ]:
+                curr_results_algo[loss_type_short] = {}
+                curr_results_loss = curr_results_algo[loss_type_short]
+                for grad_hess_type in [
+                    "estimated_gradient",
+                    "true_gradient",
+                    "low_sample",
                 ]:
-                    curr_results_algo[loss_type_short] = {}
-                    curr_results_loss = curr_results_algo[loss_type_short]
-                    for grad_hess_type in [
-                        "estimated_gradient",
-                        "true_gradient",
-                        "low_sample",
-                    ]:
-                        if grad_hess_type == "low_sample":
-                            key = (
-                                f"high_curvature_subspace_analysis/{run_config.get('analysis_run_ids', {}).get(algorithm_name, 'default')}/low_sample/"
-                                f"gradient_subspace_fraction_100evs/estimated_gradient/{loss_type}"
-                            )
-                        else:
-                            key = (
-                                f"high_curvature_subspace_analysis/{run_config.get('analysis_run_ids', {}).get(algorithm_name, 'default')}/"
-                                f"gradient_subspace_fraction_100evs/{grad_hess_type}/{loss_type}"
-                            )
-                        try:
-                            (steps_values, values), (
-                                steps_rewards,
-                                rewards,
-                            ) = load_logs(algorthm_log_path, key, run_config["xmax"])
-                        except Exception as e:
-                            logger.warning(e)
-                            continue
-                        values_split = [[] for _ in range(3)]
-                        for curr_values, curr_rewards, curr_steps in zip(
-                            np.transpose(values),
-                            np.transpose(rewards),
+                    if grad_hess_type == "low_sample":
+                        key = (
+                            f"high_curvature_subspace_analysis/{run_config.get('analysis_run_ids', {}).get(algorithm_name, 'default')}/low_sample/"
+                            f"gradient_subspace_fraction_100evs/estimated_gradient/{loss_type}"
+                        )
+                    else:
+                        key = (
+                            f"high_curvature_subspace_analysis/{run_config.get('analysis_run_ids', {}).get(algorithm_name, 'default')}/"
+                            f"gradient_subspace_fraction_100evs/{grad_hess_type}/{loss_type}"
+                        )
+                    try:
+                        (steps_values, values), (
+                            steps_rewards,
+                            rewards,
+                        ) = load_logs(algorthm_log_path, key, run_config["xmax"])
+                    except Exception as e:
+                        logger.warning(e)
+                        continue
+                    values_split = [[] for _ in range(3)]
+                    for curr_values, curr_rewards, curr_steps in zip(
+                        np.transpose(values),
+                        np.transpose(rewards),
+                        steps_values,
+                    ):
+                        _, curr_values_split = split_training_phases(
                             steps_values,
-                        ):
-                            _, curr_values_split = split_training_phases(
-                                steps_values,
-                                curr_values,
-                                steps_rewards,
-                                curr_rewards,
-                            )
-                            for i in range(len(values_split)):
-                                values_split[i].append(
-                                    np.mean(curr_values_split[i])
-                                )
+                            curr_values,
+                            steps_rewards,
+                            curr_rewards,
+                        )
+                        for i in range(len(values_split)):
+                            values_split[i].append(np.mean(curr_values_split[i]))
 
-                        curr_results_loss[grad_hess_type] = [
-                            {"mean": np.mean(v), "std": np.std(v)}
-                            for v in values_split
-                        ]
-
-        with cache_file.open("wb") as f:
-            pickle.dump(results, f)
-    else:
-        with cache_file.open("rb") as f:
-            results = pickle.load(f)
+                    curr_results_loss[grad_hess_type] = [
+                        {"mean": np.mean(v), "std": np.std(v)} for v in values_split
+                    ]
 
     for loss_type in ["policy", "vf"]:
         for env_name, env_results in results:
@@ -321,7 +310,11 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                 patches.Patch(color=COLORSCHEME[0], label="Initial phase")
             )
             legend_handles.append(
-                patches.Patch(facecolor=LIGHT_GREY, edgecolor=GREY, label="True gradient, true Hessian")
+                patches.Patch(
+                    facecolor=LIGHT_GREY,
+                    edgecolor=GREY,
+                    label="True gradient, true Hessian",
+                )
             )
             legend_handles.append(
                 patches.Patch(color=COLORSCHEME[1], label="Training phase")
@@ -334,7 +327,9 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
                     label="Estimated gradient, true Hessian",
                 )
             )
-            legend_handles.append(patches.Patch(color=COLORSCHEME[2], label="Convergence phase"))
+            legend_handles.append(
+                patches.Patch(color=COLORSCHEME[2], label="Convergence phase")
+            )
             legend_handles.append(
                 patches.Patch(
                     facecolor=LIGHT_GREY,
@@ -366,9 +361,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
             # bbox = legend_plt.get_window_extent().transformed(
             #     legend_fig.dpi_scale_trans.inverted()
             # )
-            out_path = Path(
-                out_dir / f"gradient_subspace_fraction_{loss_type}"
-            )
+            out_path = Path(out_dir / f"gradient_subspace_fraction_{loss_type}")
             # legend_fig.savefig(
             #     out_path.parent / (out_path.name + "_legend.pdf"), bbox_inches=bbox
             # )
@@ -376,9 +369,10 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, cache_file, out_dir):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(Path(args.log_dir))
+    parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
-    parser.add_argument("cache_file", type=str)
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.cache_dir), Path(args.out_dir))
+    create_plots_iclr_gradient_subspace_fraction_individual(
+        Path(args.log_dir), Path(args.out_dir)
+    )

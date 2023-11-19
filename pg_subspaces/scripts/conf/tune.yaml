@@ -1,0 +1,40 @@
+defaults:
+  - _self_
+  - algorithm: ppo_default
+  - tuning: tune_ppo
+  - override hydra/launcher: joblib
+  - override hydra/sweeper: ax
+
+env: Pendulum-v1
+env_args: {}
+seed: null
+device: auto
+show_progress: false
+num_eval_episodes: 10
+eval_interval: 10000
+checkpoint_interval: null
+additional_checkpoints: []
+save_replay_buffer: false
+num_seeds: 3
+num_configurations: 50
+ignore_initial_steps_ratio: 0.1
+
+log_dir: ${oc.env:PG_SUBSPACES_TUNING_LOG_DIR,logs}
+run_log_dir: ${log_dir}/tuning/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${run_log_dir}
+  sweep:
+    dir: ${run_log_dir}
+  job:
+    chdir: true
+  verbose:
+    - __main__
+  launcher:
+    n_jobs: 15
+  sweeper:
+    ax_config:
+      max_trials: ${num_configurations}
+      params:
+        ${tuning}

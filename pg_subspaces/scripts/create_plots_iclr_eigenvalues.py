@@ -1,15 +1,17 @@
 import argparse
-import time
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from run_configs import RUN_CONFIGS
+import yaml
 
 
 def create_plots_iclr_eigenvalues(log_dir, out_dir):
-    for env_name, run_config in RUN_CONFIGS.items():
+    with (Path(__file__).parent / "res" / "run_configs.yaml").open(
+        "r"
+    ) as run_configs_file:
+        run_configs = yaml.safe_load(run_configs_file)
+    for env_name, run_config in run_configs.items():
         if "Finger-spin" not in env_name and "Walker2d" not in env_name:
             continue
         # TODO: Do this for all the run_dirs
@@ -99,8 +101,16 @@ def create_plots_iclr_eigenvalues(log_dir, out_dir):
             def subsampling_criterion(i):
                 return i <= 200 or i >= len(eigenvals) - 200 or i % 10 == 0
 
-            eigenvals_subsampled = np.array([ev for i, ev in enumerate(reversed(eigenvals)) if subsampling_criterion(i)])
-            ev_indices = np.array([i for i in range(len(eigenvals)) if subsampling_criterion(i)])
+            eigenvals_subsampled = np.array(
+                [
+                    ev
+                    for i, ev in enumerate(reversed(eigenvals))
+                    if subsampling_criterion(i)
+                ]
+            )
+            ev_indices = np.array(
+                [i for i in range(len(eigenvals)) if subsampling_criterion(i)]
+            )
             max_abs_ev = np.abs(eigenvals_subsampled).max()
             ax.set_ylim(-max_abs_ev * 1.15, max_abs_ev * 1.15)
             ax.set_xlabel("Index")
@@ -114,7 +124,7 @@ def create_plots_iclr_eigenvalues(log_dir, out_dir):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
