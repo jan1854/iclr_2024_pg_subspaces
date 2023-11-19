@@ -87,7 +87,7 @@ if __name__ == "__main__":
         "r"
     ) as run_configs_file:
         run_configs = yaml.safe_load(run_configs_file)
-    with multiprocessing.Pool(1) as pool:
+    with multiprocessing.Pool(5) as pool:
         for env_name, run_config in run_configs.items():
             env_file_name = env_name[:-3].lower().replace("-", "_")
             if not env_name.startswith("dmc"):
