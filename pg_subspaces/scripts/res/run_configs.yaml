@@ -22,12 +22,12 @@ HalfCheetah-v3:
 Hopper-v3:
   log_dirs:
     ppo: 2023-11-17/13-22-43
-    sac: 2023-11-18/12-10-12
+    sac: 2023-11-18/15-51-33
   xmax: 1_500_000
 LunarLanderContinuous-v2:
   log_dirs:
     ppo: 2023-11-17/13-20-55
-    sac: 2023-11-17/13-30-35
+    sac: 2023-11-18/12-02-40
   xmax: 1_000_000
 Pendulum-v1:
   log_dirs:
