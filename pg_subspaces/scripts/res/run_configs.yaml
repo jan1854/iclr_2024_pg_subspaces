@@ -77,7 +77,7 @@ dmc_Finger-spin-v1:
 FetchReach-v1:
   log_dirs:
     ppo: 2023-11-15/20-07-13
-    sac: 2023-11-18/12-16-42
+    sac: 2023-11-19/16-48-10
   xmax: 500_000
 FetchPush-v1:
   log_dirs:
