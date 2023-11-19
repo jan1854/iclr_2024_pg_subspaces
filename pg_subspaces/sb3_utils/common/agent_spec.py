@@ -198,6 +198,7 @@ class HydraAgentSpec(AgentSpec):
         if device is None:
             device = agent_cfg["algorithm"]["device"]
         super().__init__(device, override_weights, agent_kwargs)
+        omegaconf.OmegaConf.resolve(agent_cfg["algorithm"])
         self.agent_cfg = {
             "algorithm": self._obj_config_to_type_and_kwargs(
                 omegaconf.OmegaConf.to_container(agent_cfg["algorithm"])
