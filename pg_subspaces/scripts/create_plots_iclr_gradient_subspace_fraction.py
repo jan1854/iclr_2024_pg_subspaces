@@ -1,6 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
+from typing import Sequence
 
 import numpy as np
 import yaml
@@ -48,10 +49,14 @@ GOLDEN_RATIO = 1.618
 
 
 def env_name_to_diplay(name):
-    if name == "dmc_Finger-spin-v1":
-        return "Finger-spin"
-    elif name == "Walker2d-v3":
+    name = name[:-3]
+    if name.startswith("dmc_"):
+        name = name[len("dmc_") :]
+    if name == "Walker2d":
         return "Walker2D"
+    if name == "Ball_in_cup-catch":
+        return "Ball_in_cup"
+    return name
 
 
 def split_training_phases(
@@ -162,8 +167,8 @@ def plot_bars(data, ax):
             for c in cp
         ],
         edgecolor=[c for c in COLORSCHEME for _ in range(3)],
-        width=0.91,
-        zorder=5,
+        width=0.85,
+        zorder=2,
     )
     bar_xpos += 10
     for i, bar in enumerate(bars):
@@ -173,7 +178,9 @@ def plot_bars(data, ax):
             bar.set_hatch("XXX")
 
 
-def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
+def create_plots_iclr_gradient_subspace_fraction(
+    log_dir, out_dir, env_names: Sequence[str]
+):
     global bar_xpos
     results = {}
     with (Path(__file__).parent / "res" / "run_configs.yaml").open(
@@ -181,7 +188,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
     ) as run_configs_file:
         run_configs = yaml.safe_load(run_configs_file)
     for env_name, run_config in run_configs.items():
-        if env_name in ["dmc_Finger-spin-v1", "Walker2d-v3"]:
+        if env_name in env_names:
             results[env_name] = {}
             curr_results_env = results[env_name]
             for algorithm_name, algorithm_log_path in run_config["log_dirs"].items():
@@ -238,12 +245,11 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
 
     for loss_type in ["policy", "vf"]:
         bar_xpos = 0
-        factor = 2
         # fig, ax = plt.subplots(figsize=(factor * GOLDEN_RATIO * 4, factor))
         plt.rc("font", size=8)
         fig, ax = plt.subplots()
         ax.set_zorder(10)
-        ax.grid(axis="y", alpha=0.5, zorder=0)
+        ax.grid(axis="y", alpha=0.5)
 
         # Calculate width and height for the desired aspect ratio
         width = 0.9  # This value might need adjustment
@@ -254,7 +260,7 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
         bottom = 0.5 - (height / 2)  # Center the axes in the figure
         ax.set_position([left, bottom, width, height])
         print(results)
-        for env_name in ["dmc_Finger-spin-v1", "Walker2d-v3"]:
+        for env_name in env_names:
             env_results = results[env_name]
             x_pos_start_env = bar_xpos
             for algorithm_name in ["ppo", "sac"]:
@@ -355,5 +361,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("log_dir", type=str)
     parser.add_argument("out_dir", type=str)
+    parser.add_argument("env_names", type=str, nargs="+")
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.out_dir))
+    create_plots_iclr_gradient_subspace_fraction(
+        Path(args.log_dir), Path(args.out_dir), args.env_names
+    )
