@@ -83,15 +83,16 @@ def combine_metrics(log_path: Path) -> None:
     for env_dir in training_log_path.iterdir():
         for date_dir in env_dir.iterdir():
             for experiment_dir in date_dir.iterdir():
-                job = create_job(experiment_dir)
-                if job is not None:
-                    jobs.append(job)
-                # In case we have another layer of subdirectories (i.e, date/time/0/0)
-                for sub_experiment_dir in experiment_dir.iterdir():
-                    if sub_experiment_dir.is_dir():
-                        job = create_job(sub_experiment_dir)
-                        if job is not None:
-                            jobs.append(job)
+                if experiment_dir.is_dir():
+                    job = create_job(experiment_dir)
+                    if job is not None:
+                        jobs.append(job)
+                    # In case we have another layer of subdirectories (i.e, date/time/0/0)
+                    for sub_experiment_dir in experiment_dir.iterdir():
+                        if sub_experiment_dir.is_dir():
+                            job = create_job(sub_experiment_dir)
+                            if job is not None:
+                                jobs.append(job)
 
     for run_dirs, combined_dir in tqdm(jobs):
         tb_dirs = [run_dir / "tensorboard" for run_dir in run_dirs]
