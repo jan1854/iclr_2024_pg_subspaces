@@ -65,7 +65,7 @@ def create_multiline_plots(
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
         for i, key in enumerate(keys):
-            metrics = read_metrics_cached(log_path, keys)
+            metrics = read_metrics_cached(log_path, [key])
             min_last_step = min([m[0][-1] for m in metrics])
             max_last_step = max([m[0][-1] for m in metrics])
             if min_last_step != max_last_step:
@@ -273,7 +273,7 @@ def create_multiline_plots(
             legend_plt = ax.legend(
                 legend,
                 frameon=False,
-                ncol=1,
+                ncol=3,
                 bbox_to_anchor=(2.0, 2.0),
             )
             legend_fig = legend_plt.figure
