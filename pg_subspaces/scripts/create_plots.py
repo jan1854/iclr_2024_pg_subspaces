@@ -65,6 +65,7 @@ def create_plots(
     plt.rc("axes", linewidth=linewidth)
     plt.rc("lines", linewidth=linewidth * 1.5)
     fig, ax = plt.subplots()
+    ax.set_zorder(100)
     try:
         ax.margins(x=0)
         color = None  # To make PyLint happy
@@ -122,7 +123,7 @@ def create_plots(
                     value_mean,
                     color=color,
                     linestyle=linestyles[i % num_same_color_plots],
-                    zorder=i + 2,
+                    zorder=1 + 0.01 * i,
                 )
                 ax.fill_between(
                     steps,
@@ -131,7 +132,7 @@ def create_plots(
                     alpha=0.2,
                     label="_nolegend_",
                     color=color,
-                    zorder=i + 52,
+                    zorder=2 + 0.01 * i,
                 )
 
         if not xaxis_log:
@@ -175,7 +176,7 @@ def create_plots(
                     bbox=dict(
                         facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
                     ),
-                    zorder=1,
+                    zorder=0.5,
                 )
                 plt.text(
                     pos,

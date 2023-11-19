@@ -67,7 +67,7 @@ def worker(
             fontsize,
             linewidth,
             fill_in_data,
-            [(100000, "$t_1", False)],
+            [(100000, "$t_1$", False)],
             {},
             out,
         )

@@ -39,31 +39,31 @@ PLOT_CONFIGS_SINGLE_RUN = {
     #     "ymax": 1.0,
     #     "smoothing_weight": 0.0,
     # },
-    # "gradient_subspace_fraction_estimated_vs_true": {
-    #     # "title": "Subspace frac., estimated vs. true grad.",
-    #     "out_dir": "gradient_subspace_fraction",
-    #     "keys": [
-    #         "gradient_subspace_fraction_001evs/true_gradient",
-    #         "gradient_subspace_fraction_001evs/estimated_gradient",
-    #         "gradient_subspace_fraction_010evs/true_gradient",
-    #         "gradient_subspace_fraction_010evs/estimated_gradient",
-    #         "gradient_subspace_fraction_100evs/true_gradient",
-    #         "gradient_subspace_fraction_100evs/estimated_gradient",
-    #     ],
-    #     "legend": [
-    #         "True grad.; 1 EV",
-    #         "Estimated grad.; 1 EV",
-    #         "True grad.; 10 EVs",
-    #         "Estimated grad.; 10 EVs",
-    #         "True grad.; 100 EVs",
-    #         "Estimated grad.; 100 EVs",
-    #     ],
-    #     "ylabel": "Gradient subspace fraction",
-    #     "num_same_color_plots": 2,
-    #     "ymin": 0.0,
-    #     "ymax": 1.0,
-    #     "smoothing_weight": 0.0,
-    # },
+    "gradient_subspace_fraction_estimated_vs_true": {
+        # "title": "Subspace frac., estimated vs. true grad.",
+        "out_dir": "gradient_subspace_fraction",
+        "keys": [
+            "gradient_subspace_fraction_001evs/true_gradient",
+            "gradient_subspace_fraction_001evs/estimated_gradient",
+            "gradient_subspace_fraction_010evs/true_gradient",
+            "gradient_subspace_fraction_010evs/estimated_gradient",
+            "gradient_subspace_fraction_100evs/true_gradient",
+            "gradient_subspace_fraction_100evs/estimated_gradient",
+        ],
+        "legend": [
+            "True grad.; 1 EV",
+            "Estimated grad.; 1 EV",
+            "True grad.; 10 EVs",
+            "Estimated grad.; 10 EVs",
+            "True grad.; 100 EVs",
+            "Estimated grad.; 100 EVs",
+        ],
+        "ylabel": "Gradient subspace fraction",
+        "num_same_color_plots": 2,
+        "ymin": 0.0,
+        "ymax": 1.0,
+        "smoothing_weight": 0.0,
+    },
     # "true_gradient_subspace_fraction": {
     #     # "title": "True gradient subspace fraction",
     #     "out_dir": "gradient_subspace_fraction",
@@ -231,14 +231,16 @@ def worker_single_run(
     xaxis_log: bool,
     keys: Sequence[str],
     smoothing_weight: float,
+    only_complete_steps: bool,
     separate_legend: bool,
     num_same_color_plots: int,
     marker: Optional[str],
     fontsize: int,
     linewidth: float,
     fill_in_data: Dict[int, float],
+    x_annotations: Sequence[Tuple[int, str, bool]],
+    y_annotations: Sequence[Tuple[int, str, bool]],
     out: Path,
-    annotations: Dict[int, str],
 ):
     from pg_subspaces.scripts.create_multiline_plots import create_multiline_plots
 
@@ -254,19 +256,20 @@ def worker_single_run(
             xaxis_log,
             keys,
             smoothing_weight,
-            True,
+            only_complete_steps,
             separate_legend,
             num_same_color_plots,
             marker,
             fontsize,
             linewidth,
             fill_in_data,
+            x_annotations,
+            y_annotations,
             out,
-            annotations,
         )
     except Exception as e:
         logger.warning(
-            f"Could not create plot {out.relative_to(out.parents[2])}, got exception {e}"
+            f"Could not create plot {out.relative_to(out.parents[2])}, got exception {type(e).__name__}: {e}"
         )
 
 
@@ -287,8 +290,8 @@ def worker_multiple_runs(
     fontsize: int,
     linewidth: float,
     fill_in_data: Dict[int, float],
-    x_annotations: Tuple[int, str, bool],
-    y_annotations: Tuple[int, str, bool],
+    x_annotations: Sequence[Tuple[int, str, bool]],
+    y_annotations: Sequence[Tuple[int, str, bool]],
     out: Path,
 ):
     from pg_subspaces.scripts.create_plots import create_plots
@@ -389,9 +392,6 @@ if __name__ == "__main__":
                         keys = [
                             f"high_curvature_subspace_analysis/{analysis_run_id}/{key}/{loss_type}"
                             for key in plot_config["keys"]
-                        ] + [
-                            f"subspace_overlaps_analysis/{analysis_run_id}/{key}/{loss_type}"
-                            for key in plot_config["keys"]
                         ]
                         if env_name.startswith("dmc_"):
                             title_env_name = env_name[len("dmc_") : -3]
@@ -419,13 +419,15 @@ if __name__ == "__main__":
                                     keys,
                                     plot_config.get("smoothing_weight", 0.0),
                                     True,
+                                    True,
                                     plot_config.get("num_same_color_plots", 1),
                                     plot_config.get("marker"),
                                     plot_config.get("fontsize", 22),
                                     plot_config.get("linewidth", 2.5),
                                     plot_config.get("fill_in_data", {}),
+                                    plot_config.get("x_annotations", {}),
+                                    plot_config.get("y_annotations", {}),
                                     out_path,
-                                    plot_config.get("annotations", {}),
                                 ),
                             )
                         )

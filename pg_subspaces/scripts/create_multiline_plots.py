@@ -74,11 +74,13 @@ def create_multiline_plots(
                     f"using {'minimum' if only_complete_steps else 'maximum'} value."
                 )
                 if only_complete_steps:
+                    metrics = [list(metric) for metric in metrics]
                     for metric in metrics:
-                        metrics[0] = np.array(
+                        metric[0] = np.array(
                             [m for m in metric[0] if m <= min_last_step]
                         )
-                        metrics[1] = metrics[1][: len(metrics[0])]
+                        metric[1] = metric[1][: len(metric[0])]
+                    metrics = [tuple(metric) for metric in metrics]
 
             steps = metrics[0][0]
             value_mean = np.array(
@@ -116,7 +118,7 @@ def create_multiline_plots(
                 markersize=2,
                 color=color,
                 linestyle=linestyles[i % num_same_color_plots],
-                zorder=10 + i,
+                zorder=1 + 0.01 * i,
             )
             if value_std is not None:
                 ax.fill_between(
@@ -126,7 +128,7 @@ def create_multiline_plots(
                     alpha=0.2,
                     label="_nolegend_",
                     color=color,
-                    zorder=10 + i,
+                    zorder=2 + 0.01 * i,
                 )
         # else:
         #     if (log_path / "tensorboard").exists():
@@ -195,7 +197,7 @@ def create_multiline_plots(
                     bbox=dict(
                         facecolor="white", edgecolor="none", boxstyle="square,pad=0.05"
                     ),
-                    zorder=1,
+                    zorder=0.5,
                 )
                 plt.text(
                     pos,

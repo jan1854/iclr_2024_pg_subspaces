@@ -195,7 +195,7 @@ def plot_bars(data, ax):
             bar.set_hatch("XXX")
 
 
-def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
+def create_plots_iclr_gradient_subspace_fraction_individual(log_dir, out_dir):
     global bar_xpos
     results = {}
     with (Path(__file__).parent / "res" / "run_configs.yaml").open(
@@ -373,4 +373,6 @@ if __name__ == "__main__":
     parser.add_argument("log_dir", type=str)
     parser.add_argument("out_dir", type=str)
     args = parser.parse_args()
-    create_plots_iclr_gradient_subspace_fraction(Path(args.log_dir), Path(args.out_dir))
+    create_plots_iclr_gradient_subspace_fraction_individual(
+        Path(args.log_dir), Path(args.out_dir)
+    )
