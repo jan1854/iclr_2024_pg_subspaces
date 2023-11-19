@@ -82,11 +82,13 @@ def create_plots(
                         f"using {'minimum' if only_complete_steps else 'maximum'} value."
                     )
                     if only_complete_steps:
+                        metrics = [list(metric) for metric in metrics]
                         for metric in metrics:
-                            metrics[0] = np.array(
+                            metric[0] = np.array(
                                 [m for m in metric[0] if m <= min_last_step]
                             )
-                            metrics[1] = metrics[1][: len(metrics[0])]
+                            metric[1] = metric[1][: len(metric[0])]
+                        metrics = [tuple(metric) for metric in metrics]
 
                 steps = metrics[0][0]
                 value_mean = np.array(
