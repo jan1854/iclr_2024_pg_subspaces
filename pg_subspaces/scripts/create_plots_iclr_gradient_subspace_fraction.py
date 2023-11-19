@@ -163,6 +163,7 @@ def plot_bars(data, ax):
         ],
         edgecolor=[c for c in COLORSCHEME for _ in range(3)],
         width=0.91,
+        zorder=5,
     )
     bar_xpos += 10
     for i, bar in enumerate(bars):
@@ -241,6 +242,8 @@ def create_plots_iclr_gradient_subspace_fraction(log_dir, out_dir):
         # fig, ax = plt.subplots(figsize=(factor * GOLDEN_RATIO * 4, factor))
         plt.rc("font", size=8)
         fig, ax = plt.subplots()
+        ax.set_zorder(10)
+        ax.grid(axis="y", alpha=0.5, zorder=0)
 
         # Calculate width and height for the desired aspect ratio
         width = 0.9  # This value might need adjustment

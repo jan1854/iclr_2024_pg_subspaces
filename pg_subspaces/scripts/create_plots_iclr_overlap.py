@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.CRITICAL)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-out_dir = Path(__file__).parents[2] / "out"
+out_dir = Path(__file__).parents[2] / "out" / "iclr"
 PLOT_CONFIGS = {
     "overlap_0100000_100evs": {
         "out_dir": "subspace_overlap",
@@ -67,13 +67,13 @@ def worker(
             fontsize,
             linewidth,
             fill_in_data,
-            {100000: "$t_1"},
+            [(100000, "$t_1", False)],
             {},
             out,
         )
     except Exception as e:
         logger.warning(
-            f"Could not create plot {out.relative_to(out.parents[2])}, got exception {e}"
+            f"Could not create plot {out.relative_to(out.parents[2])}, got exception {type(e).__name__}: {e}"
         )
 
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         "r"
     ) as run_configs_file:
         run_configs = yaml.safe_load(run_configs_file)
-    with multiprocessing.Pool(20) as pool:
+    with multiprocessing.Pool(1) as pool:
         for env_name, run_config in run_configs.items():
             env_file_name = env_name[:-3].lower().replace("-", "_")
             if not env_name.startswith("dmc"):
@@ -108,11 +108,18 @@ if __name__ == "__main__":
                     title_env_name = (
                         env_name[4:-3] if env_name.startswith("dmc_") else env_name[:-3]
                     )
+                    run_config_filtered = run_config.copy()
+                    run_config_filtered["log_dirs"] = {
+                        k: v
+                        for k, v in run_config["log_dirs"].items()
+                        if k in ["ppo", "sac"]
+                    }
                     keys = [
                         f"high_curvature_subspace_analysis/"
                         f"{analysis_run_id}/{plot_config['key']}/{loss_type}"
-                        for analysis_run_id in run_config.get(
-                            "analysis_run_ids", {"": "default"}
+                        for analysis_run_id in (
+                            run_config_filtered.get("analysis_run_ids", {})
+                            | {"": "default"}
                         ).values()
                     ]
                     # Give default the lowest priority
@@ -123,18 +130,23 @@ if __name__ == "__main__":
                             (
                                 [
                                     Path(log_dir, env_name, experiment_dir)
-                                    for experiment_dir in run_config[
+                                    for experiment_dir in run_config_filtered[
                                         "log_dirs"
                                     ].values()
                                 ],
                                 [
                                     algo_name.upper()
-                                    for algo_name in run_config["log_dirs"].keys()
+                                    for algo_name in run_config_filtered[
+                                        "log_dirs"
+                                    ].keys()
                                 ],
                                 plot_config.get("title"),
                                 plot_config.get("xlabel", "Environment steps"),
                                 plot_config["ylabel"],
-                                (run_config.get("xmin", 0), run_config.get("xmax")),
+                                (
+                                    run_config_filtered.get("xmin", 0),
+                                    run_config_filtered.get("xmax"),
+                                ),
                                 (plot_config.get("ymin"), plot_config.get("ymax")),
                                 False,
                                 keys,
