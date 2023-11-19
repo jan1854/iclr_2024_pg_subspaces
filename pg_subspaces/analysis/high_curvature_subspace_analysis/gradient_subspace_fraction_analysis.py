@@ -453,12 +453,19 @@ class GradientSubspaceFractionAnalysis(Analysis):
         agent: stable_baselines3.common.off_policy_algorithm.OffPolicyAlgorithm,
         num_samples: int,
     ) -> None:
-        env = DummyVecEnv([lambda: self.env_factory_or_dataset()])
+        env = self.env_factory_or_dataset()
         agent._last_obs = env.reset()
         # collect_rollouts requires a callback for some reason
         callback = CallbackList([])
         callback.init_callback(agent)
         agent._total_timesteps = num_samples
+        agent._setup_learn(
+            50000,
+            callback,
+            False,
+            "run",
+            False,
+        )
         agent.collect_rollouts(
             env,
             callback,
