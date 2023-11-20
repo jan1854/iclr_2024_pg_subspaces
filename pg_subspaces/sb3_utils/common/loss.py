@@ -53,7 +53,7 @@ def actor_critic_gradient(
     combined_gradient = [p.grad.clone() for p in get_trained_parameters(agent)]
     if all_gradients_fullsize:
         agent.policy.zero_grad()
-        policy_loss.backward()
+        policy_loss.backward(retain_graph=True)
         actor_gradient = [
             p.grad.clone() if p.grad is not None else torch.zeros_like(p)
             for p in get_trained_parameters(agent)
