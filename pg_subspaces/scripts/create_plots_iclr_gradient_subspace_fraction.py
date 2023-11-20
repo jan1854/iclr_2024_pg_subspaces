@@ -302,7 +302,7 @@ def create_plots_iclr_gradient_subspace_fraction(
             patches.Patch(
                 facecolor=LIGHT_GREY,
                 edgecolor=GREY,
-                label="Mini-batch gradient, precise Hessian",
+                label="Precise gradient, precise Hessian",
             )
         )
         legend_handles.append(
