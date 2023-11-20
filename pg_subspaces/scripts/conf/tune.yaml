@@ -14,7 +14,7 @@ num_eval_episodes: 10
 eval_interval: 10000
 checkpoint_interval: null
 additional_checkpoints: []
-save_replay_buffer: false
+save_replay_buffer: true
 num_seeds: 3
 num_configurations: 50
 ignore_initial_steps_ratio: 0.1
