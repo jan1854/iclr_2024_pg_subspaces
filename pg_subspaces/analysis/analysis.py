@@ -32,8 +32,8 @@ class Analysis(abc.ABC):
         env_factory_or_dataset: Callable[[], gym.Env],
         agent_spec: AgentSpec,
         run_dir: Path,
-        lock_analysis_log_file: bool = True,
-        ignore_exceptions: bool = False,
+        lock_analysis_log_file: bool,
+        ignore_exceptions: bool,
     ):
         self.analysis_name = analysis_name
         self.analysis_run_id = analysis_run_id

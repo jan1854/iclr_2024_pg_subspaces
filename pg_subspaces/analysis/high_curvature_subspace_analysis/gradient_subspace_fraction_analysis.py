@@ -67,6 +67,7 @@ class GradientSubspaceFractionAnalysis(Analysis):
             agent_spec,
             run_dir,
             lock_analysis_log_file,
+            ignore_exceptions,
         )
         self.num_samples_true_loss = num_samples_true_loss
         self.top_eigenvec_levels = top_eigenvec_levels
