@@ -75,8 +75,6 @@ def analysis_worker(
     overwrite_results: bool,
     show_progress: bool,
 ) -> TensorboardLogs:
-    register_custom_resolvers()
-
     logger.debug("Created analysis_worker.")
     train_cfg_path = run_dir / ".hydra" / "config.yaml"
     # If we're analyzing the output of a tuning run, the .hydra directory is one directory up
