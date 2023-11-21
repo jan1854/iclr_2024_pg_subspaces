@@ -35,7 +35,7 @@ Pendulum-v1:
     sac: 2023-09-22/19-13-25
     ppo_large: 2023-10-11/15-07-07
     sac_small: 2023-10-11/15-19-50
-    sac_on_policy: 2023-11-06/13-28-53    # tuned
+    sac_on_policy: 2023-11-21/16-20-16    # tuned
   xmax: 300_000
 Reacher-v2:
   log_dirs:
@@ -54,7 +54,7 @@ Walker2d-v3:
     sac: 2023-09-23/23-20-09
     ppo_large: 2023-10-11/16-34-45
     sac_small: 2023-10-11/16-31-25
-    sac_on_policy: 2023-10-30/18-55-03    # tuned
+    sac_on_policy: 2023-10-30/18-55-03
   xmax: 3_000_000
 dmc_Ball_in_cup-catch-v1:
   log_dirs:
@@ -70,7 +70,7 @@ dmc_Finger-spin-v1:
     sac: 2023-09-21/10-34-29
     ppo_large: 2023-10-10/18-02-05
     sac_small: 2023-10-10/17-43-10
-    sac_on_policy: 2023-10-30/13-25-15    # tuned
+    sac_on_policy: 2023-10-30/13-25-15
   xmax: 1_000_000
   analysis_run_ids:
     ppo: repeat_low_sample
