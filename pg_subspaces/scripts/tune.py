@@ -9,6 +9,7 @@ from joblib import delayed, Parallel
 
 from pg_subspaces.metrics.tensorboard_logs import create_event_accumulators, read_scalar
 from pg_subspaces.scripts.train import train
+from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +51,6 @@ def tune_hyperparams(cfg: omegaconf.DictConfig):
 
 
 if __name__ == "__main__":
-    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+    register_custom_resolvers()
 
     tune_hyperparams()

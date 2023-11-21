@@ -20,7 +20,7 @@ num_configurations: 50
 ignore_initial_steps_ratio: 0.1
 
 log_dir: ${oc.env:PG_SUBSPACES_TUNING_LOG_DIR,logs}
-run_log_dir: ${log_dir}/tuning/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+run_log_dir: ${log_dir}/tuning/${env}/${now:%Y-%m-%d}/${now:%H-%M-%S}${env_with_prefix:CONDOR_JOB_ID,"_",""}
 
 hydra:
   run:

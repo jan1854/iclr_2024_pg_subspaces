@@ -22,15 +22,12 @@ from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import (
     HessianEigenLanczos,
 )
+from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
 
 
-omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+register_custom_resolvers()
 
 
 def analysis_worker(

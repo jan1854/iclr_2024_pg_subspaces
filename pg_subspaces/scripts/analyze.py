@@ -23,6 +23,7 @@ from pg_subspaces.sb3_utils.common.agent_spec import (
     get_checkpoint_path,
 )
 from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
+from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,8 @@ def analysis_worker(
     overwrite_results: bool,
     show_progress: bool,
 ) -> TensorboardLogs:
+    register_custom_resolvers()
+
     logger.debug("Created analysis_worker.")
     train_cfg_path = run_dir / ".hydra" / "config.yaml"
     # If we're analyzing the output of a tuning run, the .hydra directory is one directory up
@@ -247,4 +250,5 @@ def analyze(cfg: omegaconf.DictConfig) -> None:
 
 
 if __name__ == "__main__":
+    register_custom_resolvers()
     analyze()

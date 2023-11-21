@@ -2,7 +2,6 @@ import logging
 import random
 import subprocess
 import time
-import os
 from pathlib import Path
 
 import hydra
@@ -29,16 +28,9 @@ from pg_subspaces.callbacks.fix_ep_info_buffer_callback import (
 from pg_subspaces.metrics.sb3_custom_logger import SB3CustomLogger
 from pg_subspaces.sb3_utils.common.agent_spec import CheckpointAgentSpec, HydraAgentSpec
 from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
-
+from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
-
-
-def env_with_prefix(key: str, prefix: str, default: str) -> str:
-    value = os.getenv(key)
-    if value:
-        return prefix + value
-    return default
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="train")
@@ -144,11 +136,5 @@ def train(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
 
 if __name__ == "__main__":
-    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
-    omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
-
+    register_custom_resolvers()
     main()
