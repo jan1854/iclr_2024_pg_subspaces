@@ -20,10 +20,6 @@ algorithm.algorithm.tau:
   type: choice
   values: [0.001, 0.005, 0.01, 0.02]
   value_type: float
-algorithm.algorithm.learning_starts:
-  type: choice
-  values: [100, 1000, 10000]
-  value_type: int
 algorithm.algorithm.policy_kwargs.net_arch:
   type: choice
   values: [64, 128, 256]    # The sweeper cannot handle list-type parameters

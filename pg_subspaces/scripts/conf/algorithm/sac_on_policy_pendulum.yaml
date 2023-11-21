@@ -8,14 +8,14 @@ defaults:
 algorithm:
   _target_: stable_baselines3.SAC
   policy: "MlpPolicy"
-  learning_rate: 5e-3
-  learning_starts: 100
-  tau: 0.01
-  gamma: 0.93
+  learning_rate: 3e-4
+  learning_starts: 0
+  tau: 0.005
+  gamma: 0.95
   device: ${device}
   train_freq: 2048
   buffer_size: ${.train_freq}
-  batch_size: 64
+  batch_size: 256
   gradient_steps: ${INTDIV:${MUL:${..epochs},${.train_freq}},${.batch_size}} # (epochs * train_freq // batch_size)
   action_noise: null
   replay_buffer_class: null
@@ -32,6 +32,7 @@ algorithm:
     net_arch: [ 256, 256 ]
   verbose: 0
   tensorboard_log: tensorboard
+
 
 training:
   steps: 500000
