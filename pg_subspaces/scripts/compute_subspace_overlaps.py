@@ -22,6 +22,7 @@ from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import (
     HessianEigenLanczos,
 )
+from pg_subspaces.scripts.analyze import find_parent_with_name_pattern
 from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
@@ -78,9 +79,8 @@ def compute_subspace_overlaps(cfg: omegaconf.DictConfig) -> None:
         train_logs = Path(hydra.utils.get_original_cwd()) / cfg.train_logs
     logger.info(f"Analyzing results in {train_logs}")
 
-    experiment_dir = train_logs.parent if train_logs.name.isnumeric() else train_logs
-    # assert re.match("[0-9]{2}-[0-9]{2}-[0-9]{2}", experiment_dir.name)
-    train_logs_relative = train_logs.relative_to(experiment_dir.parents[3])
+    env_path = find_parent_with_name_pattern(train_logs, ".+-v[0-9]+")
+    train_logs_relative = train_logs.relative_to(env_path.parents[1])
     if Path(cfg.log_dir).is_absolute():
         log_dir = Path(cfg.log_dir)
     else:
