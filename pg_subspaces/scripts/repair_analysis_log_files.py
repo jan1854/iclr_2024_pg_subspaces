@@ -113,6 +113,13 @@ def repair_analysis_log_files(
         run_dirs = [
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
+        for run_dir in run_dirs.copy():
+            sub_run_dirs = [
+                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
+            ]
+            if len(sub_run_dirs) > 0:
+                run_dirs.remove(run_dir)
+            run_dirs.extend(sub_run_dirs)
 
     for run_dir in tqdm(run_dirs, total=len(run_dirs)):
         repair(run_dir, expected_interval, last_checkpoint, analysis_run_id)
