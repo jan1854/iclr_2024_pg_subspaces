@@ -70,7 +70,7 @@ dmc_Finger-spin-v1:
     sac: 2023-09-21/10-34-29
     ppo_large: 2023-10-10/18-02-05
     sac_small: 2023-10-10/17-43-10
-    sac_on_policy: 2023-10-30/13-25-15
+    sac_on_policy: 2023-11-22/09-26-24    # tuned
   xmax: 1_000_000
   analysis_run_ids:
     ppo: repeat_low_sample
