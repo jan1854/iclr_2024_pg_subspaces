@@ -36,8 +36,11 @@ def analysis_worker(
     run_dir: Path,
 ) -> TensorboardLogs:
     print("Created analysis_worker.")
-    train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
+    train_cfg_path = run_dir / ".hydra" / "config.yaml"
+    if not train_cfg_path.exists() and run_dir.parent.name.isnumeric():
+        train_cfg_path = run_dir.parent / ".hydra" / "config.yaml"
 
+    train_cfg = OmegaConf.load(train_cfg_path)
     agent_spec = HydraAgentSpec(
         train_cfg.algorithm,
         "cpu",
@@ -104,6 +107,13 @@ def compute_subspace_overlaps(cfg: omegaconf.DictConfig) -> None:
         run_dirs = [
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
+        for run_dir in run_dirs.copy():
+            sub_run_dirs = [
+                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
+            ]
+            if len(sub_run_dirs) > 0:
+                run_dirs.remove(run_dir)
+            run_dirs.extend(sub_run_dirs)
 
     if cfg.num_workers == 1:
         for run_dir in run_dirs:
