@@ -26,6 +26,7 @@ class SubspaceOverlaps:
         top_eigenvec_levels: Sequence[int],
         hessian_eigen: HessianEigen,
         eigenvec_overlap_checkpoints: Sequence[int],
+        device,
         verbose,
     ):
         self.run_dir = run_dir
@@ -34,6 +35,7 @@ class SubspaceOverlaps:
         self.top_eigenvec_levels = top_eigenvec_levels
         self.hessian_eigen = hessian_eigen
         self.eigenvec_overlap_checkpoints = eigenvec_overlap_checkpoints
+        self.device = device
         self.verbose = verbose
 
     def analyze_subspace_overlaps(
@@ -47,30 +49,21 @@ class SubspaceOverlaps:
         )
         agent = self.agent_spec.create_agent()
         loss_names = ["combined_loss", "policy_loss", "value_function_loss"]
-        prefixes = ["", "low_sample/"]
         for loss_name in loss_names:
-            for prefix in prefixes:
-                if self.verbose:
-                    print(
-                        f"Calculating overlaps for loss {loss_name}{f' ({prefix[:-1]})' if len(prefix) > 0 else ''}."
-                    )
-                overlaps = self._calculate_overlaps(loss_name, agent)
-                if self.verbose:
-                    print(
-                        f"Finished calculating overlaps for loss {loss_name}"
-                        f"{f' ({prefix[:-1]})' if len(prefix) > 0 else ''}."
-                    )
-                for k, overlaps_top_k in overlaps.items():
-                    keys = []
-                    for t1, overlaps_t1 in overlaps_top_k.items():
-                        if len(overlaps_t1) > 0:
-                            curr_key = f"{prefix}overlaps_top{k:03d}_checkpoint{t1:07d}/{loss_name}"
-                            keys.append(curr_key)
-                            for t2, overlap in overlaps_t1.items():
-                                logs.add_scalar(curr_key, overlap, t2)
-                    logs.add_multiline_scalar(
-                        f"{prefix}overlaps_top{k:03d}/{loss_name}", keys
-                    )
+            if self.verbose:
+                print(f"Calculating overlaps for loss {loss_name}.")
+            overlaps = self._calculate_overlaps(loss_name, agent)
+            if self.verbose:
+                print(f"Finished calculating overlaps for loss {loss_name}.")
+            for k, overlaps_top_k in overlaps.items():
+                keys = []
+                for t1, overlaps_t1 in overlaps_top_k.items():
+                    if len(overlaps_t1) > 0:
+                        curr_key = f"overlaps_top{k:03d}_checkpoint{t1:07d}/{loss_name}"
+                        keys.append(curr_key)
+                        for t2, overlap in overlaps_t1.items():
+                            logs.add_scalar(curr_key, overlap, t2)
+                logs.add_multiline_scalar(f"overlaps_top{k:03d}/{loss_name}", keys)
         if self.verbose:
             print(f"Writing results to logs.")
         logs.log(summary_writer)
@@ -83,7 +76,7 @@ class SubspaceOverlaps:
         agent: stable_baselines3.common.base_class.BaseAlgorithm,
     ) -> Dict[int, Dict[int, Dict[int, float]]]:
         hess_eigen_calculator = HessianEigenCachedCalculator(
-            self.run_dir, self.hessian_eigen, skip_cacheing=False
+            self.run_dir, self.hessian_eigen, skip_cacheing=False, device=self.device
         )
         start_checkpoints_eigenvecs = {
             num_eigenvecs: {} for num_eigenvecs in self.top_eigenvec_levels
