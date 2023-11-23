@@ -59,7 +59,12 @@ def analysis_worker(
         analysis_cfg.verbose,
     )
     print("Starting analysis.")
-    return subspace_overlaps.analyze_subspace_overlaps()
+    try:
+        return subspace_overlaps.analyze_subspace_overlaps()
+    except Exception as e:
+        logger.warning(
+            f"Could not compute subspace overlaps for {run_dir}. Got exception {type(e).__name__}: {e}"
+        )
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
