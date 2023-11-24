@@ -62,7 +62,7 @@ def repair(
         a_id_list.sort()
         with analyses_yaml_path.open("w") as analyses_yaml_file:
             yaml.dump(analyses_dict, analyses_yaml_file)
-        print(f"Missing steps: {missing_steps}")
+        print(f"{run_dir}: Missing steps: {missing_steps}")
         print(f"Added steps: {steps_to_add}")
 
 
@@ -113,6 +113,13 @@ def repair_analysis_log_files(
         run_dirs = [
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
+        for run_dir in run_dirs.copy():
+            sub_run_dirs = [
+                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
+            ]
+            if len(sub_run_dirs) > 0:
+                run_dirs.remove(run_dir)
+            run_dirs.extend(sub_run_dirs)
 
     for run_dir in tqdm(run_dirs, total=len(run_dirs)):
         repair(run_dir, expected_interval, last_checkpoint, analysis_run_id)

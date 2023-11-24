@@ -30,7 +30,7 @@ from pg_subspaces.offline_rl.fixed_normalization_wrapper import (
     FixedNormalizationVecWrapper,
 )
 from pg_subspaces.offline_rl.load_env_dataset import load_env_dataset
-
+from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
 
@@ -199,11 +199,6 @@ def train_offline(cfg: omegaconf.DictConfig, root_path: str = ".") -> None:
 
 
 if __name__ == "__main__":
-    omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-    omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-    omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-    omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-    omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
-    omegaconf.OmegaConf.register_new_resolver("env_with_prefix", env_with_prefix)
+    register_custom_resolvers()
 
     main()

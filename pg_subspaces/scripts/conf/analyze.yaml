@@ -19,7 +19,7 @@ log_dir: ${oc.env:PG_SUBSPACES_LOG_DIR,logs}
 # Disable the creation of the log directory
 hydra:
   run:
-    dir: ${train_logs}/analysis_output/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${train_logs}/analysis_output/${now:%Y-%m-%d}/${now:%H-%M-%S}${env_with_prefix:CONDOR_JOB_ID,"_",""}
   job:
     chdir: true
   verbose:

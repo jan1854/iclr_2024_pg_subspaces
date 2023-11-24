@@ -1,7 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple, Literal
+from typing import Dict, Optional, Sequence, Tuple, Literal, Union
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -31,7 +31,7 @@ def smooth(
 
 
 def create_multiline_plots(
-    log_path: Path,
+    log_paths: Union[Sequence[Path], Sequence[Sequence[Path]]],
     legend: Optional[Sequence[str]],
     title: str,
     xlabel: str,
@@ -64,72 +64,75 @@ def create_multiline_plots(
         ax.margins(x=0)
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
-        for i, key in enumerate(keys):
-            metrics = read_metrics_cached(log_path, [key])
-            min_last_step = min([m[0][-1] for m in metrics])
-            max_last_step = max([m[0][-1] for m in metrics])
-            if min_last_step != max_last_step:
-                logger.warning(
-                    f"Found different last step ({min_last_step} vs. {max_last_step}), "
-                    f"using {'minimum' if only_complete_steps else 'maximum'} value."
+        if type(log_paths) == Path:
+            log_paths = [log_paths]
+        for log_path, curr_keys in zip(log_paths, keys):
+            for i, key in enumerate(curr_keys):
+                metrics = read_metrics_cached(log_path, [key])
+                min_last_step = min([m[0][-1] for m in metrics])
+                max_last_step = max([m[0][-1] for m in metrics])
+                if min_last_step != max_last_step:
+                    logger.warning(
+                        f"Found different last step ({min_last_step} vs. {max_last_step}), "
+                        f"using {'minimum' if only_complete_steps else 'maximum'} value."
+                    )
+                    if only_complete_steps:
+                        metrics = [list(metric) for metric in metrics]
+                        for metric in metrics:
+                            metric[0] = np.array(
+                                [m for m in metric[0] if m <= min_last_step]
+                            )
+                            metric[1] = metric[1][: len(metric[0])]
+                        metrics = [tuple(metric) for metric in metrics]
+
+                steps = metrics[0][0]
+                value_mean = np.array(
+                    [
+                        np.mean([m[1][i] for m in metrics if i < len(m[1])])
+                        for i in range(len(steps))
+                    ]
                 )
-                if only_complete_steps:
-                    metrics = [list(metric) for metric in metrics]
-                    for metric in metrics:
-                        metric[0] = np.array(
-                            [m for m in metric[0] if m <= min_last_step]
-                        )
-                        metric[1] = metric[1][: len(metric[0])]
-                    metrics = [tuple(metric) for metric in metrics]
+                value_std = np.array(
+                    [
+                        np.std([m[1][i] for m in metrics if i < len(m[1])])
+                        for i in range(len(steps))
+                    ]
+                )
 
-            steps = metrics[0][0]
-            value_mean = np.array(
-                [
-                    np.mean([m[1][i] for m in metrics if i < len(m[1])])
-                    for i in range(len(steps))
-                ]
-            )
-            value_std = np.array(
-                [
-                    np.std([m[1][i] for m in metrics if i < len(m[1])])
-                    for i in range(len(steps))
-                ]
-            )
+                for s, v in fill_in_data.items():
+                    if s not in steps:
+                        idx = np.argmax(steps > s)
+                        steps = np.insert(steps, idx, s)
+                        value_mean = np.insert(value_mean, idx, v)
+                        value_std = np.insert(value_std, idx, 0.0)
+                value_mean = smooth(value_mean, smoothing_weight)
+                if value_std is not None:
+                    value_std = smooth(value_std, smoothing_weight)
 
-            for s, v in fill_in_data.items():
-                if s not in steps:
-                    idx = np.argmax(steps > s)
-                    steps = np.insert(steps, idx, s)
-                    value_mean = np.insert(value_mean, idx, v)
-                    value_std = np.insert(value_std, idx, 0.0)
-            value_mean = smooth(value_mean, smoothing_weight)
-            if value_std is not None:
-                value_std = smooth(value_std, smoothing_weight)
-
-            if xaxis_log:
-                steps = 10**steps
-                ax.xscale("log")
-            if i % num_same_color_plots == 0:
-                color = next(ax._get_lines.prop_cycler)["color"]
-            ax.plot(
-                steps,
-                value_mean,
-                marker=marker,
-                markersize=2,
-                color=color,
-                linestyle=linestyles[i % num_same_color_plots],
-                zorder=1 + 0.01 * i,
-            )
-            if value_std is not None:
-                ax.fill_between(
+                if xaxis_log:
+                    steps = 10**steps
+                    ax.xscale("log")
+                if i % num_same_color_plots == 0:
+                    color = next(ax._get_lines.prop_cycler)["color"]
+                ax.plot(
                     steps,
-                    value_mean - value_std,
-                    value_mean + value_std,
-                    alpha=0.2,
-                    label="_nolegend_",
+                    value_mean,
+                    marker=marker,
+                    markersize=2,
                     color=color,
-                    zorder=2 + 0.01 * i,
+                    linestyle=linestyles[i % num_same_color_plots],
+                    zorder=1 + 0.01 * i,
                 )
+                if value_std is not None:
+                    ax.fill_between(
+                        steps,
+                        value_mean - value_std,
+                        value_mean + value_std,
+                        alpha=0.2,
+                        label="_nolegend_",
+                        color=color,
+                        zorder=2 + 0.01 * i,
+                    )
         # else:
         #     if (log_path / "tensorboard").exists():
         #         tb_dir = log_path / "tensorboard"

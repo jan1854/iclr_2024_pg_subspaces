@@ -22,15 +22,13 @@ from pg_subspaces.sb3_utils.common.env.make_env import make_vec_env
 from pg_subspaces.sb3_utils.hessian.eigen.hessian_eigen_lanczos import (
     HessianEigenLanczos,
 )
+from pg_subspaces.scripts.analyze import find_parent_with_name_pattern
+from pg_subspaces.utils.hydra import register_custom_resolvers
 
 logger = logging.getLogger(__name__)
 
 
-omegaconf.OmegaConf.register_new_resolver("ADD", lambda x, y: x + y)
-omegaconf.OmegaConf.register_new_resolver("SUB", lambda x, y: x - y)
-omegaconf.OmegaConf.register_new_resolver("MUL", lambda x, y: x * y)
-omegaconf.OmegaConf.register_new_resolver("DIV", lambda x, y: x / y)
-omegaconf.OmegaConf.register_new_resolver("INTDIV", lambda x, y: x // y)
+register_custom_resolvers()
 
 
 def analysis_worker(
@@ -38,8 +36,11 @@ def analysis_worker(
     run_dir: Path,
 ) -> TensorboardLogs:
     print("Created analysis_worker.")
-    train_cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
+    train_cfg_path = run_dir / ".hydra" / "config.yaml"
+    if not train_cfg_path.exists() and run_dir.parent.name.isnumeric():
+        train_cfg_path = run_dir.parent / ".hydra" / "config.yaml"
 
+    train_cfg = OmegaConf.load(train_cfg_path)
     agent_spec = HydraAgentSpec(
         train_cfg.algorithm,
         "cpu",
@@ -54,10 +55,16 @@ def analysis_worker(
         analysis_cfg.top_eigenvec_levels,
         HessianEigenLanczos(1e-3, 100, None),
         analysis_cfg.eigenvec_overlap_checkpoints,
+        analysis_cfg.device,
         analysis_cfg.verbose,
     )
     print("Starting analysis.")
-    return subspace_overlaps.analyze_subspace_overlaps()
+    try:
+        return subspace_overlaps.analyze_subspace_overlaps()
+    except Exception as e:
+        logger.warning(
+            f"Could not compute subspace overlaps for {run_dir}. Got exception {type(e).__name__}: {e}"
+        )
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
@@ -81,9 +88,8 @@ def compute_subspace_overlaps(cfg: omegaconf.DictConfig) -> None:
         train_logs = Path(hydra.utils.get_original_cwd()) / cfg.train_logs
     logger.info(f"Analyzing results in {train_logs}")
 
-    experiment_dir = train_logs.parent if train_logs.name.isnumeric() else train_logs
-    # assert re.match("[0-9]{2}-[0-9]{2}-[0-9]{2}", experiment_dir.name)
-    train_logs_relative = train_logs.relative_to(experiment_dir.parents[3])
+    env_path = find_parent_with_name_pattern(train_logs, ".+-v[0-9]+")
+    train_logs_relative = train_logs.relative_to(env_path.parents[1])
     if Path(cfg.log_dir).is_absolute():
         log_dir = Path(cfg.log_dir)
     else:
@@ -107,6 +113,13 @@ def compute_subspace_overlaps(cfg: omegaconf.DictConfig) -> None:
         run_dirs = [
             d for d in train_logs_local.iterdir() if d.is_dir() and d.name.isdigit()
         ]
+        for run_dir in run_dirs.copy():
+            sub_run_dirs = [
+                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
+            ]
+            if len(sub_run_dirs) > 0:
+                run_dirs.remove(run_dir)
+            run_dirs.extend(sub_run_dirs)
 
     if cfg.num_workers == 1:
         for run_dir in run_dirs:

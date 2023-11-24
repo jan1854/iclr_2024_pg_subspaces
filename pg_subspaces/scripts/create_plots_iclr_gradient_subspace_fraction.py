@@ -167,7 +167,7 @@ def plot_bars(data, ax):
             for c in cp
         ],
         edgecolor=[c for c in COLORSCHEME for _ in range(3)],
-        width=0.85,
+        width=0.817,
         zorder=2,
     )
     bar_xpos += 10
@@ -246,8 +246,9 @@ def create_plots_iclr_gradient_subspace_fraction(
     for loss_type in ["policy", "vf"]:
         bar_xpos = 0
         # fig, ax = plt.subplots(figsize=(factor * GOLDEN_RATIO * 4, factor))
-        plt.rc("font", size=7.5)
+        plt.rc("font", size=6.5)
         fig, ax = plt.subplots()
+        ax.set_aspect(14)
         ax.set_zorder(10)
         ax.grid(axis="y", alpha=0.5)
 
@@ -267,7 +268,7 @@ def create_plots_iclr_gradient_subspace_fraction(
                 x_pos_start_algo = bar_xpos
                 plot_bars(env_results[algorithm_name][loss_type], ax)
                 plt.text(
-                    (x_pos_start_algo + bar_xpos - 2) / 2 - 0.5,
+                    (x_pos_start_algo + bar_xpos - 2) / 2,
                     -0.1,
                     algorithm_name.upper(),
                     horizontalalignment="center",
@@ -276,7 +277,7 @@ def create_plots_iclr_gradient_subspace_fraction(
 
             plt.text(
                 (x_pos_start_env + bar_xpos - 2) / 2 - 0.5,
-                -0.2,
+                -0.22,
                 env_name_to_diplay(env_name),
                 horizontalalignment="center",
             )
@@ -302,7 +303,7 @@ def create_plots_iclr_gradient_subspace_fraction(
             patches.Patch(
                 facecolor=LIGHT_GREY,
                 edgecolor=GREY,
-                label="Mini-batch gradient, precise Hessian",
+                label="Precise gradient, precise Hessian",
             )
         )
         legend_handles.append(
