@@ -7,7 +7,7 @@ from typing import Dict, Optional, Sequence, Tuple
 import yaml
 from tqdm import tqdm
 
-from pg_subspaces.scripts.create_plots import create_plots
+from pg_subspaces.scripts.create_multiline_plots import create_multiline_plots
 
 # Disable the loggers for the imported scripts (since these just spam too much)
 logging.basicConfig(level=logging.CRITICAL)
@@ -50,7 +50,7 @@ def worker(
     out: Path,
 ):
     try:
-        create_plots(
+        create_multiline_plots(
             log_paths,
             legend,
             title,
@@ -64,6 +64,7 @@ def worker(
             only_complete_steps,
             separate_legend,
             num_same_color_plots,
+            None,
             fontsize,
             linewidth,
             fill_in_data,
@@ -93,73 +94,66 @@ if __name__ == "__main__":
             if not env_name.startswith("dmc"):
                 env_file_name = "gym_" + env_file_name
             for out_filename, plot_config in PLOT_CONFIGS.items():
-                for loss_type, loss_type_short in [
-                    ("combined_loss", "combined"),
-                    ("policy_loss", "policy"),
-                    ("value_function_loss", "vf"),
-                ]:
-                    out_path = (
-                        out_dir
-                        / plot_config["out_dir"]
-                        / loss_type
-                        / f"{env_file_name}_{out_filename}_{loss_type_short}.pdf"
-                    )
-                    out_path.parent.mkdir(exist_ok=True, parents=True)
-                    title_env_name = (
-                        env_name[4:-3] if env_name.startswith("dmc_") else env_name[:-3]
-                    )
-                    run_config_filtered = run_config.copy()
-                    run_config_filtered["log_dirs"] = {
-                        k: v
-                        for k, v in run_config["log_dirs"].items()
-                        if k in ["ppo", "sac"]
-                    }
-                    keys = [
+                out_path = (
+                    out_dir
+                    / plot_config["out_dir"]
+                    / f"{env_file_name}_{out_filename}.pdf"
+                )
+                out_path.parent.mkdir(exist_ok=True, parents=True)
+                title_env_name = (
+                    env_name[4:-3] if env_name.startswith("dmc_") else env_name[:-3]
+                )
+                run_config_filtered = run_config.copy()
+                run_config_filtered["log_dirs"] = {
+                    k: v
+                    for k, v in run_config["log_dirs"].items()
+                    if k in ["ppo", "sac"]
+                }
+                keys = [
+                    [
                         f"high_curvature_subspace_analysis/"
-                        f"{analysis_run_id}/{plot_config['key']}/{loss_type}"
-                        for analysis_run_id in (
-                            run_config_filtered.get("analysis_run_ids", {})
-                            | {"": "default"}
-                        ).values()
+                        f"{run_config_filtered.get('analysis_run_ids', {}).get(algo_name, 'default')}/{plot_config['key']}/{loss_type}"
+                        for loss_type in ["policy_loss", "value_function_loss"]
                     ]
-                    # Give default the lowest priority
-                    keys.sort(key=lambda s: 1 if "default" in s else 0)
-                    results.append(
-                        pool.apply_async(
-                            worker,
+                    for algo_name in ["ppo", "sac"]
+                ]
+                # Give default the lowest priority
+                # keys.sort(key=lambda s: 1 if "default" in s else 0)
+                results.append(
+                    pool.apply_async(
+                        worker,
+                        (
+                            [
+                                Path(log_dir, env_name, experiment_dir)
+                                for experiment_dir in run_config_filtered[
+                                    "log_dirs"
+                                ].values()
+                            ],
+                            [
+                                f"{algo_name.upper()}, {loss_type}"
+                                for algo_name in run_config_filtered["log_dirs"].keys()
+                                for loss_type in ["actor", "critic"]
+                            ],
+                            plot_config.get("title"),
+                            plot_config.get("xlabel", "Environment steps"),
+                            plot_config["ylabel"],
                             (
-                                [
-                                    Path(log_dir, env_name, experiment_dir)
-                                    for experiment_dir in run_config_filtered[
-                                        "log_dirs"
-                                    ].values()
-                                ],
-                                [
-                                    algo_name.upper()
-                                    for algo_name in run_config_filtered[
-                                        "log_dirs"
-                                    ].keys()
-                                ],
-                                plot_config.get("title"),
-                                plot_config.get("xlabel", "Environment steps"),
-                                plot_config["ylabel"],
-                                (
-                                    run_config_filtered.get("xmin", 0),
-                                    run_config_filtered.get("xmax"),
-                                ),
-                                (plot_config.get("ymin"), plot_config.get("ymax")),
-                                False,
-                                keys,
-                                plot_config["smoothing_weight"],
-                                True,
-                                True,
-                                plot_config.get("num_same_color_plots", 1),
-                                plot_config.get("fontsize", 26),
-                                plot_config.get("linewidth", 3),
-                                plot_config.get("fill_in_data", {}),
-                                out_path,
+                                run_config_filtered.get("xmin", 0),
+                                run_config_filtered.get("xmax"),
                             ),
-                        )
+                            (plot_config.get("ymin"), plot_config.get("ymax")),
+                            False,
+                            keys,
+                            plot_config["smoothing_weight"],
+                            True,
+                            True,
+                            plot_config.get("num_same_color_plots", 1) * 2,
+                            plot_config.get("fontsize", 26),
+                            plot_config.get("linewidth", 3),
+                            plot_config.get("fill_in_data", {}),
+                            out_path,
+                        ),
                     )
+                )
         for res in tqdm(results):
             res.get()
