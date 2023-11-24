@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Sequence, List, Tuple
 
 import numpy as np
+from tqdm import tqdm
 
 from pg_subspaces.metrics.tensorboard_logs import (
     create_event_accumulators,
@@ -34,7 +35,10 @@ CACHE_FILE_NAME = "metrics_cache.npz"
 
 
 def read_metrics_cached(
-    log_path: Path, keys: Sequence[str], only_complete_steps: bool = True
+    log_path: Path,
+    keys: Sequence[str],
+    verbose: bool = False,
+    only_cached: bool = False,
 ) -> List[Optional[Tuple[np.ndarray, np.ndarray]]]:
     if (log_path / "checkpoints").exists():
         run_dirs = [log_path]
@@ -49,11 +53,15 @@ def read_metrics_cached(
             run_dirs.extend(sub_run_dirs)
 
     metrics = []
-    for run_dir in run_dirs:
+    for run_dir in tqdm(run_dirs, disable=not verbose):
         metric = load_cache(run_dir, keys)
-        if metric is None:
+        if metric is None and not only_cached:
             metric = read_tensorboard_and_cache_metrics(run_dir, keys)
-        metrics.append((metric[0].astype(int), metric[1]))
+        if metric is None:
+            logger.warning(f"Did not find any of the keys {keys} for run {run_dir}.")
+            metrics.append(None)
+        else:
+            metrics.append((metric[0].astype(int), metric[1]))
     return metrics
 
 
