@@ -1,6 +1,7 @@
 import argparse
 import logging
 import multiprocessing
+import traceback
 from pathlib import Path
 from typing import Dict, Optional, Sequence, Tuple
 
@@ -247,7 +248,7 @@ def worker_single_run(
 
     try:
         create_multiline_plots(
-            log_path,
+            [log_path],
             legend,
             title,
             xlabel,
