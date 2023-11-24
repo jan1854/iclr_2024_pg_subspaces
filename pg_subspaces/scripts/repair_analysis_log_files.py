@@ -62,7 +62,7 @@ def repair(
         a_id_list.sort()
         with analyses_yaml_path.open("w") as analyses_yaml_file:
             yaml.dump(analyses_dict, analyses_yaml_file)
-        print(f"Missing steps: {missing_steps}")
+        print(f"{run_dir}: Missing steps: {missing_steps}")
         print(f"Added steps: {steps_to_add}")
 
 
