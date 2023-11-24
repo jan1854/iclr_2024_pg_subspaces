@@ -1,6 +1,6 @@
 # These hyperparameters were tuned for 50 episodes (3 seeds)
 name: "sac"
-epochs: 5  # This belongs to the algorithm, but we cannot put it there; otherwise it would be passed to the constructor
+epochs: 10  # This belongs to the algorithm, but we cannot put it there; otherwise it would be passed to the constructor
 
 defaults:
   - env_wrappers: []
@@ -8,14 +8,14 @@ defaults:
 algorithm:
   _target_: stable_baselines3.SAC
   policy: "MlpPolicy"
-  learning_rate: 4.6e-3
+  learning_rate: 1.6e-3
   learning_starts: 0
-  tau: 0.02
-  gamma: 0.999
+  tau: 0.01
+  gamma: 0.996
   device: ${device}
-  train_freq: 256
+  train_freq: 2048
   buffer_size: ${.train_freq}
-  batch_size: 32
+  batch_size: 64
   gradient_steps: ${INTDIV:${MUL:${..epochs},${.train_freq}},${.batch_size}} # (epochs * train_freq // batch_size)
   action_noise: null
   replay_buffer_class: null
@@ -29,10 +29,10 @@ algorithm:
   use_sde_at_warmup: false
   stats_window_size: 100
   policy_kwargs:
-    net_arch: [64, 64]
+    net_arch: [128, 128]
   verbose: 0
   tensorboard_log: tensorboard
 
 training:
-  steps: 1000000
+  steps: 3000000
   n_envs: 1
