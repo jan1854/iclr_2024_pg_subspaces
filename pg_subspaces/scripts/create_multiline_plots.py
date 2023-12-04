@@ -1,18 +1,12 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple, Literal, Union
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from matplotlib import pyplot as plt
 
 from pg_subspaces.metrics.read_metrics_cached import read_metrics_cached
-from pg_subspaces.metrics.tensorboard_logs import (
-    create_event_accumulators,
-    calculate_mean_std_sequence,
-    read_scalar,
-)
-
 
 logger = logging.Logger(__name__)
 
@@ -31,7 +25,7 @@ def smooth(
 
 
 def create_multiline_plots(
-    log_paths: Union[Sequence[Path], Sequence[Sequence[Path]]],
+    log_paths: Union[Path, Sequence[Path]],
     legend: Optional[Sequence[str]],
     title: str,
     xlabel: str,
@@ -39,7 +33,7 @@ def create_multiline_plots(
     xlimits: Tuple[float, float],
     ylimits: Tuple[float, float],
     xaxis_log: bool,
-    keys: Sequence[str],
+    keys: Union[Sequence[str], Sequence[Sequence[str]]],
     smoothing_weight: float,
     only_complete_steps: bool,
     separate_legend: bool,
@@ -64,8 +58,10 @@ def create_multiline_plots(
         ax.margins(x=0)
         color = None  # To make PyLint happy
         linestyles = ["-", "--", "-.", ":"]
-        if type(log_paths) == Path:
+        if isinstance(log_paths, Path):
             log_paths = [log_paths]
+        if isinstance(keys[0], str):
+            keys = [keys] * len(log_paths)
         for log_path, curr_keys in zip(log_paths, keys):
             for i, key in enumerate(curr_keys):
                 metrics = read_metrics_cached(log_path, [key])
