@@ -9,7 +9,7 @@ Ant-v3:
 BipedalWalker-v3:
   log_dirs:
     ppo: 2023-11-16/12-56-29
-    sac: 2023-11-18/12-01-24
+    sac: 2023-11-20/01-23-20
   xmax: 3_000_000
 HalfCheetah-v3:
   log_dirs:
