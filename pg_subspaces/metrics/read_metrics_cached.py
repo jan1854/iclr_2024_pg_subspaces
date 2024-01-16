@@ -43,18 +43,22 @@ def read_metrics_cached(
     if (log_path / "checkpoints").exists():
         run_dirs = [log_path]
     else:
-        run_dirs = [d for d in log_path.iterdir() if d.is_dir() and d.name.isdigit()]
+        run_dirs = sorted(
+            [d for d in log_path.iterdir() if d.is_dir() and d.name.isdigit()],
+            key=lambda p: int(p.name),
+        )
         for run_dir in run_dirs.copy():
-            sub_run_dirs = [
-                d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()
-            ]
+            sub_run_dirs = sorted(
+                [d for d in run_dir.iterdir() if d.is_dir() and d.name.isdigit()],
+                key=lambda p: int(p.name),
+            )
             if len(sub_run_dirs) > 0:
                 run_dirs.remove(run_dir)
             run_dirs.extend(sub_run_dirs)
 
     metrics = []
     for run_dir in tqdm(run_dirs, disable=not verbose):
-        metric = load_cache(run_dir, keys)
+        metric = load_cache(run_dir, keys, only_cached)
         if metric is None and not only_cached:
             metric = read_tensorboard_and_cache_metrics(run_dir, keys)
         if metric is None:
@@ -65,9 +69,11 @@ def read_metrics_cached(
     return metrics
 
 
-def load_cache(run_dir: Path, keys: Sequence[str]) -> Optional[np.ndarray]:
+def load_cache(
+    run_dir: Path, keys: Sequence[str], only_cached: bool
+) -> Optional[np.ndarray]:
     cache_path = run_dir / CACHE_FILE_NAME
-    if cache_path.exists() and not check_new_data_indicator(run_dir):
+    if cache_path.exists() and (not check_new_data_indicator(run_dir) or only_cached):
         cache = np.load(cache_path)
         for key in keys:
             if key in cache:
@@ -79,7 +85,8 @@ def read_tensorboard_and_cache_metrics(
     run_dir: Path, keys_to_read: Sequence[str]
 ) -> Optional[np.ndarray]:
     cache = {}
-    event_accumulator = create_event_accumulators([run_dir / "tensorboard"])[0][1]
+    tb_dir = run_dir / "tensorboard" if (run_dir / "tensorboard").exists() else run_dir
+    event_accumulator = create_event_accumulators([tb_dir])[0][1]
     for key in event_accumulator.Tags()["scalars"]:
         if re.fullmatch(FULL_REGEX_METRICS, key):
             scalars = read_scalar(event_accumulator, key)

@@ -140,7 +140,7 @@ def create_plots(
                 style="sci", axis="x", scilimits=(-4, 4), useMathText=True
             )
         ax.ticklabel_format(style="sci", axis="y", scilimits=(-4, 4), useMathText=True)
-        ax.set_title(title, fontsize=12)
+        ax.set_title(title)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_xlim(xlimits)
