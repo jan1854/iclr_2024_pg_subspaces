@@ -467,6 +467,8 @@ class GradientSubspaceFractionAnalysis(Analysis):
             "run",
             False,
         )
+        num_timesteps = agent.num_timesteps
+        episode_num = agent._episode_num
         agent.collect_rollouts(
             env,
             callback,
@@ -475,3 +477,5 @@ class GradientSubspaceFractionAnalysis(Analysis):
             agent.action_noise,
             num_samples,
         )
+        agent.num_timesteps = num_timesteps
+        agent._episode_num = episode_num
