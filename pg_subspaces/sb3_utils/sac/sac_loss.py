@@ -3,6 +3,7 @@ from typing import Tuple
 import stable_baselines3.common.buffers
 import torch
 from torch.nn import functional as F
+from torch.nn.utils import stateless
 
 
 def sac_loss(
@@ -46,14 +47,23 @@ def sac_loss(
         F.mse_loss(current_q, target_q_values) for current_q in current_q_values
     )
 
-    # Compute actor loss
-    # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
-    # Min over all critic networks
-    with torch.no_grad():
+    # This reparameterization is necessary to make sure that the actor_loss gradients do not affect the critic
+    # gradients. This is not necessary in stable-baselines3 since the gradients of the critic are directly applied and
+    # changes to the critic gradients afterward, thus, have no influence on the updated parameters.
+    with stateless._reparametrize_module(
+        agent.critic,
+        {
+            n: p.detach().clone().requires_grad_(True)
+            for n, p in agent.critic.named_parameters()
+        },
+    ):
+        # Compute actor loss
+        # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
+        # Min over all critic networks
         q_values_pi = torch.cat(
             agent.critic(replay_data.observations, actions_pi), dim=1
         )
-        min_qf_pi, _ = torch.min(q_values_pi, dim=1, keepdim=True)
+    min_qf_pi, _ = torch.min(q_values_pi, dim=1, keepdim=True)
     actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
 
     return actor_loss + critic_loss, actor_loss, critic_loss
