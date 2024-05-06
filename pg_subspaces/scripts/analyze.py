@@ -55,7 +55,6 @@ def create_jobs(
                     )
         else:
             for step in checkpoint_steps:
-
                 if (
                     step >= first_checkpoint
                     and (last_checkpoint is None or step <= last_checkpoint)
@@ -115,8 +114,7 @@ def analysis_worker(
 
 
 def get_step_from_checkpoint(file_name: str) -> int:
-    step_str = max(re.findall("[0-9]*", file_name))
-    return int(step_str)
+    return max([int(m[:-6]) for m in re.findall("[0-9]*_steps", file_name)])
 
 
 def find_parent_with_name_pattern(
