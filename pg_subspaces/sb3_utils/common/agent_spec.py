@@ -15,8 +15,10 @@ from typing import (
 
 import gym
 import hydra
+import numpy as np
 import omegaconf
 import stable_baselines3.common.buffers
+import stable_baselines3.common.noise
 import stable_baselines3.common.on_policy_algorithm
 import stable_baselines3.common.off_policy_algorithm
 import stable_baselines3.common.vec_env
@@ -215,6 +217,23 @@ class HydraAgentSpec(AgentSpec):
                 self.agent_cfg["algorithm"]["policy_kwargs"]["net_arch"],
                 self.agent_cfg["algorithm"]["policy_kwargs"]["net_arch"],
             ]
+
+        # To create the ActionNoise object, we need the action space dimensions. Therefore, we cannot create it via
+        # hydra.
+        if "noise_type" in self.agent_cfg.get("algorithm", {}):
+            noise_type_str = self.agent_cfg["algorithm"]["noise_type"]
+            env = env_factory()
+            if noise_type_str == "normal":
+                noise_std = self.agent_cfg["algorithm"]["noise_std"]
+                action_noise = stable_baselines3.common.noise.NormalActionNoise(
+                    mean=np.zeros(env.action_space.shape[0]),
+                    sigma=noise_std * np.ones(env.action_space.shape[0]),
+                )
+                del self.agent_cfg["algorithm"]["noise_type"]
+                del self.agent_cfg["algorithm"]["noise_std"]
+            else:
+                raise ValueError(f"Unknown noise_type: {noise_type_str}.")
+            self.agent_cfg["algorithm"]["action_noise"] = action_noise
 
     def _create_agent(
         self,
