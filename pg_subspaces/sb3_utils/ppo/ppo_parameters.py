@@ -56,17 +56,13 @@ def combine_actor_critic_parameter_vectors(
     return torch.cat(parameters, dim=0)
 
 
-def get_actor_parameter_names(
-    named_parameters: Sequence[Tuple[str, torch.nn.Parameter]]
-) -> List[str]:
+def get_actor_parameter_names(parameter_names: Sequence[str]) -> List[str]:
     return [
         n
-        for n, _ in named_parameters
+        for n in parameter_names
         if "action_net" in n or "policy_net" in n or n == "log_std"
     ]
 
 
-def get_critic_parameter_names(
-    named_parameters: Sequence[Tuple[str, torch.nn.Parameter]]
-) -> List[str]:
-    return [n for n, _ in named_parameters if "value_net" in n]
+def get_critic_parameter_names(parameter_names: Sequence[str]) -> List[str]:
+    return [n for n in parameter_names if "value_net" in n]
