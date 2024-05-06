@@ -15,7 +15,9 @@ class HessianEigenExplicit(HessianEigen):
     def _calculate_top_eigen_policy(
         self, agent: stable_baselines3.ppo.PPO, data: RolloutBufferSamples, min_num: int
     ) -> Eigen:
-        names_policy = get_actor_parameter_names(agent.policy.named_parameters())
+        names_policy = get_actor_parameter_names(
+            [n for n, p in agent.policy.named_parameters()]
+        )
         hess_policy = calculate_hessian(
             agent, lambda a: actor_critic_loss(a, data)[1], names_policy
         )
@@ -28,7 +30,9 @@ class HessianEigenExplicit(HessianEigen):
     def _calculate_top_eigen_vf(
         self, agent: stable_baselines3.ppo.PPO, data: RolloutBufferSamples, min_num: int
     ) -> Eigen:
-        names_vf = get_critic_parameter_names(agent.policy.named_parameters())
+        names_vf = get_critic_parameter_names(
+            [n for n, p in agent.policy.named_parameters()]
+        )
         hess_vf = calculate_hessian(
             agent, lambda a: actor_critic_loss(agent, data)[2], names_vf
         )

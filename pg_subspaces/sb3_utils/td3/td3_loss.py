@@ -4,6 +4,7 @@ import stable_baselines3
 import stable_baselines3.common.buffers
 import torch
 import torch.nn.functional as F
+from torch.nn.utils import stateless
 
 
 def td3_loss(
@@ -35,9 +36,19 @@ def td3_loss(
         F.mse_loss(current_q, target_q_values) for current_q in current_q_values
     )
 
-    # Compute actor loss
-    actor_loss = -agent.critic.q1_forward(
-        replay_data.observations, agent.actor(replay_data.observations)
-    ).mean()
+    # This reparameterization is necessary to make sure that the actor_loss gradients do not affect the critic
+    # gradients. This is not necessary in stable-baselines3 since the gradients of the critic are directly applied and
+    # changes to the critic gradients afterward, thus, have no influence on the updated parameters.
+    with stateless._reparametrize_module(
+        agent.critic,
+        {
+            n: p.detach().clone().requires_grad_(True)
+            for n, p in agent.critic.named_parameters()
+        },
+    ):
+        # Compute actor loss
+        actor_loss = -agent.critic.q1_forward(
+            replay_data.observations, agent.actor(replay_data.observations)
+        ).mean()
 
     return actor_loss + critic_loss, actor_loss, critic_loss
